@@ -64,7 +64,7 @@ anakin_option(USE_BM_PLACE "Select the build mode for BM place." NO)
 
 # plantfrom details
 anakin_option(NVIDIA_GPU "Use NVIDIA GPU place." YES if USE_GPU_PLACE)
-anakin_option(AMD_GPU "Use AMD GPU place." NO if USE_GPU_PLACE AND NOT NVIDIA_GPU)
+anakin_option(AMD_GPU "Use AMD GPU place." YES if USE_GPU_PLACE AND NOT NVIDIA_GPU)
 anakin_option(TARGET_ANDROID "build for android" YES if USE_ARM_PLACE)
 anakin_option(TARGET_IOS "not supported now" YES if USE_ARM_PLACE AND NOT TARGET_ANDROID)
 
@@ -179,7 +179,9 @@ if(USE_X86_PLACE)
 endif()
 
 if(AMD_GPU)
+    set(ANAKIN_TEMP_THIRD_PARTY_PATH ${CMAKE_BINARY_DIR}/third-party)
     include(cmake/amd.cmake)
+    amd_find_boost()
 endif()
 
 # gather all the config options to anakin
