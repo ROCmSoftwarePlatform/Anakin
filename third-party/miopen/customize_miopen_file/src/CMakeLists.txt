@@ -67,7 +67,7 @@ set( MIOpen_Source
 #    find_controls.cpp
 #    load_file.cpp
 #    pooling_api.cpp
-#     kernel_warnings.cpp
+     kernel_warnings.cpp
      logger.cpp
 #    lock_file.cpp
 #    lrn_api.cpp
@@ -386,6 +386,15 @@ set(COPY_HEADERS
     ${PROJECT_SOURCE_DIR}/src/include/miopen/gcn_asm_utils.hpp
     ${PROJECT_SOURCE_DIR}/src/include/miopen/clhelper.hpp
     ${PROJECT_SOURCE_DIR}/src/include/miopen/manage_ptr.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/stringutils.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/kernel_warnings.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/kernel.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/oclkernel.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/each_args.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/errors.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/object.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/rank.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/returns.hpp
 )
 
 foreach(HEADER_NAME ${COPY_HEADERS})
