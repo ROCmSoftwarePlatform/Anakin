@@ -378,3 +378,15 @@ macro(anakin_find_bmlib)
         message(FATAL_ERROR "Could not found bm_lib") 
     endif()
 endmacro()
+
+#find miopengemm
+macro(anakin_find_miopengemm)
+    find_package(miopengemm REQUIRED PATHS /opt/rocm)
+    if(miopengemm_FOUND)
+        set(MIOPENGEMM_FOUND  TRUE)
+        message(STATUS "Found miopengemm: ${miopengemm_INCLUDE_DIR}")
+        include_directories(SYSTEM ${miopengemm_INCLUDE_DIR})
+        list(APPEND ANAKIN_LINKER_LIBS ${miopengemm_LIBRARIES})
+    endif()
+endmacro()
+
