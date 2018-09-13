@@ -107,3 +107,8 @@ if(USE_ARM_PLACE)
         message(FATAL_ERROR " ARM TARGET unknown !")
     endif()
 endif()
+
+# find miopengemm
+if(USE_MIOPENGEMM)
+    anakin_find_miopengemm()
+endif()
