@@ -82,6 +82,7 @@ TEST(TestSaberFunc, test_func_softmax){
             }
         }
     }
+
 // softmax roi test will add later 
 /*
     TestSaberBase<NV,NVHX86,AK_FLOAT,Softmax, SoftmaxParam> testbase1;
@@ -111,6 +112,24 @@ TEST(TestSaberFunc, test_func_softmax){
     }
 */
     LOG(INFO)<<"NV test end.";
+#endif
+
+#ifdef AMD_GPU
+        TestSaberBase<AMD,AMDHX86,AK_FLOAT,Softmax, SoftmaxParam> testbase;
+        for(auto num:{1,3,4,11}){
+            for(auto c:{1,3,11,4}){
+                for(auto h:{3,1,11,4}){
+                    for(auto w:{1,3,4,12}){
+                        for(auto axis:{0,1,2,3}){
+                            SoftmaxParam<AMD> param(axis);
+                            testbase.set_param(param);
+                            testbase.set_input_shape(Shape({num, c, h , w}));
+                            testbase.run_test(softmax_cpu<float, AMD, AMDHX86>); 
+                        }
+                    }
+                }
+            }
+        }
 #endif
 
 #ifdef USE_X86_PLACE
@@ -160,6 +179,9 @@ int main(int argc, const char** argv) {
     // initial logger
     //logger::init(argv[0]);
     InitTest();
+#ifdef AMD_GPU
+    Env<AMD>::env_init();
+#endif
     RUN_ALL_TESTS(argv[0]);
     return 0;
 }
