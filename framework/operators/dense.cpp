@@ -1,5 +1,4 @@
 #include "framework/operators/dense.h"
-
 namespace anakin {
 
 namespace ops {
@@ -85,7 +84,7 @@ template<>
 Status DenseHelper<AMD, Precision::FP32>::Init(OpContext<AMD> &ctx,\
         const std::vector<Tensor4dPtr<AMD> >& ins, \
                 std::vector<Tensor4dPtr<AMD> >& outs) {
-    SABER_CHECK(_funcs_dense.init(ins, outs, _param_dense, SPECIFY, VENDER_IMPL, ctx));
+    SABER_CHECK(_funcs_dense.init(ins, outs, _param_dense, SPECIFY, SABER_IMPL, ctx));
     return Status::OK();
 }
 ANAKIN_REGISTER_OP_HELPER(Dense, DenseHelper, AMD, Precision::FP32);
