@@ -23,6 +23,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem.hpp>
 #include <openssl/md5.h>
+#include <miopen/db.hpp>
 
 namespace anakin {
 namespace saber {
@@ -42,6 +43,8 @@ std::string
 LoadBinaryPath(const std::string& device, const std::string& name, const std::string& args);
 
 std::string LoadFile(const std::string& s);
+std::string md5(std::string s);
+miopen::Db GetDb(std::string device_name, int max_CU);
 
 } // namespace saber
 } // namespace anakin

@@ -17,6 +17,7 @@
 #include <vector>
 #include <string>
 #include "amd_logger.h"
+#include <miopen/kernel_info.hpp>
 
 namespace anakin {
 namespace saber {
@@ -60,6 +61,10 @@ struct KernelInfo {
     KernelInfo& operator=(KernelInfo* right) {
         ALOGD("assign KerneInfo *");
         clone(right);
+    };
+    KernelInfo& operator=(miopen::solver::KernelInfo& right) {
+        ALOGD("assign KerneInfo *");
+        clone(&right);
     };
 
     void printE() {
@@ -112,6 +117,18 @@ private:
         kernel_file.assign(ki->kernel_file);
         kernel_name.assign(ki->kernel_name);
         kernel_type = ki->kernel_type;
+    }
+
+    void clone(miopen::solver::KernelInfo* ki)
+    {
+        comp_options.assign(ki->comp_options);
+        wk_dim = ki->g_wk.size();
+        copy_vector(&l_wk, &ki->l_wk);
+        copy_vector(&g_wk, &ki->g_wk);
+        //copy_vector(&g_wk_offset, &ki->g_wk_offset);
+        kernel_file.assign(ki->kernel_file);
+        kernel_name.assign(ki->kernel_name);
+        kernel_type = MIOPEN;
     }
 };
 

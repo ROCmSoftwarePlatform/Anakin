@@ -96,6 +96,9 @@ public:
 
         return run(cm, wait_events_num, wait_events, event);
     }
+
+    std::string GetName();
+
     ~OCLKernel() {}
 
 private:

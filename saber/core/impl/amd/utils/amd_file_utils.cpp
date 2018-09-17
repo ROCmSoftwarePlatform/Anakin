@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "amd_file_utils.h"
+#include <miopen/db_path.hpp>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -91,6 +92,16 @@ std::string LoadFile(const std::string& s) {
     std::stringstream buffer;
     buffer << t.rdbuf();
     return buffer.str();
+}
+
+miopen::Db GetDb(std::string device_name, int max_CU)
+{
+    auto p = boost::filesystem::path{ReplaceString(miopen::GetDbPath(), "~", getenv("HOME"))};
+    if(!boost::filesystem::exists(p))
+        boost::filesystem::create_directories(p);
+    std::string dbFileName =
+        p.string() + "/" + device_name + "_" + std::to_string(max_CU) + ".cd.pad.txt";
+    return {dbFileName};
 }
 } // namespace saber
 } // namespace anakin

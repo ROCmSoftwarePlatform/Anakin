@@ -158,7 +158,13 @@ bool BuildProgram(cl_program program, cl_device_id device_id, KernelInfo* ki) {
         AMD_LOGE("Failed to Build Program, cl_program is not initialized.");
         return false;
     }
-    cl_int errNum = clBuildProgram(program, 1, &device_id, ki->comp_options.c_str(), NULL, NULL);
+    cl_int errNum;
+    auto is_asm = miopen::EndsWith(ki->kernel_file, ".s");
+    if (is_asm) {
+        clBuildProgram(program, 1, &device_id, "", NULL, NULL);
+    } else {
+        errNum = clBuildProgram(program, 1, &device_id, ki->comp_options.c_str(), NULL, NULL);
+    }
     if (errNum != CL_SUCCESS) {
         char buildErrLog[MAX_LOG_LENGTH];
         clGetProgramBuildInfo(
@@ -357,6 +363,11 @@ bool OCLKernel::run(
         return false;
     }
     return true;
+}
+
+std::string OCLKernel::GetName()
+{
+    return kernel_info.kernel_name;
 }
 
 #endif

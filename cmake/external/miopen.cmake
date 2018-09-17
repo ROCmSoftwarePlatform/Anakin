@@ -47,6 +47,46 @@ ExternalProject_Add_Step(
     LOG               1
 )
 
+ExternalProject_Add_Step(
+    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_3
+    DEPENDEES         download
+    DEPENDERS         build
+    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/ -name *.cpp -exec cp {} ${MIOPEN_SOURCE_DIR}/src \\$<SEMICOLON>
+    ALWAYS            1
+    EXCLUDE_FORM_MAIN 1
+    LOG               1
+)
+
+ExternalProject_Add_Step(
+    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_4
+    DEPENDEES         download
+    DEPENDERS         build
+    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/include/miopen/ -name *.hpp -exec cp {} ${MIOPEN_SOURCE_DIR}/src/include/miopen \\$<SEMICOLON>
+    ALWAYS            1
+    EXCLUDE_FORM_MAIN 1
+    LOG               1
+)
+
+ExternalProject_Add_Step(
+    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_5
+    DEPENDEES         download
+    DEPENDERS         build
+    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/solver/ -name *.cpp -exec cp {} ${MIOPEN_SOURCE_DIR}/src/solver \\$<SEMICOLON>;
+    ALWAYS            1
+    EXCLUDE_FORM_MAIN 1
+    LOG               1
+)
+
+ExternalProject_Add_Step(
+    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_6
+    DEPENDEES         download
+    DEPENDERS         build
+    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/ocl/ -name *.cpp -exec cp {} ${MIOPEN_SOURCE_DIR}/src/ocl/ \\$<SEMICOLON>;
+    ALWAYS            1
+    EXCLUDE_FORM_MAIN 1
+    LOG               1
+)
+
 include_directories(${MIOPEN_INSTALL_ROOT}/include)
 add_library(miopen SHARED IMPORTED GLOBAL)
 SET_PROPERTY(TARGET miopen PROPERTY IMPORTED_LOCATION ${MIOPEN_LIB})

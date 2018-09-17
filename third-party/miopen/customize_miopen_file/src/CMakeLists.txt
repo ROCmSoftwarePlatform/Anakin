@@ -62,14 +62,14 @@ set( MIOpen_Source
 #    convolution.cpp
 #    convolution_api.cpp
 #    convolution_fft.cpp
-#    db.cpp
-#    db_record.cpp
-#    find_controls.cpp
+    db.cpp
+    db_record.cpp
+    find_controls.cpp
 #    load_file.cpp
 #    pooling_api.cpp
      kernel_warnings.cpp
      logger.cpp
-#    lock_file.cpp
+    lock_file.cpp
 #    lrn_api.cpp
 #    activ_api.cpp
 #    handle_api.cpp
@@ -80,23 +80,23 @@ set( MIOpen_Source
 #    rnn_api.cpp
     temp_file.cpp
 #    include/miopen/temp_file.hpp
-#    include/miopen/db.hpp
-#    include/miopen/db_record.hpp
-#    include/miopen/lock_file.hpp
-#    include/miopen/find_controls.hpp
+    include/miopen/db.hpp
+    include/miopen/db_record.hpp
+    include/miopen/lock_file.hpp
+    include/miopen/find_controls.hpp
 #    include/miopen/batch_norm.hpp
 #    include/miopen/check_numerics.hpp
 #    include/miopen/common.hpp
 #    include/miopen/convolution.hpp
 #    include/miopen/convolution_fft.hpp
     include/miopen/errors.hpp
-#    include/miopen/handle.hpp
-#    include/miopen/kernel_cache.hpp
-#    include/miopen/solver.hpp
-#    include/miopen/generic_search.hpp
+    include/miopen/handle.hpp
+    include/miopen/kernel_cache.hpp
+    include/miopen/solver.hpp
+    include/miopen/generic_search.hpp
 #    include/miopen/mlo_internal.hpp
 #    include/miopen/mlo_utils.hpp
-#    include/miopen/oclkernel.hpp
+    include/miopen/oclkernel.hpp
 #    include/miopen/tensor.hpp
 #    include/miopen/tensor_ops.hpp
 #    include/miopen/pooling.hpp
@@ -107,28 +107,28 @@ set( MIOpen_Source
 #    tensor.cpp
 #    tensor_api.cpp
 #    solver.cpp
-#    solver/conv_asm_3x3u.cpp
-#    solver/conv_asm_1x1u.cpp
-#    solver/conv_asm_5x10u2v2f1.cpp
-#    solver/conv_asm_5x10u2v2b1.cpp
-#    solver/conv_asm_7x7c3h224w224k64u2v2p3q3f1.cpp
+    solver/conv_asm_3x3u.cpp
+    solver/conv_asm_1x1u.cpp
+    solver/conv_asm_5x10u2v2f1.cpp
+    solver/conv_asm_5x10u2v2b1.cpp
+    solver/conv_asm_7x7c3h224w224k64u2v2p3q3f1.cpp
 #    solver/conv_asm_dir_BwdWrW3x3.cpp
 #    solver/conv_asm_dir_BwdWrW1x1.cpp
-#    solver/conv_bin_wino3x3U.cpp
-#    solver/conv_bin_winoRxS.cpp
+    solver/conv_bin_wino3x3U.cpp
+    solver/conv_bin_winoRxS.cpp
 #    solver/conv_ocl_dir2D_bwdWrW_2.cpp
 #    solver/conv_ocl_dir2D_bwdWrW_53.cpp
 #    solver/conv_ocl_dir2D_bwdWrW_1x1.cpp
-#    solver/conv_ocl_dir2Dfwdgen.cpp
-#    solver/conv_ocl_dir2D11x11.cpp
-#    solver/conv_ocl_dir2D3x3.cpp
-#    solver/conv_ocl_dir2Dfwd_exhaustive_search.cpp
-#    solver/conv_ocl_dir2Dfwd.cpp
-#    solver/conv_ocl_dir2Dfwd1x1.cpp
+    solver/conv_ocl_dir2Dfwdgen.cpp
+    solver/conv_ocl_dir2D11x11.cpp
+    solver/conv_ocl_dir2D3x3.cpp
+    solver/conv_ocl_dir2Dfwd_exhaustive_search.cpp
+    solver/conv_ocl_dir2Dfwd.cpp
+    solver/conv_ocl_dir2Dfwd1x1.cpp
     )
 
 #list(APPEND MIOpen_Source tmp_dir.cpp binary_cache.cpp md5.cpp)
-list(APPEND MIOpen_Source tmp_dir.cpp)
+list(APPEND MIOpen_Source tmp_dir.cpp md5.cpp)
 
 if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_BACKEND STREQUAL "HIP")
     set(MIOPEN_KERNEL_INCLUDES
@@ -225,7 +225,7 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
 #        ocl/utilocl.cpp
         ocl/gcn_asm_utils.cpp
 #        pooling.cpp
-#        ${PROJECT_BINARY_DIR}/db_path.cpp
+        db_path.cpp
         ${PROJECT_BINARY_DIR}/kernel.cpp
         )
 endif()
@@ -240,8 +240,8 @@ endif()
 
 if( MIOPEN_BACKEND STREQUAL "OpenCL" )
     list(APPEND MIOpen_Source
-#        ocl/handleocl.cpp
-#        ocl_kernel.cpp
+        ocl/handleocl.cpp
+        ocl_kernel.cpp
         ocl/oclerrors.cpp
         ocl/clhelper.cpp
     )
@@ -395,6 +395,23 @@ set(COPY_HEADERS
     ${PROJECT_SOURCE_DIR}/src/include/miopen/object.hpp
     ${PROJECT_SOURCE_DIR}/src/include/miopen/rank.hpp
     ${PROJECT_SOURCE_DIR}/src/include/miopen/returns.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/solver.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/logger.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/find_controls.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/db.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/db_record.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/db_path.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/lock_file.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/mlo_internal.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/legacy_exhaustive_search.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/env.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/type_name.hpp
+    ${PROJECT_SOURCE_DIR}/include/miopen/miopen.h
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/allocator.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/handle.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/common.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/serializable.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/kernel_info.hpp
 )
 
 foreach(HEADER_NAME ${COPY_HEADERS})
