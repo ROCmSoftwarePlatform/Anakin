@@ -119,16 +119,15 @@ private:
         kernel_type = ki->kernel_type;
     }
 
-    void clone(miopen::solver::KernelInfo* ki)
-    {
+    void clone(miopen::solver::KernelInfo* ki) {
         comp_options.assign(ki->comp_options);
         wk_dim = ki->g_wk.size();
         copy_vector(&l_wk, &ki->l_wk);
         copy_vector(&g_wk, &ki->g_wk);
-        //copy_vector(&g_wk_offset, &ki->g_wk_offset);
+        // copy_vector(&g_wk_offset, &ki->g_wk_offset);
         kernel_file.assign(ki->kernel_file);
         kernel_name.assign(ki->kernel_name);
-        kernel_type = MIOPEN;
+        kernel_type = ki->isMIOpenKernel ? MIOPEN : SABER;
     }
 };
 

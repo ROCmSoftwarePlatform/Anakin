@@ -130,7 +130,7 @@ void conv_pool_cpu_func(const std::vector<Tensor<TargetType_H>*>& input,
 
 
 template <typename TargetType, typename TargetType_H>
-void test_conv_eltwise() {
+void test_conv_pooling() {
     Env<TargetType>::env_init();
     Env<TargetType_H>::env_init();
     TestSaberBase<TargetType, TargetType_H, AK_FLOAT, ConvPooling, ConvPoolingParam> testbase;
@@ -198,9 +198,12 @@ void test_conv_eltwise() {
 TEST(TestSaberFunc, test_saber_conv_results) {
 
     #ifdef USE_CUDA
-    test_conv_eltwise<NV, NVHX86>();
+    test_conv_pooling<NV, NVHX86>();
     #endif
 
+    #ifdef AMD_GPU
+    test_conv_pooling<AMD, AMDHX86>();
+    #endif
 }
 int main(int argc, const char** argv) {
     // initial logger

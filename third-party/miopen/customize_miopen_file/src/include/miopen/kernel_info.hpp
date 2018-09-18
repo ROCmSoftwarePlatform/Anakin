@@ -11,22 +11,20 @@
 #include <string>
 #include <vector>
 
-namespace miopen{
-namespace solver{
+namespace miopen {
+namespace solver {
 
-struct KernelInfo
-{
+struct KernelInfo {
     std::string comp_options;
     std::vector<size_t> l_wk;
     std::vector<size_t> g_wk;
     std::string kernel_file;
     std::string kernel_name;
     friend std::ostream& operator<<(std::ostream& os, const KernelInfo& k);
+    bool isMIOpenKernel = true;
 };
 
-}
-}
-
-
+} // namespace solver
+} // namespace miopen
 
 #endif /* SABER_FUNCS_IMPL_AMD_KERNEL_INFO_HPP_ */

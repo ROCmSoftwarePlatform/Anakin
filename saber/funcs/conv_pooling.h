@@ -25,6 +25,9 @@
 #include "saber/funcs/impl/cuda/saber_conv_pooling.h"
 #endif
 
+#ifdef AMD_GPU
+#include "saber/funcs/impl/amd/include/saber_conv_pooling.h"
+#endif
 namespace anakin {
 namespace saber {
 

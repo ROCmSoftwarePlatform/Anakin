@@ -111,7 +111,8 @@ using mlo_kernel_info = std::tuple<const std::string,
 //#include <miopen/db_path.hpp>
 //#include <miopen/db.hpp>
 
-
+#define MLO_POOLING_OP_AVE 0
+#define MLO_POOLING_OP_MAX 1
 
 inline int mloLg2(int v)
 {
@@ -243,6 +244,24 @@ struct ProblemDescription
     }
 };
 
+struct PoolingContext
+{
+    int batch_sz;
+    int n_inputs;
+    int in_height;
+    int in_width;
+    int n_outputs;
+    int out_height;
+    int out_width;
+    int pooling_type;
+    int pad1;
+    int pad0;
+    int kernel_size1;
+    int kernel_size0;
+    int kernel_stride1;
+    int kernel_stride0;
+};
+
 /// A leftover of the legacy design, houses problem config,
 /// environmental context (e.g. HW/SW platform) and solver-specific state.
 ///
@@ -258,6 +277,9 @@ struct ConvolutionContext : ProblemDescription
     bool use_binaries                      = true;
     rocm_meta_version rmv                  = rocm_meta_version::Default;
     bool workaround_disable_search_enforce = false;
+    bool has_active;
+    bool has_pooling;
+    PoolingContext poolingContext;
 
     inline Handle& GetStream() const { return *_stream; }
     inline void SetStream(Handle* stream) { _stream = stream; }
