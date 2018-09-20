@@ -194,9 +194,15 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         kernels/conv_3x3_wheel_alpha_v9_0_15_stride_2_dil_gfx906_md10.so
         kernels/conv_3x3_wheel_alpha_v9_0_15_stride_2_dec_gfx906_md10.so
         kernels/conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10.so
+        kernels/conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias.so
+        kernels/conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_prelu.so
+        kernels/conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu.so
         kernels/conv_3x3_wheel_alpha_v7_0_3b_gfx906_md10.so
         kernels/conv_3x3_wheel_alpha_v7_0_3b_gfx900.so
         kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_md10.so
+        kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias.so
+        kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_md10_prelu.so
+        kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu.so
         kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_m30.so
         kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_m21.so
         kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_m10.so

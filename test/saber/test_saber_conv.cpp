@@ -82,6 +82,11 @@ TEST(TestSaberFunc, test_saber_conv_results) {
     Env<X86>::env_init();
     TestSaberBase<X86, X86, AK_FLOAT, Conv, ConvParam> testbase_x86;
 #endif
+#ifdef AMD_GPU
+    TestSaberBase<AMD, AMDHX86, AK_FLOAT, Conv, ConvParam> testbase_amd;
+    Env<AMD>::env_init();
+    Env<AMDHX86>::env_init();
+#endif
     std::vector<int> kernel_h_v{1, 3};
     std::vector<int> kernel_w_v{1, 3};
     std::vector<int> pad_h_v{0, 1};
@@ -153,6 +158,25 @@ TEST(TestSaberFunc, test_saber_conv_results) {
             param_x86.activation_param = ActivationParam<X86>(Active_relu);
         }
 #endif
+#ifdef AMD_GPU
+        Tensor<AMD> weights_dev;
+        Tensor<AMD> bias_dev;
+
+        weights_dev.re_alloc(weights_s, AK_FLOAT);
+        fill_tensor_rand(weights_dev, -5.f, 5.0f);
+        if (bias_term) {
+            bias_dev.re_alloc(bias_s, AK_FLOAT);
+            fill_tensor_rand(bias_dev, -5.0f, 5.0f);
+        }
+        ConvParam<AMD> param_amd(group, pad_h, pad_w,
+                               stride_h, stride_w,
+                               dilation_h, dilation_w,
+                               &weights_dev, &bias_dev);
+        if (with_relu) {
+            param_amd.activation_param = ActivationParam<AMD>(Active_relu);
+        }
+#endif
+
         for (auto input_num : input_num_v)
         for (auto height : in_h_v)
         for (auto width : in_w_v) {
@@ -169,7 +193,13 @@ TEST(TestSaberFunc, test_saber_conv_results) {
                                                Layout_NCHW));//add some input shape
             testbase_x86.run_test(conv_cpu_func<float, X86, X86>, 1e-3);//run test
 #endif
-        }
+#ifdef AMD_GPU
+            testbase_amd.set_param(param_amd);//set param
+            testbase_amd.set_input_shape(Shape({input_num,in_channels,height,width},
+                                              Layout_NCHW));//add some input shape
+            testbase_amd.run_test(conv_cpu_func<float, AMD, AMDHX86>, 1e-3);//run test
+#endif
+       }
     }
 }
 int main(int argc, const char** argv) {

@@ -119,8 +119,16 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
             kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_m21.so";
         else if(params.rmv == rocm_meta_version::V3)
             kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_m30.so";
-        else if(params.rmv == rocm_meta_version::AMDHSA_1_0)
-            kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10.so";
+        else if(params.rmv == rocm_meta_version::AMDHSA_1_0) {
+            if (params.has_active && params.bias)
+                kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu.so";
+            else if (params.has_active && !params.bias)
+                kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_prelu.so";
+            else if (!params.has_active && params.bias)
+                kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias.so";
+            else
+                kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10.so";
+        }
         else
             MIOPEN_THROW("conv_3x3_wheel_alpha_v3_0b_gfx803: Unsupported metadata version.");
     }
@@ -128,8 +136,16 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
     {
         if(params.rmv == rocm_meta_version::V3)
             kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900.so";
-        else if(params.rmv == rocm_meta_version::AMDHSA_1_0)
-            kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10.so";
+        else if(params.rmv == rocm_meta_version::AMDHSA_1_0) {
+            if (params.has_active && params.bias)
+                kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu.so";
+            else if (params.has_active && !params.bias)
+                kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_prelu.so";
+            else if (!params.has_active && params.bias)
+                kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias.so";
+            else
+                kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10.so";
+        }
         else
             MIOPEN_THROW("conv_3x3_wheel_alpha_v7_0_3b_gfx900: Unsupported metadata version.");
     }

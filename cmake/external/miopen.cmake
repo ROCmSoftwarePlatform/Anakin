@@ -87,6 +87,25 @@ ExternalProject_Add_Step(
     LOG               1
 )
 
+ExternalProject_Add_Step(
+    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_7
+    DEPENDEES         download
+    DEPENDERS         build
+    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/kernels/ -name *.cl -exec cp {} ${MIOPEN_SOURCE_DIR}/src/kernels/ \\$<SEMICOLON>;
+    ALWAYS            1
+    EXCLUDE_FORM_MAIN 1
+    LOG               1
+)
+
+ExternalProject_Add_Step(
+    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_8
+    DEPENDEES         download
+    DEPENDERS         build
+    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/kernels/ -name *.so -exec cp {} ${MIOPEN_SOURCE_DIR}/src/kernels/ \\$<SEMICOLON>;
+    ALWAYS            1
+    EXCLUDE_FORM_MAIN 1
+    LOG               1
+)
 include_directories(${MIOPEN_INSTALL_ROOT}/include)
 add_library(miopen SHARED IMPORTED GLOBAL)
 SET_PROPERTY(TARGET miopen PROPERTY IMPORTED_LOCATION ${MIOPEN_LIB})
