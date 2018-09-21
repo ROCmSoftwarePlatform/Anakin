@@ -48,6 +48,12 @@ template class OutputHelper<ARM, Precision::FP32>;
 ANAKIN_REGISTER_OP_HELPER(Output, OutputHelper, ARM, Precision::FP32);
 #endif //arm
 
+#ifdef AMD_GPU
+INSTANCE_OUTPUT(AMD, Precision::FP32);
+template class OutputHelper<AMD, Precision::FP32>;
+ANAKIN_REGISTER_OP_HELPER(Output, OutputHelper, AMD, Precision::FP32);
+#endif
+
 //! register op
 ANAKIN_REGISTER_OP(Output)
 #ifdef USE_CUDA
@@ -58,6 +64,9 @@ ANAKIN_REGISTER_OP(Output)
 #endif
 #ifdef USE_X86_PLACE
 .__alias__<X86, Precision::FP32>("output")
+#endif
+#ifdef AMD_GPU
+.__alias__<AMD, Precision::FP32>("output")
 #endif
 .Doc("Output operator [ only a input data holder and reshape ] ");
 
