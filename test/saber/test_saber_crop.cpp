@@ -75,6 +75,11 @@ TEST(TestSaberFunc, test_func_crop) {
     TestSaberBase<X86,X86,AK_FLOAT,Crop,CropParam> testbase_x86;
     LOG(INFO)<<"ENVEND";
 #endif
+#ifdef AMD_GPU
+    Env<AMD>::env_init();
+    TestSaberBase<AMD,AMDHX86,AK_FLOAT,Crop,CropParam> testbase_amd;
+    LOG(INFO)<<"ENVEND";
+#endif
     //combine param by yourself
     std::vector<int> offset = {2, 2};
     std::vector<int> shape = {1, 3, 4, 5};
@@ -82,7 +87,7 @@ TEST(TestSaberFunc, test_func_crop) {
                     for(int h_in: {32,64,128,512}){
                         for(int ch_in:{3,8,16,32}){
                             for(int num_in:{1,2,32,64}){
-                            	#ifdef USE_CUDA
+                                #ifdef USE_CUDA
                                 //make param
                                 CropParam<NV> param_nv( /*axis_in*/2, /*offset*/offset, /*shape_in*/shape);
                                 //testbase test
@@ -99,6 +104,15 @@ TEST(TestSaberFunc, test_func_crop) {
                                 //testbase.set_rand_limit(255,255);
                                 testbase_x86.set_input_shape(Shape({num_in,ch_in,h_in,w_in}));
                                 testbase_x86.run_test(norm_cpu_nchw<float,X86,X86>);//run test  
+                                #endif
+                                #ifdef AMD_GPU
+                                //make param
+                                CropParam<AMD> param_amd( /*axis_in*/2, /*offset*/offset, /*shape_in*/shape);
+                                //testbase test
+                                testbase_amd.set_param(param_amd);//set param
+                                //testbase.set_rand_limit(255,255);
+                                testbase_amd.set_input_shape(Shape({num_in,ch_in,h_in,w_in}));
+                                testbase_amd.run_test(norm_cpu_nchw<float,AMD,AMDHX86>);//run test 
                                 #endif
                             }
                         }
