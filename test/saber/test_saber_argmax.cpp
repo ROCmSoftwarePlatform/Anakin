@@ -21,9 +21,9 @@ int test_iter = 10;
 bool compare_result = true;
 bool get_time = false;
 
-//void argmax_nv_basic(Tensor<NVHX86>& tensor_in, Tensor<NVHX86>& tensor_out, ArgmaxParam<NV> param){
+//void argmax_amd_basic(Tensor<AMDHX86>& tensor_in, Tensor<AMDHX86>& tensor_out, ArgmaxParam<AMD> param){
 template <typename dtype, typename TargetType_D, typename TargetType_H>
-void argmax_nv_basic(const std::vector<Tensor<TargetType_H>*>& tensor_in,std::vector<Tensor<TargetType_H>*>& tensor_out,ArgmaxParam<TargetType_D>& param){
+void argmax_basic(const std::vector<Tensor<TargetType_H>*>& tensor_in,std::vector<Tensor<TargetType_H>*>& tensor_out,ArgmaxParam<TargetType_D>& param){
     int num = tensor_in[0]->num();
     int channel = tensor_in[0]->channel();
     int height = tensor_in[0]->height();
@@ -142,7 +142,7 @@ void test_model(){
            // test_argmax<TargetD, TargetH, OpType>(shape, param);
             testbase.set_param(param);//set param
             testbase.set_input_shape(shape);//add some input shape
-            testbase.run_test(argmax_nv_basic<float, TargetType_D, TargetType_H>);//run test
+            testbase.run_test(argmax_basic<float, TargetType_D, TargetType_H>);//run test
                                
         }
     }
@@ -159,6 +159,10 @@ TEST(TestSaberFunc, test_func_argmax) {
 #ifdef USE_X86_PLACE
     //Env<X86>::env_init();
     test_model<AK_FLOAT, X86, X86>();
+#endif
+#ifdef AMD_GPU
+    Env<AMD>::env_init();
+    test_model<AK_FLOAT, AMD, AMDHX86>();
 #endif
 }
 
