@@ -196,7 +196,8 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
     for (int i = 0; i < _kernels_ptr.size(); i++) {
         if ((_kernels_ptr[i].get()->GetName() == "MIOpenConvUni")
             || (_kernels_ptr[i].get()->GetName() == "MIOpenConv1x1")
-            || (_kernels_ptr[i].get()->GetName() == "MIOpenConv1x1pquv"))
+            || (_kernels_ptr[i].get()->GetName() == "MIOpenConv1x1pquv")
+            || (_kernels_ptr[i].get()->GetName() == "MIOpenCvD3x3_WSR0"))
         {
             memObjects[0] = (PtrDtype)inputs[0]->data();
             memObjects[1] = (PtrDtype)param.weight()->data();
