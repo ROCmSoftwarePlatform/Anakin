@@ -169,7 +169,7 @@ struct ProblemDescription
     int kernel_dilation1 = 0;
     int bias             = 0;
     std::string in_layout;
-    std::string in_data_type;
+    std::string in_data_type{"FP32"};
     std::string weights_layout;
     std::string out_data_type;
     std::string out_layout;

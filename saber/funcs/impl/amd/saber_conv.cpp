@@ -68,16 +68,16 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
     convContext.n_inputs                = inputs[0]->channel();
     convContext.in_height               = inputs[0]->height();
     convContext.in_width                = inputs[0]->width();
-    convContext.kernel_size1            = param.weight()->width();
-    convContext.kernel_size0            = param.weight()->height();
+    convContext.kernel_size0            = param.weight()->width();
+    convContext.kernel_size1            = param.weight()->height();
     convContext.n_outputs               = param.weight()->num();
     convContext.out_height              = outputs[0]->height();
     convContext.out_width               = outputs[0]->width();
     convContext.batch_sz                = inputs[0]->num();
     convContext.pad0                    = param.pad_w;
     convContext.pad1                    = param.pad_h;
-    convContext.kernel_stride0          = param.stride_h;
-    convContext.kernel_stride1          = param.stride_w;
+    convContext.kernel_stride0          = param.stride_w;
+    convContext.kernel_stride1          = param.stride_h;
     convContext.kernel_dilation0        = param.dilation_w;
     convContext.kernel_dilation1        = param.dilation_h;
     convContext.bias                    = (param.bias()->size() > 0) ? 1 : 0;
@@ -194,7 +194,10 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
     ALOGD("kernel size:" << _kernels_ptr.size() << " name:" << _kernels_ptr[0].get()->GetName());
 
     for (int i = 0; i < _kernels_ptr.size(); i++) {
-        if (_kernels_ptr[i].get()->GetName() == "MIOpenConvUni") {
+        if ((_kernels_ptr[i].get()->GetName() == "MIOpenConvUni")
+            || (_kernels_ptr[i].get()->GetName() == "MIOpenConv1x1")
+            || (_kernels_ptr[i].get()->GetName() == "MIOpenConv1x1pquv"))
+        {
             memObjects[0] = (PtrDtype)inputs[0]->data();
             memObjects[1] = (PtrDtype)param.weight()->data();
             memObjects[2] = (isBias) ? (PtrDtype)param.bias()->data() : nullptr;
@@ -238,9 +241,9 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                 return SaberInvalidValue;
             }
             list.push_back(_kernels_ptr[i]);
-        } else if (_kernels_ptr[i].get()->GetName() == "MIOpenConv1x1") {
-            // todo
-        } else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConv3x3F") {
+        }
+        else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConv3x3F")
+        {
             int d_n_groups = 64, d_flags = 0;
             memObjects[0] = (PtrDtype)inputs[0]->data();
             memObjects[1] = (PtrDtype)param.weight()->data();
@@ -266,7 +269,9 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                 return SaberInvalidValue;
             }
             list.push_back(_kernels_ptr[i]);
-        } else {
+        }
+        else
+        {
             ALOGD("Not implement kernel name:" << _kernels_ptr[i].get()->GetName());
         }
     }
