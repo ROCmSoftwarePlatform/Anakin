@@ -94,6 +94,10 @@ TEST(TestSaberFunc, test_func_pool)
 #ifdef USE_CUDA
     test_pad<NV, NVHX86, AK_FLOAT>();
 #endif
+#ifdef AMD_GPU
+    Env<AMD>::env_init();
+    test_pad<AMD, AMDHX86, AK_FLOAT>();
+#endif
 }
 
 int main(int argc, const char** argv) {
