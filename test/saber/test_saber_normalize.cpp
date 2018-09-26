@@ -14,7 +14,6 @@ using namespace anakin::saber;
  */
 template <typename dtype,typename TargetType_D,typename TargetType_H>
 void norm_cpu_func(const std::vector<Tensor<TargetType_H>*>& input,std::vector<Tensor<TargetType_H>*>& output,NormalizeParam<TargetType_D>& param) {
-    
     int p=param.p;
     bool across_spatial=param.across_spatial;
     bool has_scale=param.has_scale;
@@ -143,7 +142,6 @@ void test_normalize(){
     for (bool sp_flag : {false}){
         for (bool channel_flag : {false,true}) {
             for (int p : {1, 2}) {
-                
                 for(int w_in:{32, 64}){
                     for(int h_in: {32, 64}){
                         for(int ch_in:{3, 8}){
@@ -189,6 +187,10 @@ TEST(TestSaberFunc, test_func_normalize) {
 #endif
 #ifdef USE_X86_PLACE
     test_normalize<X86, X86, AK_FLOAT>();
+#endif
+#ifdef AMD_GPU
+    Env<AMD>::env_init();
+    test_normalize<AMD, AMDHX86, AK_FLOAT>();
 #endif
 }
 
