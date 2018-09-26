@@ -76,6 +76,41 @@ TEST(TestSaberFunc, test_op_embedding) {
     }
 
 #endif 
+#ifdef AMD_GPU
+    TestSaberBase<AMD, AMDHX86, AK_FLOAT, Embedding, EmbeddingParam> testbase0;
+    Tensor<AMDHX86> weight_h0(weights_s);
+    Tensor<AMD> weight_d0(weights_s);
+    fill_tensor_rand(weight_h0, -0.5, 0.5);
+    weight_d0.copy_from(weight_h0);
+
+    EmbeddingParam<AMD> param0(word_num, emb_dim, padding_idx, &weight_d0);
+    testbase0.set_param(param0);
+
+
+    //test for nchw
+    for(int w_in : {32,64}) {
+        for(int h_in : {32, 64}){
+            for(int ch_in : {3, 8}){
+                for(int num_in:{1, 2}){
+                    testbase0.set_rand_limit(1, 128); //random interval [1, 128].
+                    testbase0.set_input_shape(Shape({num_in, ch_in, h_in, w_in}));
+                    testbase0.run_test(embedding_cpu_base<float, AMD, AMDHX86>);//run test
+                }
+            }
+        }
+    }
+
+    //test for nc
+    for(int ch_in : {3, 8, 16, 64}){
+        for(int num_in:{1, 2, 32, 64}){
+            testbase0.set_rand_limit(1, 128);
+            testbase0.set_input_shape(Shape({num_in, ch_in}, Layout_HW));
+            testbase0.run_test(embedding_cpu_base<float, AMD, AMDHX86>);//run test
+        }
+    }
+
+#endif
+
 
 #ifdef USE_CUDA
     TestSaberBase<NV, NVHX86, AK_FLOAT, Embedding, EmbeddingParam> testbase0;
@@ -120,6 +155,9 @@ int main(int argc, const char** argv) {
     //logger::init(argv[0]);
     
     InitTest();
+#ifdef AMD_GPU
+    Env<AMD>::env_init();
+#endif
     RUN_ALL_TESTS(argv[0]);
     
     return 0;
