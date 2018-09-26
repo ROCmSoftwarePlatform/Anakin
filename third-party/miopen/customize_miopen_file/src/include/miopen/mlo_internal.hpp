@@ -277,8 +277,9 @@ struct ConvolutionContext : ProblemDescription
     bool use_binaries                      = true;
     rocm_meta_version rmv                  = rocm_meta_version::Default;
     bool workaround_disable_search_enforce = false;
-    bool has_active;
-    bool has_pooling;
+    bool has_active                        = false;
+    float negative_slope                   = 0.0f;
+    bool has_pooling                       = false;
     PoolingContext poolingContext;
 
     inline Handle& GetStream() const { return *_stream; }

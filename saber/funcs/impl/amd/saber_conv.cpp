@@ -65,33 +65,50 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
     miopen::ConvolutionContext convContext;
     convContext.direction.Set(1);
     convContext.general_compile_options += "";
-    convContext.n_inputs                = inputs[0]->channel();
-    convContext.in_height               = inputs[0]->height();
-    convContext.in_width                = inputs[0]->width();
-    convContext.kernel_size0            = param.weight()->width();
-    convContext.kernel_size1            = param.weight()->height();
-    convContext.n_outputs               = param.weight()->num();
-    convContext.out_height              = outputs[0]->height();
-    convContext.out_width               = outputs[0]->width();
-    convContext.batch_sz                = inputs[0]->num();
-    convContext.pad0                    = param.pad_w;
-    convContext.pad1                    = param.pad_h;
-    convContext.kernel_stride0          = param.stride_w;
-    convContext.kernel_stride1          = param.stride_h;
-    convContext.kernel_dilation0        = param.dilation_w;
-    convContext.kernel_dilation1        = param.dilation_h;
-    convContext.bias                    = (param.bias()->size() > 0) ? 1 : 0;
-    convContext.float_size              = 32;
-    convContext.in_stride               = inputs[0]->get_stride()[2];
-    convContext.out_stride              = outputs[0]->get_stride()[2];
-    convContext.in_channel_stride       = convContext.in_stride * convContext.in_height;
-    convContext.in_batch_stride         = convContext.in_channel_stride * convContext.n_inputs;
-    convContext.out_channel_stride      = convContext.out_stride * convContext.out_height;
-    convContext.out_batch_stride        = convContext.out_channel_stride * convContext.n_outputs;
-    convContext.has_active              = param.activation_param.has_active ? 1 : 0;
-    convContext.rmv                     = rocm_meta_version::AMDHSA_1_0;
-    convContext.use_binaries            = true;
-    convContext.in_layout               = "NCHW";
+    convContext.n_inputs           = inputs[0]->channel();
+    convContext.in_height          = inputs[0]->height();
+    convContext.in_width           = inputs[0]->width();
+    convContext.kernel_size0       = param.weight()->width();
+    convContext.kernel_size1       = param.weight()->height();
+    convContext.n_outputs          = param.weight()->num();
+    convContext.out_height         = outputs[0]->height();
+    convContext.out_width          = outputs[0]->width();
+    convContext.batch_sz           = inputs[0]->num();
+    convContext.pad0               = param.pad_w;
+    convContext.pad1               = param.pad_h;
+    convContext.kernel_stride0     = param.stride_w;
+    convContext.kernel_stride1     = param.stride_h;
+    convContext.kernel_dilation0   = param.dilation_w;
+    convContext.kernel_dilation1   = param.dilation_h;
+    convContext.bias               = (param.bias()->size() > 0) ? 1 : 0;
+    convContext.float_size         = 32;
+    convContext.in_stride          = inputs[0]->get_stride()[2];
+    convContext.out_stride         = outputs[0]->get_stride()[2];
+    convContext.in_channel_stride  = convContext.in_stride * convContext.in_height;
+    convContext.in_batch_stride    = convContext.in_channel_stride * convContext.n_inputs;
+    convContext.out_channel_stride = convContext.out_stride * convContext.out_height;
+    convContext.out_batch_stride   = convContext.out_channel_stride * convContext.n_outputs;
+    convContext.has_active         = param.activation_param.has_active ? 1 : 0;
+    convContext.negative_slope =
+            param.activation_param.has_active ? param.activation_param.negative_slope : 0;
+    convContext.rmv             = rocm_meta_version::AMDHSA_1_0;
+    convContext.use_binaries    = true;
+    convContext.use_asm_kernels = true;
+    convContext.do_search       = true;
+    convContext.save_srch_req   = true;
+    convContext.in_layout       = "NCHW";
+    convContext.out_layout      = "NCHW";
+    convContext.in_data_type    = "FP32";
+    convContext.out_data_type   = "FP32";
+    int data_len                = convContext.in_data_type == "FP32" ? 4 : 2;
+    convContext.bot_sz = convContext.batch_sz * convContext.n_inputs * convContext.in_height
+                         * convContext.in_width * data_len;
+    convContext.top_sz = convContext.batch_sz * convContext.n_outputs * convContext.out_height
+                         * convContext.out_width * data_len;
+    convContext.weights_sz = convContext.n_outputs * convContext.n_inputs * convContext.kernel_size0
+                             * convContext.kernel_size1 * data_len;
+    convContext.bias_sz       = (param.bias()->size() > 0) ? convContext.n_outputs * data_len : 0;
+    convContext.deconvolution = 0;
     convContext.general_compile_options = " -DMIOPEN_USE_FP32=1 -DMIOPEN_USE_FP16=0";
 
     miopen::Db db = anakin::saber::GetDb(dev._info._device_name, dev._info._compute_core_num);
@@ -100,9 +117,11 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
     convContext.SetStream(&handle);
     miopen::solver::ConvSolution solution = miopen::solver::SearchForSolution<
             miopen::solver::ConvBinWinograd3x3U,
-            miopen::solver::ConvAsm3x3U,
-            miopen::solver::ConvAsm1x1U,
-            miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
+            /*
+                        miopen::solver::ConvAsm3x3U,
+                        miopen::solver::ConvAsm1x1U,
+                        miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
+            */
             miopen::solver::ConvOclDirectFwdGen,
             miopen::solver::ConvOclDirectFwd3x3,
             miopen::solver::ConvOclDirectFwd1x1,
@@ -199,8 +218,7 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
             || (_kernels_ptr[i].get()->GetName() == "MIOpenConv1x1pquv")
             || (_kernels_ptr[i].get()->GetName() == "MIOpenCvD3x3_WSR0")
             || (_kernels_ptr[i].get()->GetName() == "MIOpenCDFGen")
-            || (_kernels_ptr[i].get()->GetName() == "MIOpenCDFGen4"))
-        {
+            || (_kernels_ptr[i].get()->GetName() == "MIOpenCDFGen4")) {
             memObjects[0] = (PtrDtype)inputs[0]->data();
             memObjects[1] = (PtrDtype)param.weight()->data();
             memObjects[2] = (isBias) ? (PtrDtype)param.bias()->data() : nullptr;
@@ -244,9 +262,7 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                 return SaberInvalidValue;
             }
             list.push_back(_kernels_ptr[i]);
-        }
-        else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConv3x3F")
-        {
+        } else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConv3x3F") {
             int d_n_groups = 64, d_flags = 0;
             memObjects[0] = (PtrDtype)inputs[0]->data();
             memObjects[1] = (PtrDtype)param.weight()->data();
@@ -272,9 +288,7 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                 return SaberInvalidValue;
             }
             list.push_back(_kernels_ptr[i]);
-        }
-        else
-        {
+        } else {
             ALOGD("Not implement kernel name:" << _kernels_ptr[i].get()->GetName());
         }
     }

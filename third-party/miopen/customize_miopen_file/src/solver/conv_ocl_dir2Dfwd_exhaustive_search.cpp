@@ -204,11 +204,17 @@ static int MeasureLoop(Handle* profile_h,
 
             if(params.bias)
             {
-                k(bot_ocl_buf, wei_ocl_buf, bias_ocl_buf, top_ocl_buf, padding_value);
+                if(params.has_active)
+                    k(bot_ocl_buf, wei_ocl_buf, bias_ocl_buf, top_ocl_buf, params.negative_slope, padding_value);
+                else
+                    k(bot_ocl_buf, wei_ocl_buf, bias_ocl_buf, top_ocl_buf, padding_value);
             }
             else
             {
-                k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf, padding_value);
+                if(params.has_active)
+                    k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf, params.negative_slope, padding_value);
+                else
+                    k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf, padding_value);
             }
             processing_time = profile_h->GetKernelTime();
         }
@@ -226,11 +232,17 @@ static int MeasureLoop(Handle* profile_h,
 
             if(params.bias)
             {
-                k(bot_ocl_buf, wei_ocl_buf, bias_ocl_buf, top_ocl_buf, padding_value);
+                if(params.has_active)
+                    k(bot_ocl_buf, wei_ocl_buf, bias_ocl_buf, top_ocl_buf, params.negative_slope, padding_value);
+                else
+                    k(bot_ocl_buf, wei_ocl_buf, bias_ocl_buf, top_ocl_buf, padding_value);
             }
             else
             {
-                k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf, padding_value);
+                if(params.has_active)
+                    k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf, params.negative_slope, padding_value);
+                else
+                    k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf, padding_value);
             }
 
             params.GetStream().Finish();
@@ -239,11 +251,18 @@ static int MeasureLoop(Handle* profile_h,
 
             if(params.bias)
             {
-                k(bot_ocl_buf, wei_ocl_buf, bias_ocl_buf, top_ocl_buf, padding_value);
+                if(params.has_active)
+                    k(bot_ocl_buf, wei_ocl_buf, bias_ocl_buf, top_ocl_buf, params.negative_slope, padding_value);
+                else
+                    k(bot_ocl_buf, wei_ocl_buf, bias_ocl_buf, top_ocl_buf, padding_value);
+
             }
             else
             {
-                k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf, padding_value);
+                if(params.has_active)
+                    k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf, params.negative_slope, padding_value);
+                else
+                    k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf, padding_value);
             }
 
             params.GetStream().Finish();
@@ -252,8 +271,9 @@ static int MeasureLoop(Handle* profile_h,
             processing_time = subtractTimes(e, s);
         }
     }
-    catch(miopen::Exception&)
+    catch(miopen::Exception& ex)
     {
+        MIOPEN_LOG_E("MeasureLoop failed for: " << ex.what());
         return -1;
     }
 
