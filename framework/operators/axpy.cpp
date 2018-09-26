@@ -59,6 +59,14 @@ Status AxpyHelper<Ttype, Ptype>::InferShape(const std::vector<Tensor4dPtr<Ttype>
     return Status::OK();
 }
 
+#ifdef AMD_GPU
+INSTANCE_AXPY(AMD, Precision::FP32);
+template class AxpyHelper<AMD, Precision::FP32>;
+template class AxpyHelper<AMD, Precision::FP16>;
+template class AxpyHelper<AMD, Precision::INT8>;
+ANAKIN_REGISTER_OP_HELPER(Axpy, AxpyHelper, AMD, Precision::FP32);
+#endif
+
 #ifdef USE_CUDA
 INSTANCE_AXPY(NV, Precision::FP32);
 template class AxpyHelper<NV, Precision::FP32>;
@@ -96,6 +104,10 @@ template class AxpyHelper<ARM, Precision::INT8>;
 //! register op
 ANAKIN_REGISTER_OP(Axpy)
 .Doc("Axpy operator")
+
+#ifdef AMD_GPU 
+.__alias__<AMD, Precision::FP32>("axpy")
+#endif
 #ifdef USE_CUDA
 .__alias__<NV, Precision::FP32>("axpy")
 #endif
