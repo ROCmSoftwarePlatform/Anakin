@@ -1,3 +1,18 @@
+/* Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 #include "framework/operators/scale.h"
 
 namespace anakin {
@@ -53,6 +68,11 @@ Status ScaleHelper<Ttype, Ptype>::InferShape(const
     SABER_CHECK(_funcs_scale.compute_output_shape(ins, outs, _param_scale));
     return Status::OK();
 }
+#ifdef AMD_GPU
+INSTANCE_SCALE(AMD, Precision::FP32);
+template class ScaleHelper<AMD, Precision::FP32>;
+ANAKIN_REGISTER_OP_HELPER(Scale, ScaleHelper, AMD, Precision::FP32);
+#endif
 
 #ifdef USE_CUDA
 INSTANCE_SCALE(NV, Precision::FP32);
@@ -75,6 +95,9 @@ ANAKIN_REGISTER_OP_HELPER(Scale, ScaleHelper, ARM, Precision::FP32);
 //! register op
 ANAKIN_REGISTER_OP(Scale)
 .Doc("Scale operator")
+#ifdef AMD_GPU
+.__alias__<AMD, Precision::FP32>("Scale")
+#endif
 #ifdef USE_CUDA
 .__alias__<NV, Precision::FP32>("Scale")
 #endif
