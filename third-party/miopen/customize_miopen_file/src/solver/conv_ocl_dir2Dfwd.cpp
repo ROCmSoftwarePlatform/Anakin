@@ -391,6 +391,12 @@ ConvSolution ConvOclDirectFwd::GetSolution(const ConvolutionContext& params,
     kernel_params.kernel_name = "MIOpenConvUni";
 
     result.construction_params.push_back(kernel_params);
+
+    // Start to do pooling...
+    if (params.has_pooling) {
+        addPoolingKernel(params, result);
+    }
+
     return result;
 }
 } // namespace solver

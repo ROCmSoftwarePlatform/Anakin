@@ -115,7 +115,7 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::create(
                          * convContext.out_width * data_len;
     convContext.weights_sz = convContext.n_outputs * convContext.n_inputs * convContext.kernel_size0
                              * convContext.kernel_size1 * data_len;
-    convContext.bias_sz                 = 0;
+    convContext.bias_sz                 = outputs[0]->channel();
     convContext.deconvolution           = 0;
     convContext.in_stride               = inputs[0]->get_stride()[2];
     convContext.out_stride              = _outConvRelu->get_stride()[2];
@@ -168,10 +168,11 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::create(
             // miopen::solver::ConvAsm3x3U,
             // miopen::solver::ConvAsm1x1U,
             // miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
-            // miopen::solver::ConvOclDirectFwdGen,
-            // miopen::solver::ConvOclDirectFwd3x3,
-            // miopen::solver::ConvOclDirectFwd1x1,
-            miopen::solver::ConvOclDirectFwd>(convContext, db);
+            miopen::solver::ConvOclDirectFwdGen,
+            miopen::solver::ConvOclDirectFwd3x3,
+            miopen::solver::ConvOclDirectFwd1x1,
+            miopen::solver::ConvOclDirectFwd
+            >(convContext, db);
     miopen::Handle::clearClEnv();
 
     for (auto s : solution.construction_params) {
@@ -195,47 +196,109 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
     if (param.conv_param.activation_param.has_active == 0)
         param.conv_param.activation_param.negative_slope = 1;
 
-    ALOGD(" num=" << inputs[0]->num() << " channel=" << inputs[0]->channel()
-                  << " height=" << inputs[0]->height() << " width=" << inputs[0]->width()
-                  << " param.conv_param.weight()->num()=" << param.conv_param.weight()->num()
-                  << " param.conv_param.weight()->channel()="
-                  << param.conv_param.weight()->channel()
-                  << " param.conv_param.weight()->width()=" << param.conv_param.weight()->width()
-                  << " param.conv_param.weight()->height()=" << param.conv_param.weight()->height()
-                  << " param.conv_param.bias()->size()=" << param.conv_param.bias()->size()
-                  << " param.conv_param.bias()->channel()=" << param.conv_param.bias()->channel()
-                  << " param.conv_param.bias()->width()=" << param.conv_param.bias()->width()
-                  << " param.conv_param.bias()->height()=" << param.conv_param.bias()->height()
-                  << " param.conv_param.group=" << param.conv_param.group
-                  << " param.conv_param.pad_h=" << param.conv_param.pad_h
-                  << " param.conv_param.pad_w=" << param.conv_param.pad_w
-                  << " param.conv_param.stride_h=" << param.conv_param.stride_h
-                  << " param.conv_param.stride_w=" << param.conv_param.stride_w
-                  << " param.conv_param.dilation_h=" << param.conv_param.dilation_h
-                  << " param.conv_param.dilation_w=" << param.conv_param.dilation_w
-                  << " param.conv_param.alpha=" << param.conv_param.alpha
-                  << " param.conv_param.beta=" << param.conv_param.beta
-                  << " param.has_active=" << param.conv_param.activation_param.has_active
-                  << " param.conv_param.activation_param.negative_slope="
-                  << param.conv_param.activation_param.negative_slope
-                  << " param.conv_param.activation_param.active="
-                  << param.conv_param.activation_param.active
-                  << " param.conv_param.activation_param.coef="
-                  << param.conv_param.activation_param.coef
-                  << " param.pooling_param.window_h=" << param.pooling_param.window_h
-                  << " param.pooling_param.window_w=" << param.pooling_param.window_w
-                  << " param.pooling_param.pad_h=" << param.pooling_param.pad_h
-                  << " param.pooling_param.pad_w=" << param.pooling_param.pad_w
-                  << " param.pooling_param.stride_h=" << param.pooling_param.stride_h
-                  << " param.pooling_param.stride_w=" << param.pooling_param.stride_w
-                  << " param.pooling_param.pooling_type=" << param.pooling_param.pooling_type
-                  << " param.pooling_param.global_pooling=" << param.pooling_param.global_pooling
-                  << " param.pooling_param.cmp_out_shape_floor_as_conv="
-                  << param.pooling_param.cmp_out_shape_floor_as_conv);
+
+    ALOGD(" num=" << inputs[0]->num());
+    ALOGD(" channel=" << inputs[0]->channel());
+    ALOGD(" height=" << inputs[0]->height());
+    ALOGD(" width=" << inputs[0]->width());
+    ALOGD(" param.conv_param.weight()->num()=" << param.conv_param.weight()->num());
+    ALOGD(" param.conv_param.weight()->channel()=" << param.conv_param.weight()->channel());
+    ALOGD(" param.conv_param.weight()->width()=" << param.conv_param.weight()->width());
+    ALOGD(" param.conv_param.weight()->height()=" << param.conv_param.weight()->height());
+    if (isBias)
+    {
+        ALOGD(" param.conv_param.bias()->size()=" << param.conv_param.bias()->size());
+        ALOGD(" param.conv_param.bias()->channel()=" << param.conv_param.bias()->channel());
+        ALOGD(" param.conv_param.bias()->width()=" << param.conv_param.bias()->width());
+        ALOGD(" param.conv_param.bias()->height()=" << param.conv_param.bias()->height());
+    }
+    else
+    {
+        ALOGD(" Bias is disable");
+    }
+    ALOGD(" param.conv_param.group=" << param.conv_param.group);
+    ALOGD(" param.conv_param.pad_h=" << param.conv_param.pad_h);
+    ALOGD(" param.conv_param.pad_w=" << param.conv_param.pad_w);
+    ALOGD(" param.conv_param.stride_h=" << param.conv_param.stride_h);
+    ALOGD(" param.conv_param.stride_w=" << param.conv_param.stride_w);
+    ALOGD(" param.conv_param.dilation_h=" << param.conv_param.dilation_h);
+    ALOGD(" param.conv_param.dilation_w=" << param.conv_param.dilation_w);
+    ALOGD(" param.conv_param.alpha=" << param.conv_param.alpha);
+    ALOGD(" param.conv_param.beta=" << param.conv_param.beta);
+    ALOGD(" param.has_active=" << param.conv_param.activation_param.has_active);
+    ALOGD(" param.conv_param.activation_param.negative_slope="
+        << param.conv_param.activation_param.negative_slope);
+    ALOGD(" param.conv_param.activation_param.active="
+        << param.conv_param.activation_param.active);
+    ALOGD(" param.conv_param.activation_param.coef="
+        << param.conv_param.activation_param.coef);
+    ALOGD(" param.pooling_param.window_h=" << param.pooling_param.window_h);
+    ALOGD(" param.pooling_param.window_w=" << param.pooling_param.window_w);
+    ALOGD(" param.pooling_param.pad_h=" << param.pooling_param.pad_h);
+    ALOGD(" param.pooling_param.pad_w=" << param.pooling_param.pad_w);
+    ALOGD(" param.pooling_param.stride_h=" << param.pooling_param.stride_h);
+    ALOGD(" param.pooling_param.stride_w=" << param.pooling_param.stride_w);
+    ALOGD(" param.pooling_param.pooling_type=" << param.pooling_param.pooling_type);
+    ALOGD(" param.pooling_param.global_pooling=" << param.pooling_param.global_pooling);
+    ALOGD(" param.pooling_param.cmp_out_shape_floor_as_conv="
+        << param.pooling_param.cmp_out_shape_floor_as_conv);
 
     for (amd_kernel_list::iterator it = _kernels.begin(); it != _kernels.end(); it++) {
         ALOGD("it->get()->GetName()=" << it->get()->GetName());
-        if (it->get()->GetName() == "sp3AsmConv3x3F") {
+        if ((it->get()->GetName() == "MIOpenConvUni")
+            || (it->get()->GetName() == "MIOpenConv1x1")
+            || (it->get()->GetName() == "MIOpenConv1x1pquv")
+            || (it->get()->GetName() == "MIOpenCvD3x3_WSR0")
+            || (it->get()->GetName() == "MIOpenCDFGen")
+            || (it->get()->GetName() == "MIOpenCDFGen4"))
+        {
+            PtrDtype memObjects[4] = {0, 0, 0, 0};
+            memObjects[0] = (PtrDtype)inputs[0]->data();
+            memObjects[1] = (PtrDtype)param.conv_param.weight()->data();
+            memObjects[2] = (isBias) ? (PtrDtype)param.conv_param.bias()->data() : nullptr;
+            memObjects[3] = (PtrDtype)_outConvRelu->mutable_data();
+
+            bool isActive = param.conv_param.activation_param.has_active;
+            if (isBias) {
+                if (isActive) {
+                    err = it->get()->SetKernelArgs(
+                            (PtrDtype)memObjects[0],
+                            (PtrDtype)memObjects[1],
+                            (PtrDtype)memObjects[2],
+                            (PtrDtype)memObjects[3],
+                            param.conv_param.activation_param.negative_slope,
+                            0.0f);
+                } else {
+                    err = it->get()->SetKernelArgs(
+                            (PtrDtype)memObjects[0],
+                            (PtrDtype)memObjects[1],
+                            (PtrDtype)memObjects[2],
+                            (PtrDtype)memObjects[3],
+                            0.0f);
+                }
+            } else {
+                if (isActive) {
+                    err = it->get()->SetKernelArgs(
+                            (PtrDtype)memObjects[0],
+                            (PtrDtype)memObjects[1],
+                            (PtrDtype)memObjects[3],
+                            param.conv_param.activation_param.negative_slope,
+                            0.0f);
+                } else {
+                    err = it->get()->SetKernelArgs(
+                            (PtrDtype)memObjects[0],
+                            (PtrDtype)memObjects[1],
+                            (PtrDtype)memObjects[3],
+                            0.0f);
+                }
+            }
+            if (!err) {
+                ALOGE("Fail to set kernel args :" << err);
+                return SaberInvalidValue;
+            }
+        }
+        else if (it->get()->GetName() == "sp3AsmConv3x3F")
+        {
             int d_n_groups = 64, d_flags = 0;
             PtrDtype biasMemObject = isBias ? param.conv_param.bias()->data() : 0;
             err                    = it->get()->SetKernelArgs(
@@ -255,7 +318,9 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
                 ALOGE("Fail to set execution");
                 return SaberInvalidValue;
             }
-        } else if (it->get()->GetName() == "mloPooling") {
+        }
+        else if (it->get()->GetName() == "mloPooling")
+        {
             err = it->get()->SetKernelArgs(
                     (PtrDtype)_outConvRelu->data(),
                     (PtrDtype)outputs[0]->mutable_data(),
@@ -265,9 +330,25 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
                 return SaberInvalidValue;
             }
 
-        } else {
+        }
+        else if (it->get()->GetName() == "mloPoolingG")
+        {
+            err = it->get()->SetKernelArgs(
+                    (PtrDtype)_outConvRelu->data(),
+                    (PtrDtype)outputs[0]->mutable_data(),
+                    (PtrDtype)nullptr);
+            if (!err) {
+                ALOGE("Fail to set execution");
+                return SaberInvalidValue;
+            }
+
+        }
+        else
+        {
+            ALOGD("disptach non-implementation kernel: " << it->get()->GetName());
         }
     }
+
     err = LaunchKernel(cm, _kernels);
 
     if (!err) {

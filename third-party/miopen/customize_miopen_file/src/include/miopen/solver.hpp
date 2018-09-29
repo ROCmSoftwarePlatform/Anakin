@@ -372,6 +372,8 @@ std::vector<Solution> SearchForAllSolutions(const Context& search_params, Db db)
 }
 #endif
 
+void addPoolingKernel(const ConvolutionContext& params, ConvSolution& result);
+
 /// Base class for problem solvers.
 ///
 /// Solvers are to be instantiated as const objects and shall not have any variable

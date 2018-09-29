@@ -190,6 +190,12 @@ ConvSolution ConvOclDirectFwd3x3::GetSolution(const ConvolutionContext& params) 
     construction_parameters.kernel_name = "MIOpenCvD3x3_WSR0";
 
     result.construction_params.push_back(construction_parameters);
+
+    // Start to do pooling...
+    if (params.has_pooling) {
+        addPoolingKernel(params, result);
+    }
+
     return result;
 }
 } // namespace solver

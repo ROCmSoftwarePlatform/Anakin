@@ -356,7 +356,14 @@ ConvSolution ConvOclDirectFwd1x1::GetSolution(const ConvolutionContext& params,
             result.construction_params.push_back(kernel);
         }
     }
+
+    // Start to do pooling...
+    if (params.has_pooling) {
+        addPoolingKernel(params, result);
+    }
+
     return result;
 }
+
 } // namespace solver
 } // namespace miopen

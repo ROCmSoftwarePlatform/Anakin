@@ -240,6 +240,12 @@ ConvSolution ConvOclDirectFwdGen::GetSolution(const ConvolutionContext& params) 
 
     ConvSolution result;
     result.construction_params.push_back(construction_params);
+
+    // Start to do pooling...
+    if (params.has_pooling) {
+        addPoolingKernel(params, result);
+    }
+
     return result;
 }
 } // namespace solver
