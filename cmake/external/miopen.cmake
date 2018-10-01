@@ -51,7 +51,7 @@ ExternalProject_Add_Step(
     ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_3
     DEPENDEES         download
     DEPENDERS         build
-    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/ -name *.cpp -exec cp {} ${MIOPEN_SOURCE_DIR}/src \\$<SEMICOLON>
+    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/ -maxdepth 1 -name *.cpp -exec cp {} ${MIOPEN_SOURCE_DIR}/src \\$<SEMICOLON>
     ALWAYS            1
     EXCLUDE_FORM_MAIN 1
     LOG               1
