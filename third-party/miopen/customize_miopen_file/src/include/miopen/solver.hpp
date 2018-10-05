@@ -191,15 +191,22 @@ auto FindSolutionImpl(rank<1>, Solver s, const Context& context, Db& db)
         if(context.do_search || enforce.IsSearch(context)) // TODO: Make it a customization point
         {
             MIOPEN_LOG_I("Starting search: " << SolverDbId(s) << ", enforce: " << enforce);
-            try
-            {
-                auto c = s.Search(context);
-                db.Update(context, SolverDbId(s), c);
-                return s.GetSolution(context, c);
-            }
-            catch(const miopen::Exception& ex)
-            {
-                MIOPEN_LOG_E("Search failed for: " << SolverDbId(s) << ": " << ex.what());
+            if (s.IsOptimized()) {
+                MIOPEN_LOG_I("skip search for optimized kernel");
+                LegacyPerformanceConfig result;
+                db.Update(context, SolverDbId(s), result);
+                return s.GetSolution(context, result);
+            } else {
+                try
+                {
+                    auto c = s.Search(context);
+                    db.Update(context, SolverDbId(s), c);
+                    return s.GetSolution(context, c);
+                }
+                catch(const miopen::Exception& ex)
+                {
+                    MIOPEN_LOG_E("Search failed for: " << SolverDbId(s) << ": " << ex.what());
+                }
             }
         }
     }
@@ -435,6 +442,7 @@ struct SolverBase
     ///                          const ConvolutionContext& params,
     ///                          const ConvSolution& solution,
     ///                          float& elapsed_time) const;
+    bool IsOptimized() const { return false; }
 };
 
 struct PerformanceConfigConvAsm3x3U : Serializable<PerformanceConfigConvAsm3x3U>
@@ -612,6 +620,23 @@ struct ConvOclDirectFwd1x1 : ConvOclDirectFwdLegacyExhaustiveSearch
     ConvSolution GetSolution(const ConvolutionContext& params,
                              const LegacyPerformanceConfig& searched_params) const;
     bool IsValidPerformanceConfig(const ConvolutionContext&, const LegacyPerformanceConfig&) const
+    {
+        return true;
+    }
+};
+
+struct ConvOclDirectFwd1x1AMD : ConvOclDirectFwdLegacyExhaustiveSearch
+{
+    bool IsApplicable(const ConvolutionContext& params) const;
+
+    ConvSolution GetSolution(const ConvolutionContext& params,
+                             const LegacyPerformanceConfig& searched_params) const;
+    bool IsValidPerformanceConfig(const ConvolutionContext&, const LegacyPerformanceConfig&) const
+    {
+        return true;
+    }
+
+    bool IsOptimized() const
     {
         return true;
     }

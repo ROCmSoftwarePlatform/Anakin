@@ -126,6 +126,8 @@ set( MIOpen_Source
     solver/conv_ocl_dir2Dfwd.cpp
     solver/conv_ocl_dir2Dfwd1x1.cpp
     solver/conv_ocl_dir2D_utils.cpp
+    solver/conv_ocl_dir2Dfwd1x1_AMD.cpp
+    solver/solver_conv_common.cpp
     )
 
 #list(APPEND MIOpen_Source tmp_dir.cpp binary_cache.cpp md5.cpp)

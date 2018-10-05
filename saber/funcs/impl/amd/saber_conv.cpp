@@ -117,6 +117,7 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
     convContext.SetStream(&handle);
     miopen::solver::ConvSolution solution = miopen::solver::SearchForSolution<
             miopen::solver::ConvBinWinograd3x3U,
+            miopen::solver::ConvOclDirectFwd1x1AMD,
             /*
                         miopen::solver::ConvAsm3x3U,
                         miopen::solver::ConvAsm1x1U,
@@ -143,6 +144,10 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
     if (solution.construction_params.size() > 0) {
         for (auto miKernelInfo : solution.construction_params) {
             kernelInfo = miKernelInfo;
+            if (kernelInfo.kernel_name == "conv1x1_act"
+                || kernelInfo.kernel_name == "InnerProduct") {
+                kernelInfo.kernel_type = SABER;
+            }
 
             kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
             if (!kptr.get()->isInit()) {
@@ -152,6 +157,7 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
             _kernels_ptr.push_back(kptr);
         }
     } else {
+        // todo: gemm
         ALOGE("No solution found!!!");
     }
 
@@ -211,6 +217,10 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
         return SaberInvalidValue;
     }
     ALOGD("kernel size:" << _kernels_ptr.size() << " name:" << _kernels_ptr[0].get()->GetName());
+    memObjects[0] = (PtrDtype)inputs[0]->data();
+    memObjects[1] = (PtrDtype)param.weight()->data();
+    memObjects[2] = (isBias) ? (PtrDtype)param.bias()->data() : nullptr;
+    memObjects[3] = (PtrDtype)outputs[0]->mutable_data();
 
     for (int i = 0; i < _kernels_ptr.size(); i++) {
         if ((_kernels_ptr[i].get()->GetName() == "MIOpenConvUni")
@@ -219,10 +229,6 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
             || (_kernels_ptr[i].get()->GetName() == "MIOpenCvD3x3_WSR0")
             || (_kernels_ptr[i].get()->GetName() == "MIOpenCDFGen")
             || (_kernels_ptr[i].get()->GetName() == "MIOpenCDFGen4")) {
-            memObjects[0] = (PtrDtype)inputs[0]->data();
-            memObjects[1] = (PtrDtype)param.weight()->data();
-            memObjects[2] = (isBias) ? (PtrDtype)param.bias()->data() : nullptr;
-            memObjects[3] = (PtrDtype)outputs[0]->mutable_data();
 
             if (isBias) {
                 if (isActive) {
@@ -264,10 +270,6 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
             list.push_back(_kernels_ptr[i]);
         } else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConv3x3F") {
             int d_n_groups = 64, d_flags = 0;
-            memObjects[0] = (PtrDtype)inputs[0]->data();
-            memObjects[1] = (PtrDtype)param.weight()->data();
-            memObjects[2] = (isBias) ? (PtrDtype)param.bias()->data() : 0;
-            memObjects[3] = (PtrDtype)outputs[0]->mutable_data();
 
             err = _kernels_ptr[i].get()->SetKernelArgs(
                     (unsigned int)inputs[0]->num(),
@@ -283,6 +285,45 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                     (PtrDtype)memObjects[3],
                     (PtrDtype)memObjects[2]);
 
+            if (!err) {
+                ALOGE("Fail to set kernel args :" << err);
+                return SaberInvalidValue;
+            }
+            list.push_back(_kernels_ptr[i]);
+        } else if (_kernels_ptr[i].get()->GetName() == "conv1x1_act") {
+            float negative_slope = 0.0f;
+            if (isActive)
+                negative_slope = 0.0f;
+            else
+                negative_slope = 1.0f;
+
+            if (isBias) {
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                        (PtrDtype)memObjects[1],
+                        (PtrDtype)memObjects[0],
+                        (PtrDtype)memObjects[2],
+                        (PtrDtype)memObjects[3],
+                        negative_slope);
+            } else {
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                        (PtrDtype)memObjects[1],
+                        (PtrDtype)memObjects[0],
+                        (PtrDtype)memObjects[3],
+                        negative_slope);
+            }
+            list.push_back(_kernels_ptr[i]);
+        } else if (_kernels_ptr[i].get()->GetName() == "InnerProduct") {
+            // todo: need review activation!!
+            if (isBias) {
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                        (PtrDtype)memObjects[0],
+                        (PtrDtype)memObjects[1],
+                        (PtrDtype)memObjects[2],
+                        (PtrDtype)memObjects[3]);
+            } else {
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                        (PtrDtype)memObjects[0], (PtrDtype)memObjects[1], (PtrDtype)memObjects[3]);
+            }
             if (!err) {
                 ALOGE("Fail to set kernel args :" << err);
                 return SaberInvalidValue;
