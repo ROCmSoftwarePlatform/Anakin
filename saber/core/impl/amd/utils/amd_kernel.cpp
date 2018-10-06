@@ -32,15 +32,29 @@ AMDKernelPtr CreateKernel(int device_id, KernelInfo* ki) {
     return gen_shared_ocl(new OCLKernel(context, device, ki));
 }
 
-bool LaunchKernel(AMDStream_t stream, amd_kernel_list kernels) {
-    bool record = AMDProfiler::is_recording();
+bool LaunchKernel(AMDStream_t stream, amd_kernel_list kernels, bool sync) {
+    ALOGD(__func__);
+    bool record        = AMDProfiler::is_recording();
+    float exec_time_ms = 0;
     cl_event_list list;
     for (amd_kernel_list::iterator it = kernels.begin(); it != kernels.end(); it++) {
         cl_event event;
-        if (!it->get()->Invoke(stream, 0, NULL, (record ? &event : NULL)))
+        ALOGD(__func__ << " E");
+        if (!it->get()->Invoke(stream, 0, NULL, (record || sync ? &event : NULL))) {
+            ALOGD(__func__ << " Failed");
             return false;
+        }
         if (record)
             list.push_back(event);
+        if (sync) {
+            TargetWrapper<AMD>::sync_event(event);
+            cl_ulong start, end;
+            clGetEventProfilingInfo(
+                    event, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, NULL);
+            clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, NULL);
+            exec_time_ms = (end - start) * 1e-6;
+        }
+        ALOGD(__func__ << " X : " << exec_time_ms << " ms");
     }
     if (record)
         AMDProfiler::add_event(list);
@@ -50,4 +64,3 @@ bool LaunchKernel(AMDStream_t stream, amd_kernel_list kernels) {
 
 } // namespace saber
 } // namespace anakin
-
