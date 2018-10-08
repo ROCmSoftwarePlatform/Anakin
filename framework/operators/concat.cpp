@@ -39,6 +39,11 @@ void Concat<Ttype, Ptype>::operator()(OpContext<Ttype>& ctx, \
         static_cast<ConcatHelper<Ttype, Ptype>*>(this->_helper)->_param_concat; \
     impl->_funcs_concat(ins, outs, param, ctx); \
 }
+#ifdef AMD_GPU
+INSTANCE_CONCAT(AMD, Precision::FP32);
+template class ConcatHelper<AMD, Precision::FP32>;
+ANAKIN_REGISTER_OP_HELPER(Concat, ConcatHelper, AMD, Precision::FP32);
+#endif
 
 #ifdef USE_CUDA
 INSTANCE_CONCAT(NV, Precision::FP32);
@@ -61,6 +66,10 @@ ANAKIN_REGISTER_OP_HELPER(Concat, ConcatHelper, X86, Precision::FP32);
 //! register op
 ANAKIN_REGISTER_OP(Concat)
 .Doc("Concat operator")
+
+#ifdef AMD_GPU
+.__alias__<AMD, Precision::FP32>("concat")
+#endif
 #ifdef USE_CUDA
 .__alias__<NV, Precision::FP32>("concat")
 #endif

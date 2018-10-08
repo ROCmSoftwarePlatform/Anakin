@@ -92,7 +92,10 @@ void test_model(){
 }
 
 TEST(TestSaberFunc, test_func_concat) {
-   
+#ifdef AMD_GPU
+   //Init the test_base
+   test_model<AK_FLOAT, AMD, AMDHX86>();
+#endif 
 #ifdef USE_CUDA
    //Init the test_base
    test_model<AK_FLOAT, NV, NVHX86>();
@@ -125,6 +128,9 @@ int main(int argc, const char** argv) {
     // initial logger
     //logger::init(argv[0]);
     InitTest();
+#ifdef AMD_GPU
+    Env<AMD>::env_init();
+#endif
     RUN_ALL_TESTS(argv[0]);
 
     return 0;
