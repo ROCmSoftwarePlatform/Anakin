@@ -10,6 +10,11 @@
 using namespace anakin::saber;
 
 TEST(TestSaberFunc, test_saber_depthwise_conv_results) {
+#ifdef AMD_GPU
+        Env<AMD>::env_init();
+        Env<AMDHX86>::env_init();
+        TestSaberBase<AMD,AMDHX86,AK_FLOAT,Conv,ConvParam> testbase_amd;
+#endif
 #ifdef USE_CUDA
     Env<NV>::env_init();
     Env<NVHX86>::env_init();
@@ -51,6 +56,20 @@ TEST(TestSaberFunc, test_saber_depthwise_conv_results) {
         int in_channels = group;
         Shape weights_s({out_channels, in_channels, kernel_h, kernel_w}, Layout_NCHW);
         Shape bias_s({1, out_channels, 1, 1}, Layout_NCHW);
+#ifdef AMD_GPU
+                Tensor<AMD> weights_dev;
+                Tensor<AMD> bias_dev;
+                weights_dev.re_alloc(weights_s, AK_FLOAT);
+                fill_tensor_rand(weights_dev, -10.f, 20.0f);
+                if (bias_term) {
+                    bias_dev.re_alloc(bias_s, AK_FLOAT);
+                    fill_tensor_rand(bias_dev, -10.0f, 20.0f);
+                }
+                ConvParam<AMD> param_amd(group, pad_h, pad_w,
+                                       stride_h, stride_w,
+                                       dilation_h, dilation_w,
+                                       &weights_dev, &bias_dev);
+#endif
 #ifdef USE_CUDA
         Tensor<NV> weights_dev;
         Tensor<NV> bias_dev;
@@ -84,6 +103,12 @@ TEST(TestSaberFunc, test_saber_depthwise_conv_results) {
         for (auto input_num : input_num_v)
         for (auto height : in_h_v)
         for (auto width : in_w_v) {
+#ifdef AMD_GPU
+            testbase_amd.set_param(param_amd);//set param
+            testbase_amd.set_input_shape(Shape({input_num,in_channels,height,width},
+                                              Layout_NCHW));//add some input shape
+            testbase_amd.run_test(conv_cpu_func<float, AMD, AMDHX86>, 1e-3);//run test
+#endif
 #ifdef USE_CUDA
             testbase_nv.set_param(param_nv);//set param
             testbase_nv.set_input_shape(Shape({input_num,in_channels,height,width},
