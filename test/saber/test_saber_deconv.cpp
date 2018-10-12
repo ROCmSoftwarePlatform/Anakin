@@ -1,3 +1,18 @@
+/* Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 #include "core/context.h"
 #include "funcs/deconv.h"
 #include "test_saber_func.h"
@@ -275,7 +290,7 @@ void deconv_testbase() {
     std::vector<int> in_h_v{64};
     std::vector<int> in_w_v{64};
     std::vector<int> input_num_v{1};
-    std::vector<int> input_channels_v{48};
+    std::vector<int> input_channels_v{16};
     std::vector<int> output_channels_v{16};
     std::vector<bool> bias_term_v{true, false};
     std::vector<bool> with_relu_v{true, false};
@@ -313,9 +328,17 @@ void deconv_testbase() {
                                    dilation_h, dilation_w,
                                    &weights_dev, &bias_dev);
 
+
+#ifdef AMD_GPU
+        if (relu_flag) {
+            param_nv.activation_param = ActivationParam<AMD>(Active_relu);
+        }
+#endif
+#ifdef NVIDIA_GPU
         if (relu_flag) {
             param_nv.activation_param = ActivationParam<NV>(Active_relu);
         }
+#endif
         for (auto input_num : input_num_v)
         for (auto height : in_h_v)
         for (auto width : in_w_v) {
@@ -332,6 +355,10 @@ void deconv_testbase() {
 }
 
 TEST(TestSaberFunc, test_func_self_deconv_nv) {
+
+#ifdef AMD_GPU
+    deconv_testbase<AMDHX86, AMD>();
+#endif
 #ifdef NVIDIA_GPU
     deconv_testbase<NVHX86, NV>();
 #endif
@@ -341,8 +368,10 @@ TEST(TestSaberFunc, test_func_self_deconv_nv) {
 int main(int argc, const char** argv) {
     // initial logger
     //logger::init(argv[0]);
-
     InitTest();
+#ifdef AMD_GPU
+    Env<AMD>::env_init();
+#endif
     RUN_ALL_TESTS(argv[0]);
     return 0;
 }
