@@ -49,6 +49,12 @@ Status EltwiseHelper<Ttype, Ptype>::InferShape(const std::vector<Tensor4dPtr<Tty
     return Status::OK();
 }
 
+#ifdef AMD_GPU
+INSTANCE_ELTWISE(AMD, Precision::FP32);
+template class EltwiseHelper<AMD, Precision::FP32>;
+ANAKIN_REGISTER_OP_HELPER(Eltwise, EltwiseHelper, AMD, Precision::FP32);
+#endif
+
 #ifdef USE_CUDA
 INSTANCE_ELTWISE(NV, Precision::FP32);
 template class EltwiseHelper<NV, Precision::FP32>;
@@ -70,6 +76,9 @@ ANAKIN_REGISTER_OP_HELPER(Eltwise, EltwiseHelper, ARM, Precision::FP32);
 //! register op
 ANAKIN_REGISTER_OP(Eltwise)
 .Doc("Eltwise operator")
+#ifdef AMD_GPU
+    .__alias__<AMD, Precision::FP32>("eltwise")
+#endif
 #ifdef USE_CUDA
 .__alias__<NV, Precision::FP32>("eltwise")
 #endif

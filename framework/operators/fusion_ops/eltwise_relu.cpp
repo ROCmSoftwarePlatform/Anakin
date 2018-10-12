@@ -4,6 +4,19 @@ namespace anakin {
 
 namespace ops {
 
+#ifdef AMD_GPU
+template<>
+void EltwiseRelu<AMD, Precision::FP32>::operator()(
+    OpContext<AMD>& ctx,
+    const std::vector<Tensor4dPtr<AMD> >& ins,
+    std::vector<Tensor4dPtr<AMD> >& outs) {
+    auto* impl = static_cast<EltwiseReluHelper<AMD, Precision::FP32>*>(this->_helper);
+    auto& param = static_cast<EltwiseReluHelper<AMD, Precision::FP32>*>
+                  (this->_helper)->_param_eltwise_relu;
+    impl->_funcs_eltwise_relu(ins, outs, param, ctx);
+}
+#endif
+
 #ifdef USE_CUDA
 template<>
 void EltwiseRelu<NV, Precision::FP32>::operator()(
@@ -77,6 +90,12 @@ Status EltwiseReluHelper<Ttype, Ptype>::InferShape(const
 }
 
 #ifdef USE_CUDA
+template class EltwiseReluHelper<AMD, Precision::FP32>;
+template class EltwiseReluHelper<AMD, Precision::FP16>;
+template class EltwiseReluHelper<AMD, Precision::INT8>;
+#endif
+
+#ifdef USE_CUDA
 template class EltwiseReluHelper<NV, Precision::FP32>;
 template class EltwiseReluHelper<NV, Precision::FP16>;
 template class EltwiseReluHelper<NV, Precision::INT8>;
@@ -89,6 +108,10 @@ template class EltwiseReluHelper<ARM, Precision::INT8>;
 #endif
 
 // register helper
+#ifdef AMD_GPU
+ANAKIN_REGISTER_OP_HELPER(EltwiseRelu, EltwiseReluHelper, AMD, Precision::FP32);
+#endif
+
 #ifdef USE_CUDA
 ANAKIN_REGISTER_OP_HELPER(EltwiseRelu, EltwiseReluHelper, NV, Precision::FP32);
 #endif
@@ -100,6 +123,9 @@ ANAKIN_REGISTER_OP_HELPER(EltwiseRelu, EltwiseReluHelper, ARM, Precision::FP32);
 //! register op
 ANAKIN_REGISTER_OP(EltwiseRelu)
 .Doc("EltwiseRelu operator")
+#ifdef AMD_GPU
+    .__alias__<AMD, Precision::FP32>("eltwise")
+#endif
 #ifdef USE_CUDA
 .__alias__<NV, Precision::FP32>("eltwise")
 #endif
