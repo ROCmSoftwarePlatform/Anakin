@@ -6,11 +6,21 @@ namespace ops {
 
 #ifdef USE_CUDA
 template<>
-void Im2Sequence<NV, Precision::FP32>::operator() (OpContext<NV> &ctx, 
-                          const std::vector<Tensor4dPtr<NV> >& ins, 
+void Im2Sequence<NV, Precision::FP32>::operator() (OpContext<NV> &ctx,
+                          const std::vector<Tensor4dPtr<NV> >& ins,
                           std::vector<Tensor4dPtr<NV> >& outs) {
     auto* impl = static_cast<Im2SequenceHelper<NV, Precision::FP32>*>(this->_helper);
     auto& param = static_cast<Im2SequenceHelper<NV, Precision::FP32>*>(this->_helper)->_param_im2sequence;
+    impl->_funcs_im2sequence(ins, outs, param, ctx);
+}
+#endif
+#ifdef AMD_GPU
+template<>
+void Im2Sequence<AMD, Precision::FP32>::operator() (OpContext<AMD> &ctx,
+                          const std::vector<Tensor4dPtr<AMD> >& ins,
+                          std::vector<Tensor4dPtr<AMD> >& outs) {
+    auto* impl = static_cast<Im2SequenceHelper<AMD, Precision::FP32>*>(this->_helper);
+    auto& param = static_cast<Im2SequenceHelper<AMD, Precision::FP32>*>(this->_helper)->_param_im2sequence;
     impl->_funcs_im2sequence(ins, outs, param, ctx);
 }
 #endif
@@ -62,6 +72,11 @@ template class Im2SequenceHelper<NV, Precision::FP32>;
 template class Im2SequenceHelper<NV, Precision::FP16>;
 template class Im2SequenceHelper<NV, Precision::INT8>;
 #endif
+#ifdef AMD_GPU
+template class Im2SequenceHelper<AMD, Precision::FP32>;
+template class Im2SequenceHelper<AMD, Precision::FP16>;
+template class Im2SequenceHelper<AMD, Precision::INT8>;
+#endif
 
 #ifdef USE_ARM_PLACE
 template class Im2SequenceHelper<ARM, Precision::FP32>;
@@ -72,9 +87,12 @@ template class Im2SequenceHelper<ARM, Precision::INT8>;
 //template class Im2SequenceHelper<ARM, Precision::FP32>;
 //template class Im2SequenceHelper<ARM, Precision::FP16>;
 //template class Im2SequenceHelper<ARM, Precision::INT8>;
-// register helper 
+// register helper
 #ifdef USE_CUDA
 ANAKIN_REGISTER_OP_HELPER(Im2Sequence, Im2SequenceHelper, NV, Precision::FP32);
+#endif
+#ifdef AMD_GPU
+ANAKIN_REGISTER_OP_HELPER(Im2Sequence, Im2SequenceHelper, AMD, Precision::FP32);
 #endif
 #ifdef USE_ARM_PLACE
 ANAKIN_REGISTER_OP_HELPER(Im2Sequence, Im2SequenceHelper, ARM, Precision::FP32);
@@ -85,6 +103,9 @@ ANAKIN_REGISTER_OP(Im2Sequence)
     .Doc("Im2Sequence operator")
 #ifdef USE_CUDA
     .__alias__<NV, Precision::FP32>("im2sequence")
+#endif
+#ifdef AMD_GPU
+    .__alias__<AMD, Precision::FP32>("im2sequence")
 #endif
 #ifdef USE_ARM_PLACE
     .__alias__<ARM, Precision::FP32>("im2sequence")
