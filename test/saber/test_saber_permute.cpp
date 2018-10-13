@@ -75,6 +75,10 @@ TEST(TestSaberFunc, test_func_permute)
 #ifdef USE_X86_PLACE
     test_permute<X86, X86, AK_FLOAT>();
 #endif
+#ifdef AMD_GPU
+    Env<AMD>::env_init();
+    test_permute<AMD, AMDHX86, AK_FLOAT>();
+#endif
 }
 
 int main(int argc, const char** argv) {

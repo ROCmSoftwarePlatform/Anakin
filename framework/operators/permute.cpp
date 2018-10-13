@@ -45,6 +45,12 @@ Status PermuteHelper<Ttype, Ptype>::InferShape(const std::vector<Tensor4dPtr<Tty
     return Status::OK();
 }
 
+#ifdef AMD_GPU
+INSTANCE_PERMUTE(AMD, Precision::FP32);
+template class PermuteHelper<AMD, Precision::FP32>;
+ANAKIN_REGISTER_OP_HELPER(Permute, PermuteHelper, AMD, Precision::FP32);
+#endif
+
 #ifdef USE_CUDA
 INSTANCE_PERMUTE(NV, Precision::FP32);
 template class PermuteHelper<NV, Precision::FP32>;
@@ -66,6 +72,9 @@ ANAKIN_REGISTER_OP_HELPER(Permute, PermuteHelper, ARM, Precision::FP32);
 //! register op
 ANAKIN_REGISTER_OP(Permute)
 .Doc("Permute operator")
+#ifdef AMD_GPU
+    .__alias__<AMD, Precision::FP32>("permute")
+#endif
 #ifdef USE_CUDA
 .__alias__<NV, Precision::FP32>("permute")
 #endif
