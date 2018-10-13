@@ -16,6 +16,18 @@ void Power<NV, Precision::FP32>::operator()(
     impl->_funcs_power(ins, outs, param, ctx);
 }
 #endif
+#ifdef AMD_GPU
+template<>
+void Power<AMD, Precision::FP32>::operator()(
+    OpContext<AMD>& ctx,
+    const std::vector<Tensor4dPtr<AMD> >& ins,
+    std::vector<Tensor4dPtr<AMD> >& outs) {
+    auto* impl =
+        static_cast<PowerHelper<AMD, Precision::FP32>*>(this->_helper);
+    auto& param = impl->_param_power;
+    impl->_funcs_power(ins, outs, param, ctx);
+}
+#endif
 
 /// TODO ... specialization other type of operator
 
@@ -58,6 +70,11 @@ template class PowerHelper<NV, Precision::FP32>;
 template class PowerHelper<NV, Precision::FP16>;
 template class PowerHelper<NV, Precision::INT8>;
 #endif
+#ifdef AMD_GPU
+template class PowerHelper<AMD, Precision::FP32>;
+template class PowerHelper<AMD, Precision::FP16>;
+template class PowerHelper<AMD, Precision::INT8>;
+#endif
 
 #ifdef USE_ARM_PLACE
 template class PowerHelper<ARM, Precision::FP32>;
@@ -69,6 +86,10 @@ template class PowerHelper<ARM, Precision::INT8>;
 #ifdef USE_CUDA
 ANAKIN_REGISTER_OP_HELPER(Power, PowerHelper, NV, Precision::FP32);
 #endif
+#ifdef AMD_GPU
+ANAKIN_REGISTER_OP_HELPER(Power, PowerHelper, AMD, Precision::FP32);
+#endif
+
 #ifdef USE_ARM_PLACE
 ANAKIN_REGISTER_OP_HELPER(Power, PowerHelper, ARM, Precision::FP32);
 #endif
@@ -79,6 +100,10 @@ ANAKIN_REGISTER_OP(Power)
 #ifdef USE_CUDA
 .__alias__<NV, Precision::FP32>("power")
 #endif
+#ifdef AMD_GPU
+.__alias__<AMD, Precision::FP32>("power")
+#endif
+
 #ifdef USE_ARM_PLACE
 .__alias__<ARM, Precision::FP32>("power")
 #endif
