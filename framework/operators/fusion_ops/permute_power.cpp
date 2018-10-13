@@ -16,6 +16,18 @@ void PermutePower<NV, Precision::FP32>::operator()(
     impl->_funcs_permute_power(ins, outs, param, ctx);
 }
 #endif
+#ifdef AMD_GPU
+template<>
+void PermutePower<AMD, Precision::FP32>::operator()(
+    OpContext<AMD>& ctx,
+    const std::vector<Tensor4dPtr<AMD> >& ins,
+    std::vector<Tensor4dPtr<AMD> >& outs) {
+    auto* impl = static_cast<PermutePowerHelper<AMD, Precision::FP32>*>(this->_helper);
+    auto& param = static_cast<PermutePowerHelper<AMD, Precision::FP32>*>
+                  (this->_helper)->_param_permute_power;
+    impl->_funcs_permute_power(ins, outs, param, ctx);
+}
+#endif
 
 /// TODO ... specialization other type of operator
 
@@ -62,6 +74,11 @@ template class PermutePowerHelper<NV, Precision::FP32>;
 template class PermutePowerHelper<NV, Precision::FP16>;
 template class PermutePowerHelper<NV, Precision::INT8>;
 #endif
+#ifdef AMD_GPU
+template class PermutePowerHelper<AMD, Precision::FP32>;
+template class PermutePowerHelper<AMD, Precision::FP16>;
+template class PermutePowerHelper<AMD, Precision::INT8>;
+#endif
 
 #ifdef USE_ARM_PLACE
 template class PermutePowerHelper<ARM, Precision::FP32>;
@@ -73,6 +90,9 @@ template class PermutePowerHelper<ARM, Precision::INT8>;
 #ifdef USE_CUDA
 ANAKIN_REGISTER_OP_HELPER(PermutePower, PermutePowerHelper, NV, Precision::FP32);
 #endif
+#ifdef AMD_GPU
+ANAKIN_REGISTER_OP_HELPER(PermutePower, PermutePowerHelper, AMD, Precision::FP32);
+#endif
 #ifdef USE_ARM_PLACE
 ANAKIN_REGISTER_OP_HELPER(PermutePower, PermutePowerHelper, ARM, Precision::FP32);
 #endif
@@ -82,6 +102,9 @@ ANAKIN_REGISTER_OP(PermutePower)
 .Doc("PermutePower fusion operator")
 #ifdef USE_CUDA
 .__alias__<NV, Precision::FP32>("permute_power")
+#endif
+#ifdef AMD_GPU
+.__alias__<AMD, Precision::FP32>("permute_power")
 #endif
 #ifdef USE_ARM_PLACE
 .__alias__<ARM, Precision::FP32>("permute_power")
