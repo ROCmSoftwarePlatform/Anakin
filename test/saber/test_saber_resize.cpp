@@ -1,3 +1,17 @@
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 #include "saber/core/context.h"
 #include "saber/funcs/resize.h"
@@ -196,6 +210,62 @@ TEST(TestSaberFunc, test_func_resize) {
                                     case 2:
                                         LOG(INFO) << "resize_type: " << "custom";
                                         testbase.run_test(resize_bilinear_custom_cpu<float, NV, NVHX86>, 0.0001);
+                                    default:
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+#endif
+
+#ifdef AMD_GPU
+
+    LOG(INFO)<<"AMD test......";
+    //Init the test_base
+    Env<AMD>::env_init();
+    TestSaberBase<AMD, AMDHX86, AK_FLOAT, Resize, ResizeParam> testbase;
+
+    for (int num_in : {
+                3, 5, 8
+            }) {
+        for (int c_in : {
+                    3, 5, 8
+                }) {
+            for (int h_in : {
+                        3, 5, 8
+                    }) {
+                for (int w_in : {
+                            2, 5, 8
+                        }) {
+                    for (float scale_w : {
+                                1.0f, 3.3f
+                            }) {
+                        for (float scale_h : {
+                                    1.0f, 4.4f
+                                }) {
+                            for (int resize_type : {0, 1, 2}){
+                                LOG(INFO) << scale_w << "   " << scale_h;
+                                ResizeParam<AMD> param((ResizeType)resize_type, scale_w, scale_h);
+                                testbase.set_param(param);
+                                testbase.set_input_shape(Shape({num_in, c_in, h_in, w_in}));
+                                switch (resize_type){
+                                    case 0:
+                                        LOG(INFO) << "resize_type: " << "bilinear_align";
+                                        testbase.run_test(resize_bilinear_align_cpu<float, AMD, AMDHX86>, 0.0001);
+                                        break;
+                                    case 1:
+                                        LOG(INFO) << "resize_type: " << "bilinear no align";
+                                        testbase.run_test(resize_bilinear_no_align_cpu<float, AMD, AMDHX86>, 0.0001);
+                                        break;
+                                    case 2:
+                                        LOG(INFO) << "resize_type: " << "custom";
+                                        testbase.run_test(resize_bilinear_custom_cpu<float, AMD, AMDHX86>, 0.0001);
                                     default:
                                         break;
                                 }
