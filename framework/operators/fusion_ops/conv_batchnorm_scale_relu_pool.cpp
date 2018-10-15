@@ -1,3 +1,17 @@
+/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 #include "framework/operators/fusion_ops/conv_batchnorm_scale_relu_pool.h"
 
 namespace anakin {
@@ -171,21 +185,21 @@ Status ConvBatchnormScaleReluPoolHelper<Ttype, Ptype>::Init(OpContext<Ttype> &ct
 
         graph::GraphGlobalMem<Ttype>::Global().template apply<Level_1>(
                                     std::bind(&ConvPooling<Ttype, PrecisionWrapper<Ptype>::saber_type>::trans_weights, 
-                                    &_funcs_conv_batchnorm_scale_relu_pooling, 
+                                    &_funcs_conv_batchnorm_scale_relu_pooling, _1, _2, _3, _4, _5), 
                                     weights.d_tensor(), 
                                     strides[0], strides[1], 
                                     group, 
-                                    SABER_IMPL));
+                                    SABER_IMPL);
         weights.map_to_host();
     } else {
         PBlock<Ttype> weight_empty;
         graph::GraphGlobalMem<Ttype>::Global().template apply<Level_1>(
                                     std::bind(&ConvPooling<Ttype, PrecisionWrapper<Ptype>::saber_type>::trans_weights, 
-                                    &_funcs_conv_batchnorm_scale_relu_pooling, 
+                                    &_funcs_conv_batchnorm_scale_relu_pooling, _1, _2, _3, _4, _5),
                                     weight_empty.d_tensor(), 
                                     strides[0], strides[1], 
                                     group, 
-                                    SABER_IMPL));
+                                    SABER_IMPL);
     }
     return Status::OK();
 }
@@ -243,6 +257,11 @@ template class ConvBatchnormScaleReluPoolHelper<ARM, Precision::FP32>;
 ANAKIN_REGISTER_OP_HELPER(ConvBatchnormScaleReluPool, ConvBatchnormScaleReluPoolHelper, ARM, Precision::FP32);
 #endif
 
+#ifdef AMD_GPU
+INSTANCE_CONVBATCHNORMSCALERELUPOOLING(AMD, Precision::FP32);
+template class ConvBatchnormScaleReluPoolHelper<AMD, Precision::FP32>;
+ANAKIN_REGISTER_OP_HELPER(ConvBatchnormScaleReluPool, ConvBatchnormScaleReluPoolHelper, AMD, Precision::FP32);
+#endif
 
 //! register op
 ANAKIN_REGISTER_OP(ConvBatchnormScaleReluPool)
@@ -252,6 +271,9 @@ ANAKIN_REGISTER_OP(ConvBatchnormScaleReluPool)
 #endif
 #ifdef USE_ARM_PLACE
     .__alias__<ARM, Precision::FP32>("convolution_batchnorm_scale_relu_pooling")
+#endif
+#ifdef AMD_GPU
+    .__alias__<AMD, Precision::FP32>("convolution_batchnorm_scale_relu_pooling")
 #endif
     .num_in(1)
     .num_out(1)

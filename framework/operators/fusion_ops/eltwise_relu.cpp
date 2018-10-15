@@ -103,7 +103,7 @@ Status EltwiseReluHelper<Ttype, Ptype>::InferShape(const
     return Status::OK();
 }
 
-#ifdef USE_CUDA
+#ifdef AMD_GPU
 template class EltwiseReluHelper<AMD, Precision::FP32>;
 template class EltwiseReluHelper<AMD, Precision::FP16>;
 template class EltwiseReluHelper<AMD, Precision::INT8>;
