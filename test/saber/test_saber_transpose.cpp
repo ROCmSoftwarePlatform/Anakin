@@ -1,4 +1,17 @@
+/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
 
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 #include "saber/core/context.h"
 #include "saber/funcs/transpose.h"
 #include "test_saber_func.h"
@@ -41,6 +54,25 @@ void transpose_cpu(const std::vector<Tensor<TargetType_H>*>& input,std::vector<T
 
 
 TEST(TestSaberFunc, test_func_transpose){
+#ifdef AMD_GPU
+        LOG(INFO)<<"AMD test......";
+        //Init the test_base
+        Env<AMD>::env_init();
+        TestSaberBase<AMD,AMDHX86,AK_FLOAT, Transpose, TransposeParam> testbase;
+        for(int num_in:{1,3,32}){
+            for(int c_in:{1,3,12}){
+                for(int h_in:{2,3,25}){
+                    for(int w_in:{2,3,32}){
+                        TransposeParam<AMD> param;
+                        testbase.set_param(param);
+                        testbase.set_input_shape(Shape({num_in, c_in, h_in, w_in}));
+                        testbase.run_test(transpose_cpu<float, AMD, AMDHX86>);
+
+                    }
+                }
+            }
+        }
+#endif
 
 #ifdef USE_CUDA
     LOG(INFO)<<"NV test......";
