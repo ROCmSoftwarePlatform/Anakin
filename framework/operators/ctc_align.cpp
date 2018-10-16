@@ -1,8 +1,34 @@
+/* Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 #include "framework/operators/ctc_align.h"
 
 namespace anakin {
 
 namespace ops {
+
+#ifdef AMD_GPU
+template<>
+void CtcAlign<AMD, Precision::FP32>::operator() (OpContext<AMD> &ctx, 
+                          const std::vector<Tensor4dPtr<AMD> >& ins, 
+                          std::vector<Tensor4dPtr<AMD> >& outs) {
+    auto* impl = static_cast<CtcAlignHelper<AMD, Precision::FP32>*>(this->_helper);
+    auto& param = static_cast<CtcAlignHelper<AMD, Precision::FP32>*>(this->_helper)->_param_ctc_align;
+    impl->_funcs_ctc_align(ins, outs, param, ctx);
+}
+#endif
 
 #ifdef USE_CUDA
 template<>
@@ -66,6 +92,10 @@ template class CtcAlignHelper<ARM, Precision::INT8>;
 //template class CtcAlignHelper<ARM, Precision::FP16>;
 //template class CtcAlignHelper<ARM, Precision::INT8>;
 // register helper 
+
+#ifdef AMD_GPU
+ANAKIN_REGISTER_OP_HELPER(CtcAlign, CtcAlignHelper, AMD, Precision::FP32);
+#endif
 #ifdef USE_CUDA
 ANAKIN_REGISTER_OP_HELPER(CtcAlign, CtcAlignHelper, NV, Precision::FP32);
 #endif
@@ -76,6 +106,10 @@ ANAKIN_REGISTER_OP_HELPER(CtcAlign, CtcAlignHelper, ARM, Precision::FP32);
 //! register op
 ANAKIN_REGISTER_OP(CtcAlign)
     .Doc("CtcAlign operator")
+
+#ifdef AMD_GPU
+    .__alias__<AMD, Precision::FP32>("ctc_align")
+#endif
 #ifdef USE_CUDA
     .__alias__<NV, Precision::FP32>("ctc_align")
 #endif
