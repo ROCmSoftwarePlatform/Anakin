@@ -1,3 +1,17 @@
+/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 #include "core/tensor.h"
 #include "core/common.h"
 #include "core/buffer.h"
@@ -196,7 +210,7 @@ void AMD_API::destroy_stream(stream_t stream) {
 }
 
 void AMD_API::destroy_event(event_t event) {
-    ALOGD(__func__ << " :Does baidu expect this event is an User Event?");
+    ALOGD(__func__);
 
     if (event == nullptr) {
         ALOGD("event is empty, do nothing");
@@ -210,11 +224,9 @@ void AMD_API::destroy_event(event_t event) {
         AMD_CHECK(clGetEventInfo(event, CL_EVENT_REFERENCE_COUNT, sizeof(cl_int), &refs, NULL));
         if (refs == 1)
             AMD_CHECK(clSetUserEventStatus(event, CL_COMPLETE));
-
-        AMD_CHECK(clReleaseEvent(event));
-    } else {
-        ALOGD("NOT User Event, do nothing");
     }
+
+    AMD_CHECK(clReleaseEvent(event));
 }
 
 void AMD_API::record_event(event_t& event, stream_t stream) {
@@ -907,11 +919,9 @@ void AMDH_API::destroy_event(event_t event) {
         AMD_CHECK(clGetEventInfo(event, CL_EVENT_REFERENCE_COUNT, sizeof(cl_int), &refs, NULL));
         if (refs == 1)
             AMD_CHECK(clSetUserEventStatus(event, CL_COMPLETE));
-
-        AMD_CHECK(clReleaseEvent(event));
-    } else {
-        ALOGD("NOT User Event, do nothing");
     }
+
+    AMD_CHECK(clReleaseEvent(event));
 }
 
 void AMDH_API::record_event(event_t& event, stream_t stream) {

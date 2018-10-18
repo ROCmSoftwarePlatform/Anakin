@@ -44,8 +44,7 @@ bool LaunchKernel(AMDStream_t stream, amd_kernel_list kernels, bool sync) {
             ALOGD(__func__ << " Failed");
             return false;
         }
-        if (record)
-            list.push_back(event);
+
         if (sync) {
             TargetWrapper<AMD>::sync_event(event);
             cl_ulong start, end;
@@ -54,6 +53,10 @@ bool LaunchKernel(AMDStream_t stream, amd_kernel_list kernels, bool sync) {
             clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, NULL);
             exec_time_ms = (end - start) * 1e-6;
         }
+        if (record)
+            list.push_back(event);
+        else if (sync)
+            TargetWrapper<AMD>::destroy_event(event);
         ALOGD(__func__ << " X : " << exec_time_ms << " ms");
     }
     if (record)
