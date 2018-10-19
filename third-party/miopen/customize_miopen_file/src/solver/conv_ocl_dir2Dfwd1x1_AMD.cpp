@@ -216,7 +216,28 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
 
             kernelInfo.l_wk = {256, 1, 1};
             kernelInfo.g_wk = {256 * 200, 1, 1};
+        } else if (conv11_param->kernel_name == "Conv1x1C320H7W7K1280Pool.cl") {
+            kernelInfo.kernel_name = "conv1x1_act_pool";
+
+            if (params.bias) {
+                kernelInfo.comp_options = std::string(" -DBIAS ") + std::string(" -DN=")
+                                          + std::to_string(params.batch_sz) + std::string(" -DH=")
+                                          + std::to_string(params.in_height) + std::string(" -DW=")
+                                          + std::to_string(params.in_width) + std::string(" -DC=")
+                                          + std::to_string(params.n_inputs) + std::string(" -DK=")
+                                          + std::to_string(params.n_outputs);
+            } else {
+                kernelInfo.comp_options = std::string(" -DN=") + std::to_string(params.batch_sz)
+                                          + std::string(" -DH=") + std::to_string(params.in_height)
+                                          + std::string(" -DW=") + std::to_string(params.in_width)
+                                          + std::string(" -DC=") + std::to_string(params.n_inputs)
+                                          + std::string(" -DK=") + std::to_string(params.n_outputs);
+            }
+
+            kernelInfo.l_wk = {1024, 1, 1};
+            kernelInfo.g_wk = {1024 * 64, 1, 1};
         }
+        kernelInfo.isMIOpenKernel = false;
         result.construction_params.push_back(kernelInfo);
     } else {
         ALOGE("can NOT get solution");

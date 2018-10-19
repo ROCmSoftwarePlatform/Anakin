@@ -89,7 +89,16 @@ void ConvCommon::init() {
     // width = 7
     // MobilenetV2, C160H7W7K960S1 but not implement
 
-    // MobilenetV2, W7C320K1280POOL but not implement
+    // MobilenetV2, W7C320K1280POOL
+    tempType              = new Conv1x1Type();
+    tempType->stride      = 1;
+    tempType->channel     = 320;
+    tempType->width       = 7;
+    tempType->output_num  = 1280;
+    tempType->batch       = 1;
+    tempType->dev         = GFX803;
+    tempType->kernel_name = "Conv1x1C320H7W7K1280Pool.cl";
+    conv1x1type.push_back(tempType);
 
     // Mobilenet, C512H7W7K1024S1 but not implement
 
@@ -498,7 +507,16 @@ void ConvCommon::init() {
     // width = 7
     // MobilenetV2, C160H7W7K960S1 but not implement
 
-    // MobilenetV2, W7C320K1280POOL but not implement
+    // MobilenetV2, W7C320K1280POOL
+    tempType              = new Conv1x1Type();
+    tempType->stride      = 1;
+    tempType->channel     = 320;
+    tempType->width       = 7;
+    tempType->output_num  = 1280;
+    tempType->batch       = 1;
+    tempType->dev         = GFX900;
+    tempType->kernel_name = "Conv1x1C320H7W7K1280Pool.cl";
+    conv1x1type.push_back(tempType);
 
     // Mobilenet, C512H7W7K1024S1 but not implement
 
