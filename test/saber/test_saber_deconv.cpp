@@ -291,7 +291,7 @@ void deconv_testbase() {
     std::vector<int> in_h_v{64};
     std::vector<int> in_w_v{64};
     std::vector<int> input_num_v{1};
-    std::vector<int> input_channels_v{16};
+    std::vector<int> input_channels_v{48};
     std::vector<int> output_channels_v{16};
     std::vector<bool> bias_term_v{true, false};
     std::vector<bool> with_relu_v{true, false};

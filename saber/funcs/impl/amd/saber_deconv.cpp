@@ -42,16 +42,11 @@ SaberStatus SaberDeconv2D<AMD, OpDtype>::create(
     KernelInfo kernelInfo;
 
     // bool isBias = (param.bias()->size() > 0) ? true : false;
-    int isBias = (param.bias()->size() > 0) ? 1 : 0;
-    int relu_flag;
-    if (param.activation_param.active == Active_relu)
-        relu_flag = 1;
-    else
-        relu_flag = 0;
-
+    int isBias           = (param.bias()->size() > 0) ? 1 : 0;
+    int relu_flag        = (param.activation_param.active == Active_relu) ? 1 : 0;
     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
-
-    int K       = (param.weight()->num());
+    // int K       = (param.weight()->num());
+    int K       = (param.weight()->channel());
     int N       = (inputs[0]->height()) * (inputs[0]->width());
     int M       = (outputs[0]->channel()) * (param.weight()->height()) * (param.weight()->width());
     float alpha = 1.0;
@@ -69,23 +64,14 @@ SaberStatus SaberDeconv2D<AMD, OpDtype>::create(
     tgg = MIOpenGEMM::Geometry(false, tA, tB, tC, lda, ldb, ldc, M, N, K, 0, 'f');
 
     if (param.weight()->height() == 1 && param.weight()->width() == 1 && param.stride_h == 1
-        && param.stride_w == 1) {
+        && param.stride_w == 1 && param.pad_h == 0 && param.pad_w == 0) {
         _outGemmWorkspace = new Tensor<AMD>;
         Shape sh({inputs[0]->num(), inputs[0]->channel(), inputs[0]->height(), inputs[0]->width()});
 
         _outGemmWorkspace->re_alloc(sh);
-        _outCol2ImSpace = new Tensor<AMD>;
-
-        Shape sh2({outputs[0]->num(),
-                   outputs[0]->channel(),
-                   outputs[0]->height(),
-                   outputs[0]->width()});
-        _outCol2ImSpace->re_alloc(sh2);
         bool miopengemm_verbose = false;
-
         // jn : print warning messages when the returned kernel(s) might be sub-optimal
         bool miopengemm_warnings = false;
-
         // jn : find with no workspace
         MIOpenGEMM::Solution soln = MIOpenGEMM::find(
                 0.003f,
@@ -97,92 +83,82 @@ SaberStatus SaberDeconv2D<AMD, OpDtype>::create(
                 tgg,
                 miopengemm_verbose,
                 miopengemm_warnings);
-
         std::string kernel_clstring;
         size_t local_work_size;
         size_t global_work_size;
         cl_int errCode;
-        int kernelNum = 0;
-        for (int j = 0; j < inputs[0]->num(); j++) {
-            int i = 0;
-            if (soln.v_tgks.size() == 2) {
-                _multikernel = true;
 
-                // jn : the main kernel is at the back of the solution vector
-                kernel_clstring = soln.v_tgks[i].kernstr;
-                tempfix::set_offsets_to_uint(kernel_clstring, 1);
-
-                kernelInfo.kernel_type = SOURCE;
-                kernelInfo.kernel_name = soln.v_tgks[i].fname;
-                local_work_size        = soln.v_tgks[i].local_work_size;
-                global_work_size       = soln.v_tgks[i].global_work_size;
-
-                kernelInfo.kernel_file   = kernel_clstring;
-                kernelInfo.wk_dim        = 1;
-                kernelInfo.l_wk          = {local_work_size, 1, 1};
-                kernelInfo.g_wk          = {global_work_size, 1, 1};
-                AMDKernelPtr kptr_atomic = CreateKernel(inputs[0]->device_id(), &kernelInfo);
-
-                if (!kptr_atomic.get()->isInit()) {
-                    ALOGE("Failed to create kernel");
-                    return SaberInvalidValue;
-                }
-                _kernel_atomic = kptr_atomic;
-                _kernels.push_back(kptr_atomic);
-
-                kernelNum++;
-                i++;
-            }
+        int i = 0;
+        if (soln.v_tgks.size() == 2) {
+            _multikernel = true;
 
             // jn : the main kernel is at the back of the solution vector
             kernel_clstring = soln.v_tgks[i].kernstr;
-            tempfix::set_offsets_to_uint(kernel_clstring, 3);
+            tempfix::set_offsets_to_uint(kernel_clstring, 1);
 
+            kernelInfo.kernel_type = SOURCE;
             kernelInfo.kernel_name = soln.v_tgks[i].fname;
             local_work_size        = soln.v_tgks[i].local_work_size;
             global_work_size       = soln.v_tgks[i].global_work_size;
 
-            kernelInfo.kernel_file = kernel_clstring;
-            kernelInfo.wk_dim      = 1;
-            kernelInfo.l_wk        = {local_work_size, 1, 1};
-            kernelInfo.g_wk        = {global_work_size, 1, 1};
-            kernelInfo.kernel_type = SOURCE;
+            kernelInfo.kernel_file   = kernel_clstring;
+            kernelInfo.wk_dim        = 1;
+            kernelInfo.l_wk          = {local_work_size, 1, 1};
+            kernelInfo.g_wk          = {global_work_size, 1, 1};
+            AMDKernelPtr kptr_atomic = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
-            AMDKernelPtr kptr_normal = CreateKernel(inputs[0]->device_id(), &kernelInfo);
-
-            if (!kptr_normal.get()->isInit()) {
+            if (!kptr_atomic.get()->isInit()) {
                 ALOGE("Failed to create kernel");
                 return SaberInvalidValue;
             }
-            _kernel_normal = kptr_normal;
-            _kernels.push_back(kptr_normal);
+            _kernel_atomic = kptr_atomic;
+            _kernels.push_back(kptr_atomic);
 
-            kernelNum++;
+            i++;
         }
-        if (isBias) {
-            kernelInfo.kernel_file = "MIOpenBiasReLuUni.cl";
-            kernelInfo.kernel_name = "MIOpenBias";
-            kernelInfo.kernel_type = SABER;
-            kernelInfo.wk_dim      = 1;
-            kernelInfo.l_wk        = {256};
-            kernelInfo.g_wk        = {(outputs[0]->num()) * (param.weight()->num())
-                                       * (outputs[0]->height()) * (outputs[0]->width()),
-                               1,
-                               1};
 
-            AMDKernelPtr kptr_isBias = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+        // jn : the main kernel is at the back of the solution vector
+        kernel_clstring = soln.v_tgks[i].kernstr;
+        tempfix::set_offsets_to_uint(kernel_clstring, 3);
 
-            if (!kptr_isBias.get()->isInit()) {
-                ALOGE("Failed to load program");
-                return SaberInvalidValue;
-            }
-            _kernel_isBias = kptr_isBias;
-            _kernels.push_back(kptr_isBias);
+        kernelInfo.kernel_name = soln.v_tgks[i].fname;
+        local_work_size        = soln.v_tgks[i].local_work_size;
+        global_work_size       = soln.v_tgks[i].global_work_size;
 
-            kernelNum++;
+        kernelInfo.kernel_file = kernel_clstring;
+        kernelInfo.wk_dim      = 1;
+        kernelInfo.l_wk        = {local_work_size, 1, 1};
+        kernelInfo.g_wk        = {global_work_size, 1, 1};
+        kernelInfo.kernel_type = SOURCE;
+
+        AMDKernelPtr kptr_normal = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+
+        if (!kptr_normal.get()->isInit()) {
+            ALOGE("Failed to create kernel");
+            return SaberInvalidValue;
         }
-    } else { // !=1  !=1 !=1 !=1
+        _kernel_normal = kptr_normal;
+        _kernels.push_back(kptr_normal);
 
+        kernelInfo.kernel_file = "MIOpenBiasReLuUni.cl";
+        kernelInfo.kernel_name = "MIOpenBiasReluBoth";
+        kernelInfo.kernel_type = SABER;
+
+        kernelInfo.l_wk = {256, 1, 1};
+        kernelInfo.g_wk = {(outputs[0]->num()) * (param.weight()->num()) * (outputs[0]->height())
+                                   * (outputs[0]->width()),
+                           1,
+                           1};
+
+        AMDKernelPtr kptr_isBias = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+
+        if (!kptr_isBias.get()->isInit()) {
+            ALOGE("Failed to load program");
+            return SaberInvalidValue;
+        }
+        _kernel_isBias = kptr_isBias;
+        _kernels.push_back(kptr_isBias);
+    } else {
         _outGemmWorkspace = new Tensor<AMD>();
         Shape sh({param.weight()->channel(),
                   param.weight()->height(),
@@ -215,82 +191,74 @@ SaberStatus SaberDeconv2D<AMD, OpDtype>::create(
         size_t local_work_size;
         size_t global_work_size;
         cl_int errCode;
-        int kernelNum = 0;
-        for (int j = 0; j < inputs[0]->num(); j++) {
-            int i = 0;
+        int i = 0;
+        if (soln.v_tgks.size() == 2) {
+            _multikernel = true;
 
-            if (soln.v_tgks.size() == 2) {
-                _multikernel = true;
-
-                // jn : the main kernel is at the back of the solution vector
-                kernel_clstring = soln.v_tgks[i].kernstr;
-                tempfix::set_offsets_to_uint(kernel_clstring, 1);
-
-                kernelInfo.kernel_name = soln.v_tgks[i].fname;
-                local_work_size        = soln.v_tgks[i].local_work_size;
-                global_work_size       = soln.v_tgks[i].global_work_size;
-
-                kernelInfo.kernel_file = kernel_clstring;
-                kernelInfo.wk_dim      = 1;
-                kernelInfo.l_wk        = {local_work_size, 1, 1};
-                kernelInfo.g_wk        = {global_work_size, 1, 1};
-                kernelInfo.kernel_type = SOURCE;
-
-                AMDKernelPtr kptr_atomic = CreateKernel(inputs[0]->device_id(), &kernelInfo);
-
-                if (!kptr_atomic.get()->isInit()) {
-                    ALOGE("Failed to load program");
-                    return SaberInvalidValue;
-                }
-                _kernel_atomic = kptr_atomic;
-                _kernels.push_back(kptr_atomic);
-                kernelNum++;
-                i++;
-            }
-
-            // jn : the main kernel is at the back of the solution vector
             kernel_clstring = soln.v_tgks[i].kernstr;
-            tempfix::set_offsets_to_uint(kernel_clstring, 3);
+            tempfix::set_offsets_to_uint(kernel_clstring, 1);
 
             kernelInfo.kernel_name = soln.v_tgks[i].fname;
             local_work_size        = soln.v_tgks[i].local_work_size;
             global_work_size       = soln.v_tgks[i].global_work_size;
 
             kernelInfo.kernel_file = kernel_clstring;
-
+            kernelInfo.wk_dim      = 1;
             kernelInfo.l_wk        = {local_work_size, 1, 1};
             kernelInfo.g_wk        = {global_work_size, 1, 1};
-            kernelInfo.wk_dim      = 1;
             kernelInfo.kernel_type = SOURCE;
 
-            AMDKernelPtr kptr_normal = CreateKernel(inputs[0]->device_id(), &kernelInfo);
-            _kernel_normal           = kptr_normal;
-            _kernels.push_back(kptr_normal);
-            kernelNum++;
+            AMDKernelPtr kptr_atomic = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
-            kernelInfo.kernel_file = "MIOpenUtilKernels2.cl";
-            kernelInfo.kernel_name = "Col2Im";
-            kernelInfo.kernel_type = SABER;
-            kernelInfo.wk_dim      = 1;
-            kernelInfo.l_wk        = {256, 1, 1};
-            kernelInfo.g_wk        = {
-                    param.weight()->num() * outputs[0]->height() * outputs[0]->width(), 1, 1};
-
-            AMDKernelPtr kptr_col2Im = CreateKernel(inputs[0]->device_id(), &kernelInfo);
-
-            if (!kptr_col2Im.get()->isInit()) {
-                ALOGE("Failed to create kernel");
+            if (!kptr_atomic.get()->isInit()) {
+                ALOGE("Failed to load program");
                 return SaberInvalidValue;
             }
-            _kernel_col2Im = kptr_col2Im;
-            _kernels.push_back(kptr_col2Im);
-
-            kernelNum++;
+            _kernel_atomic = kptr_atomic;
+            _kernels.push_back(kptr_atomic);
+            i++;
         }
+
+        // jn : the main kernel is at the back of the solution vector
+        kernel_clstring = soln.v_tgks[i].kernstr;
+        tempfix::set_offsets_to_uint(kernel_clstring, 3);
+
+        kernelInfo.kernel_name = soln.v_tgks[i].fname;
+        local_work_size        = soln.v_tgks[i].local_work_size;
+        global_work_size       = soln.v_tgks[i].global_work_size;
+
+        kernelInfo.kernel_file = kernel_clstring;
+
+        kernelInfo.l_wk        = {local_work_size, 1, 1};
+        kernelInfo.g_wk        = {global_work_size, 1, 1};
+        kernelInfo.wk_dim      = 1;
+        kernelInfo.kernel_type = SOURCE;
+
+        AMDKernelPtr kptr_normal = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+        _kernel_normal           = kptr_normal;
+        _kernels.push_back(kptr_normal);
+
+        kernelInfo.kernel_file = "MIOpenUtilKernels2.cl";
+        kernelInfo.kernel_name = "Col2Im";
+        kernelInfo.kernel_type = SABER;
+        kernelInfo.wk_dim      = 1;
+        kernelInfo.l_wk        = {256, 1, 1};
+        kernelInfo.g_wk        = {
+                param.weight()->num() * outputs[0]->height() * outputs[0]->width(), 1, 1};
+
+        AMDKernelPtr kptr_col2Im = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+
+        if (!kptr_col2Im.get()->isInit()) {
+            ALOGE("Failed to create kernel");
+            return SaberInvalidValue;
+        }
+        _kernel_col2Im = kptr_col2Im;
+        _kernels.push_back(kptr_col2Im);
 
         kernelInfo.kernel_file = "MIOpenBiasReLuUni.cl";
         kernelInfo.kernel_name = "MIOpenBiasReluBoth";
         kernelInfo.kernel_type = SABER;
+        kernelInfo.wk_dim      = 1;
 
         kernelInfo.l_wk = {256, 1, 1};
         kernelInfo.g_wk = {(outputs[0]->num()) * (param.weight()->num()) * (outputs[0]->height())
@@ -306,7 +274,6 @@ SaberStatus SaberDeconv2D<AMD, OpDtype>::create(
         }
         _kernel_isBias = kptr_isBias;
         _kernels.push_back(kptr_isBias);
-        kernelNum++;
     }
 
     ALOGD("COMPLETE CREATE KERNEL");
@@ -321,23 +288,14 @@ SaberStatus SaberDeconv2D<AMD, OpDtype>::dispatch(
     bool err;
     ALOGD("dispatch");
     amd_kernel_list list;
-    int isBias    = 0;
-    int relu_flag = 0;
 
     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
-    // isBias          = (param.bias()->size() > 0) ? true : false;
-    if (param.bias()->size() > 0)
-        isBias = 1;
-    else
-        isBias = 0;
 
-    if (param.activation_param.active == Active_relu)
-        relu_flag = 1;
-    else
-        relu_flag = 0;
+    int isBias    = (param.bias()->size() > 0) ? 1 : 0;
+    int relu_flag = (param.activation_param.active == Active_relu) ? 1 : 0;
 
     if (param.weight()->height() == 1 && param.weight()->width() == 1 && param.stride_h == 1
-        && param.stride_w == 1) {
+        && param.stride_w == 1 && param.pad_h == 0 && param.pad_w == 0) {
         cl_uint uintObjects[3]   = {0, 0, 0};
         cl_float floatObjects[2] = {1.0f, 0.0f};
         cl_uint im_offset        = 0;
@@ -347,14 +305,12 @@ SaberStatus SaberDeconv2D<AMD, OpDtype>::dispatch(
                                 (cl_mem)outputs[0]->mutable_data(),
                                 (cl_mem)param.bias()->data()};
         cl_mem gemmWrokspace     = (cl_mem)_outGemmWorkspace->mutable_data();
-
-        int j = 0;
+        int j                    = 0;
         for (int i = 0; i < (inputs[0]->num()); i++) {
             uintObjects[0] =
                     i * (inputs[0]->channel()) * (inputs[0]->height()) * (inputs[0]->width());
             uintObjects[2] =
                     i * (param.weight()->num()) * outputs[0]->height() * outputs[0]->width();
-            // im_offset = i* outputs[0]->channel() * outputs[0]->height() * outputs[0]->width();
             if (_multikernel) {
                 AMDKernel* kernel = _kernel_atomic.get();
                 kernel->SetKernelArgs(
@@ -377,28 +333,59 @@ SaberStatus SaberDeconv2D<AMD, OpDtype>::dispatch(
 
             list.push_back(_kernel_normal);
             ALOGD("COMPLETE SET ARGUMENT");
-        }
 
+            err = LaunchKernel(cm, list);
+            if (!err) {
+                ALOGE("Fialed to set execution.");
+                return SaberInvalidValue;
+            }
+            list.clear();
+        }
         if (isBias) {
             AMDKernel* kernel = _kernel_isBias.get();
-
-            err = kernel->SetKernelArgs(
+            kernel->SetKernelArgs(
                     (PtrDtype)memObjects[2],
                     (PtrDtype)memObjects[2],
                     (PtrDtype)memObjects[3],
-                    1.0f,
+                    0.0f, // important
                     (int)(inputs[0]->num()),
                     (int)(param.weight()->num()),
                     (int)(outputs[0]->height()),
-                    (int)(outputs[0]->width()));
+                    (int)(outputs[0]->width()),
+                    (int)isBias,
+                    (int)relu_flag);
 
             list.push_back(_kernel_isBias);
             ALOGD("COMPLETE SET ARGUMENT");
-        }
-    }
+        } else // isBias==0
+        {
+            if (relu_flag) {
+                AMDKernel* kernel = _kernel_isBias.get();
+                kernel->SetKernelArgs(
+                        (PtrDtype)memObjects[2],
+                        (PtrDtype)memObjects[2],
+                        (PtrDtype)memObjects[3],
+                        0.0f,
+                        (int)(inputs[0]->num()),
+                        (int)(param.weight()->num()),
+                        (int)(outputs[0]->height()),
+                        (int)(outputs[0]->width()),
+                        (int)isBias,
+                        (int)relu_flag);
 
-    else // param.weight()->height() != 1 && param.weight()->width() != 1 && param.stride_h != 1 &&
-         // param.stride_w != 1
+                list.push_back(_kernel_isBias);
+            }
+
+            ALOGD("COMPLETE SET ARGUMENT");
+        }
+        err = LaunchKernel(cm, list);
+        if (!err) {
+            ALOGE("Fialed to set execution.");
+            return SaberInvalidValue;
+        }
+        list.clear();
+    } else // param.weight()->height() != 1 && param.weight()->width() != 1 && param.stride_h != 1
+           // && param.stride_w != 1
     {
 
         cl_uint uintObjects[3]   = {0, 0, 0};
@@ -415,12 +402,11 @@ SaberStatus SaberDeconv2D<AMD, OpDtype>::dispatch(
         AMDKernel* kernel;
         for (int i = 0; i < (inputs[0]->num()); i++) {
             uintObjects[0] =
-                    // i * (param.weight()->num()) * (inputs[0]->height()) * (inputs[0]->width());
                     i * (inputs[0]->channel()) * (inputs[0]->height()) * (inputs[0]->width());
 
             uintObjects[2] =
                     i * (param.weight()->num()) * outputs[0]->height() * outputs[0]->width();
-            // im_offset = i* outputs[0]->channel() * outputs[0]->height() * outputs[0]->width();
+
             if (_multikernel) {
                 AMDKernel* kernel = _kernel_atomic.get();
                 kernel->SetKernelArgs(
@@ -440,27 +426,34 @@ SaberStatus SaberDeconv2D<AMD, OpDtype>::dispatch(
                     (float)floatObjects[1]);
 
             list.push_back(_kernel_normal);
-        }
-        kernel = _kernel_col2Im.get();
-        kernel->SetKernelArgs(
-                (PtrDtype)_outCol2ImSpace->mutable_data(),
-                (int)inputs[0]->height(),
-                (int)inputs[0]->width(),
-                (int)param.weight()->height(),
-                (int)param.weight()->width(),
-                (int)param.pad_h,
-                (int)param.pad_w,
-                (int)param.stride_h,
-                (int)param.stride_w,
-                (int)param.dilation_h,
-                (int)param.dilation_w,
-                (int)outputs[0]->height(),
-                (int)outputs[0]->width(),
-                (PtrDtype)outputs[0]->mutable_data(),
-                (int)uintObjects[2]);
 
-        list.push_back(_kernel_col2Im);
-        ALOGD("COMPLETE SET ARGUMENT");
+            kernel = _kernel_col2Im.get();
+            kernel->SetKernelArgs(
+                    (PtrDtype)_outCol2ImSpace->mutable_data(),
+                    (int)inputs[0]->height(),
+                    (int)inputs[0]->width(),
+                    (int)param.weight()->height(),
+                    (int)param.weight()->width(),
+                    (int)param.pad_h,
+                    (int)param.pad_w,
+                    (int)param.stride_h,
+                    (int)param.stride_w,
+                    (int)param.dilation_h,
+                    (int)param.dilation_w,
+                    (int)outputs[0]->height(),
+                    (int)outputs[0]->width(),
+                    (PtrDtype)outputs[0]->mutable_data(),
+                    (int)uintObjects[2]);
+            list.push_back(_kernel_col2Im);
+            ALOGD("COMPLETE SET ARGUMENT");
+
+            err = LaunchKernel(cm, list);
+            if (!err) {
+                ALOGE("Fialed to set execution.");
+                return SaberInvalidValue;
+            }
+            list.clear();
+        }
 
         if (isBias) {
 

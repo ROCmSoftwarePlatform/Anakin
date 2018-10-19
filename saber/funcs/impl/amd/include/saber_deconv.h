@@ -98,7 +98,6 @@ private:
     AMDKernelPtr _kernel_isBias;
 
     std::vector<cl_program> _programs;
-    size_t _x_t_size;
     bool _multikernel;
     Tensor<AMD>* _outGemmWorkspace;
     Tensor<AMD>* _outCol2ImSpace;
