@@ -1,6 +1,27 @@
 /*******************************************************************************
- * conv_ocl_dir2Dfwd1x1_AMD.cpp
- * Created on: Oct. 5, 2018
+ *
+ * MIT License
+ *
+ * Copyright (c) 2018 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
  *******************************************************************************/
 
 #include "miopen/solver.hpp"
@@ -39,10 +60,15 @@ bool ConvOclDirectFwd1x1AMD::IsApplicable(const ConvolutionContext& params) cons
             dev = GFX900;
         }
         ConvCommon cc;
-        Conv1x1Type conv11_param = cc.getKernelInfo(
+        Conv1x1Type* conv11_param = cc.getKernelInfo(
                 dev, params.kernel_stride0, params.n_inputs, params.in_width, params.n_outputs);
-        if (!conv11_param.isValid)
+
+        if (conv11_param == NULL) {
             result = false;
+        } else {
+            ALOGD("ConvOclDirectFwd1x1AMD::IsApplicable result:" << result << " kernel name="
+                                                                 << conv11_param->kernel_name);
+        }
     }
     return result;
 }
@@ -62,13 +88,13 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
     }
 
     ConvCommon cc;
-    Conv1x1Type conv11_param = cc.getKernelInfo(
+    Conv1x1Type* conv11_param = cc.getKernelInfo(
             dev, params.kernel_stride0, params.n_inputs, params.in_width, params.n_outputs);
 
     KernelInfo kernelInfo;
-    if (conv11_param.isValid) {
-        kernelInfo.kernel_file = conv11_param.kernel_name;
-        if (conv11_param.kernel_name == "Conv1x1Atomic.cl") {
+    if (conv11_param != NULL) {
+        kernelInfo.kernel_file = conv11_param->kernel_name;
+        if (conv11_param->kernel_name == "Conv1x1Atomic.cl") {
             kernelInfo.kernel_name = "conv1x1_act";
 
             kernelInfo.comp_options =
@@ -79,26 +105,26 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
                     + std::to_string(params.n_inputs) + std::string(" -DK=")
                     + std::to_string(params.n_outputs) + std::string(" -DSTRIDE=")
                     + std::to_string(params.kernel_stride0) + std::string(" -DGLOBAL_SPLITU=")
-                    + std::to_string(conv11_param.params.global_split)
+                    + std::to_string(conv11_param->params.global_split)
                     + std::string(" -DPER_ITER_STRIDE=")
-                    + std::to_string(conv11_param.params.stride_per_iter)
-                    + std::string(" -DTILE_COL=") + std::to_string(conv11_param.params.tile_col)
-                    + std::string(" -DTILE_ROW=") + std::to_string(conv11_param.params.tile_row)
+                    + std::to_string(conv11_param->params.stride_per_iter)
+                    + std::string(" -DTILE_COL=") + std::to_string(conv11_param->params.tile_col)
+                    + std::string(" -DTILE_ROW=") + std::to_string(conv11_param->params.tile_row)
                     + std::string(" -DPER_WI_TILE_ROW=")
-                    + std::to_string(conv11_param.params.wi_per_tile_col)
+                    + std::to_string(conv11_param->params.wi_per_tile_col)
                     + std::string(" -DPER_WI_TILE_COL=")
-                    + std::to_string(conv11_param.params.wi_per_tile_row)
-                    + std::string(" -DBRANCH=") + std::to_string(conv11_param.params.code_branch)
-                    + std::string(" -DMETHOD=") + std::to_string(conv11_param.params.code_method);
+                    + std::to_string(conv11_param->params.wi_per_tile_row)
+                    + std::string(" -DBRANCH=") + std::to_string(conv11_param->params.code_branch)
+                    + std::string(" -DMETHOD=") + std::to_string(conv11_param->params.code_method);
 
-            int wg_in = (params.out_height * params.out_width + conv11_param.params.tile_col - 1)
-                        / conv11_param.params.tile_col;
-            int wg_wei = (params.n_outputs + conv11_param.params.tile_row - 1)
-                         / conv11_param.params.tile_row;
+            int wg_in = (params.out_height * params.out_width + conv11_param->params.tile_col - 1)
+                        / conv11_param->params.tile_col;
+            int wg_wei = (params.n_outputs + conv11_param->params.tile_row - 1)
+                         / conv11_param->params.tile_row;
 
             kernelInfo.l_wk = {256, 1, 1};
-            kernelInfo.g_wk = {256 * wg_in * wg_wei * conv11_param.params.global_split, 1, 1};
-        } else if (conv11_param.kernel_name == "Conv1x1FC7.cl") {
+            kernelInfo.g_wk = {256 * wg_in * wg_wei * conv11_param->params.global_split, 1, 1};
+        } else if (conv11_param->kernel_name == "Conv1x1FC7.cl") {
             kernelInfo.kernel_name = "InnerProduct";
             if (params.bias) {
                 kernelInfo.comp_options = std::string(" -DBIAS ") + std::string(" -DSTRIDE=")
@@ -110,7 +136,7 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
 
             kernelInfo.l_wk = {256, 1, 1};
             kernelInfo.g_wk = {256 * 64 * 1, 1, 1};
-        } else if (conv11_param.kernel_name == "Conv1x1CXH7W7K160.cl") {
+        } else if (conv11_param->kernel_name == "Conv1x1CXH7W7K160.cl") {
             kernelInfo.kernel_name = "conv1x1_act";
 
             if (params.bias) {
@@ -130,7 +156,7 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
 
             kernelInfo.l_wk = {256, 1, 1};
             kernelInfo.g_wk = {256 * 40 * 4, 1, 1};
-        } else if (conv11_param.kernel_name == "Conv1x1CXH7W7K320.cl") {
+        } else if (conv11_param->kernel_name == "Conv1x1CXH7W7K320.cl") {
             kernelInfo.kernel_name = "conv1x1_act";
 
             if (params.bias) {
@@ -150,7 +176,7 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
 
             kernelInfo.l_wk = {256, 1, 1};
             kernelInfo.g_wk = {256 * 40 * 4, 1, 1};
-        } else if (conv11_param.kernel_name == "Conv1x1CXH14W14K96.cl") {
+        } else if (conv11_param->kernel_name == "Conv1x1CXH14W14K96.cl") {
             kernelInfo.kernel_name = "conv1x1_act";
 
             if (params.bias) {
@@ -170,7 +196,7 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
 
             kernelInfo.l_wk = {256, 1, 1};
             kernelInfo.g_wk = {256 * 39 * 4, 1, 1};
-        } else if (conv11_param.kernel_name == "Conv1x1C256H56W56K512S2.cl") {
+        } else if (conv11_param->kernel_name == "Conv1x1C256H56W56K512S2.cl") {
             kernelInfo.kernel_name = "conv1x1_act";
 
             if (params.bias) {
