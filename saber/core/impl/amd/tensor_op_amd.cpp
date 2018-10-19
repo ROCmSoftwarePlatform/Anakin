@@ -41,6 +41,7 @@ void fill_tensor_const_impl(
     clEnqueueFillBuffer(stream, dio, &value, sizeof(Dtype), offset, size, 0, NULL, &event);
     clFlush(stream);
     clWaitForEvents(1, &event);
+    clReleaseEvent(event);
 }
 
 template <typename TargetType>
