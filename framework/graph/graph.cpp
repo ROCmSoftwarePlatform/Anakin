@@ -1,3 +1,17 @@
+/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 #include "framework/graph/graph.h"
 #include "framework/model_parser/parser/parser.h"
 #include "framework/graph/llvm/scheduler.h"
@@ -133,7 +147,7 @@ Status Graph<Ttype, Ptype>::Optimize() EXCLUSIVE_LOCKS_REQUIRED(_mut) {
 			_nodes_exec_order = scheduler.get_exec_node_in_order();
 
 
-#if 0
+#ifdef AMD_GPU
             // get node exec in order
             _nodes_exec_order = scheduler.get_exec_node_in_order();
 #else		// enable conv+eltwise fusion
