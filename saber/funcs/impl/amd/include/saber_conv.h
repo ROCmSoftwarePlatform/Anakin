@@ -20,6 +20,9 @@
 #include "saber/funcs/impl/impl_conv.h"
 #include "saber/core/impl/amd/utils/amd_kernel.h"
 #include "saber/funcs/funcs_utils.h"
+#include <miopengemm/miogemm.hpp>
+#include <miopengemm/gemm.hpp>
+#include <miopengemm/geometry.hpp>
 
 namespace anakin {
 
@@ -34,12 +37,12 @@ public:
     SaberConv2D() {
         _multikernel = false;
         _kernels_ptr.clear();
-        _outWorkspace = nullptr;
+        _outGemmWorkspace = nullptr;
     }
     ~SaberConv2D() {
         _kernels_ptr.clear();
-        if (_outWorkspace) {
-            delete _outWorkspace;
+        if (_outGemmWorkspace) {
+            delete _outGemmWorkspace;
         }
     }
 
@@ -75,7 +78,7 @@ private:
     bool _extern_trans{false};
     std::vector<AMDKernelPtr> _kernels_ptr{nullptr};
     bool _multikernel{false};
-    Tensor<AMD>* _outWorkspace;
+    Tensor<AMD>* _outGemmWorkspace;
 };
 } // namespace saber
 } // namespace anakin

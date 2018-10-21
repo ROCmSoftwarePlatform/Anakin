@@ -16,6 +16,7 @@
 #include "saber/funcs/conv.h"
 #include "third-party/miopen/include/miopen/solver.hpp"
 #include "saber/core/impl/amd/utils/amd_file_utils.h"
+#include "saber/funcs/impl/amd/include/amd_utils.h"
 
 namespace anakin {
 namespace saber {
@@ -62,9 +63,9 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
     Device<AMD> dev = Env<AMD>::cur_env()[inputs[0]->device_id()]; // anakin device id to AMD device
     cl_device_id device = dev.get_device();
     cl_context context  = dev.get_context();
+    bool isBias         = (param.bias()->size() > 0) ? true : false;
 
     if (param.group == inputs[0]->channel() && param.group == outputs[0]->channel()) {
-        bool isBias             = (param.bias()->size() > 0) ? true : false;
         kernelInfo.comp_options = std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias);
 
         if (param.activation_param.has_active) {
@@ -213,17 +214,6 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
                 miopen::solver::ConvOclDirectFwd1x1,
                 miopen::solver::ConvOclDirectFwd>(convContext, db);
         miopen::Handle::clearClEnv();
-
-        if (solution.workspce_sz > 0) {
-            std::vector<Tensor<AMD>*> conv_outputs;
-            Tensor<AMD>* conv_out = new Tensor<AMD>();
-            conv_outputs.push_back(conv_out);
-            Conv<AMD, AK_FLOAT> conv;
-            conv.compute_output_shape(inputs, conv_outputs, param);
-            conv_out->re_alloc(conv_out->shape());
-            _outWorkspace = conv_out;
-        }
-
         ALOGD("Solution wk size:" << solution.workspce_sz
                                   << " param size:" << solution.construction_params.size());
         if (solution.construction_params.size() > 0) {
@@ -244,6 +234,150 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
         } else {
             // todo: gemm
             ALOGE("No solution found!!!");
+            _outGemmWorkspace = new Tensor<AMD>();
+            _outGemmWorkspace->re_alloc(
+                    Shape({(inputs[0]->num()),
+                           std::max((inputs[0]->channel()), (param.weight()->num())),
+                           (inputs[0]->height()),
+                           (inputs[0]->width())}));
+
+            int K = (inputs[0]->channel()) * (param.weight()->height()) * (param.weight()->width());
+            int M = (param.weight()->num());
+            int N = (outputs[0]->height()) * (outputs[0]->width());
+            float alpha = 1.0;
+            float beta  = 0.0;
+            bool tA     = false;
+            bool tB     = false;
+            bool tC     = false;
+            int lda     = K;
+            int ldb     = N;
+            int ldc     = N;
+
+            MIOpenGEMM::Geometry tgg{};
+            tgg = MIOpenGEMM::Geometry(true, tB, tA, tC, ldb, lda, ldc, N, M, K, 0, 'f');
+            AMD_API::stream_t cm = this->_ctx->get_compute_stream();
+
+            /////////////////////////////////////////////////////////////
+            // gemm kernel
+            // jn : print search results to terminal
+            bool miopengemm_verbose = false;
+
+            // jn : print warning messages when the returned kernel(s) might be sub-optimal
+            bool miopengemm_warnings = false;
+
+            // jn : find with no workspace
+            MIOpenGEMM::Solution soln = MIOpenGEMM::find(
+                    0.003f,
+                    cm,
+                    (cl_mem)inputs[0]->data(),
+                    (cl_mem)param.weight()->data(),
+                    (cl_mem)_outGemmWorkspace->mutable_data(),
+                    false,
+                    tgg,
+                    miopengemm_verbose,
+                    miopengemm_warnings);
+
+            std::string kernel_clstring;
+            size_t local_work_size;
+            size_t global_work_size;
+            cl_int errCode;
+
+            for (int j = 0; j < inputs[0]->num(); j++) {
+                int i = 0;
+                if (soln.v_tgks.size() == 2) {
+                    _multikernel = true;
+
+                    // jn : the main kernel is at the back of the solution vector
+                    kernel_clstring = soln.v_tgks[i].kernstr;
+                    tempfix::set_offsets_to_uint(kernel_clstring, 1);
+
+                    kernelInfo.kernel_name = soln.v_tgks[i].fname;
+                    local_work_size        = soln.v_tgks[i].local_work_size;
+                    global_work_size       = soln.v_tgks[i].global_work_size;
+
+                    kernelInfo.kernel_file = kernel_clstring;
+                    kernelInfo.l_wk        = {local_work_size, 1, 1};
+                    kernelInfo.g_wk        = {global_work_size, 1, 1};
+                    kernelInfo.kernel_type = SOURCE;
+
+                    kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+                    if (!kptr.get()->isInit()) {
+                        ALOGE("Failed to create kernel");
+                        return SaberInvalidValue;
+                    }
+                    _kernels_ptr.push_back(kptr);
+
+                    i++;
+                }
+
+                // jn : the main kernel is at the back of the solution vector
+                kernel_clstring = soln.v_tgks[i].kernstr;
+                tempfix::set_offsets_to_uint(kernel_clstring, 3);
+
+                kernelInfo.kernel_name = soln.v_tgks[i].fname;
+                local_work_size        = soln.v_tgks[i].local_work_size;
+                global_work_size       = soln.v_tgks[i].global_work_size;
+
+                kernelInfo.kernel_file = kernel_clstring;
+                kernelInfo.l_wk        = {local_work_size, 1, 1};
+                kernelInfo.g_wk        = {global_work_size, 1, 1};
+                kernelInfo.kernel_type = SOURCE;
+
+                // To create the program
+                kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+                if (!kptr.get()->isInit()) {
+                    ALOGE("Failed to create kernel");
+                    return SaberInvalidValue;
+                }
+                _kernels_ptr.push_back(kptr);
+            }
+
+            /////////////////////////////////////////////////////////////
+            // Bias relu kernel
+            if (isBias) {
+                kernelInfo.kernel_file = "MIOpenBiasReLuUni.cl";
+                if (param.activation_param.has_active) {
+                    kernelInfo.kernel_name = "MIOpenBiasReluBoth";
+                } else {
+                    kernelInfo.kernel_name = "MIOpenBias";
+                }
+
+                kernelInfo.l_wk = {256, 1, 1};
+                kernelInfo.g_wk = {(inputs[0]->num()) * (param.weight()->num())
+                                           * (outputs[0]->height()) * (outputs[0]->width()),
+                                   1,
+                                   1};
+
+                kernelInfo.kernel_type = SABER;
+
+                // To create the program
+                kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+                if (!kptr.get()->isInit()) {
+                    ALOGE("Failed to create kernel");
+                    return SaberInvalidValue;
+                }
+                _kernels_ptr.push_back(kptr);
+            } else {
+                if (param.activation_param.has_active) {
+                    kernelInfo.kernel_file = "ReluUni.cl";
+                    kernelInfo.kernel_name = "ReluUni";
+
+                    kernelInfo.l_wk        = {256, 1, 1};
+                    kernelInfo.g_wk        = {(inputs[0]->num()) * (param.weight()->num())
+                                               * (outputs[0]->height()) * (outputs[0]->width()),
+                                       1,
+                                       1};
+                    kernelInfo.kernel_type = SABER;
+
+                    // To create the program
+                    kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+                    if (!kptr.get()->isInit()) {
+                        ALOGE("Failed to create kernel");
+                        return SaberInvalidValue;
+                    }
+                    _kernels_ptr.push_back(kptr);
+                }
+            }
         }
     }
     ALOGD("COMPLETE CREATE KERNEL");
@@ -457,7 +591,7 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
             } else if (_kernels_ptr[i].get()->GetName() == "conv1x1_act") {
                 float negative_slope = 0.0f;
                 if (isActive)
-                    negative_slope = 0.0f;
+                    negative_slope = param.activation_param.negative_slope;
                 else
                     negative_slope = 1.0f;
 
@@ -474,6 +608,10 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                             (PtrDtype)memObjects[0],
                             (PtrDtype)memObjects[3],
                             negative_slope);
+                }
+                if (!err) {
+                    ALOGE("Fail to set kernel args :" << err);
+                    return SaberInvalidValue;
                 }
                 list.push_back(_kernels_ptr[i]);
             } else if (_kernels_ptr[i].get()->GetName() == "InnerProduct") {
@@ -497,6 +635,70 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                 list.push_back(_kernels_ptr[i]);
             } else {
                 ALOGD("Not implement kernel name:" << _kernels_ptr[i].get()->GetName());
+                if (_multikernel) {
+                    ALOGD("kernel name :" << _kernels_ptr[i].get()->GetName());
+                    err = _kernels_ptr[i].get()->SetKernelArgs(memObjects[3], 0, 0.0f);
+                    if (!err) {
+                        ALOGE("Fail to set kernel args :" << err);
+                        return SaberInvalidValue;
+                    }
+                    list.push_back(_kernels_ptr[i++]);
+                    ALOGD("kernel name :" << _kernels_ptr[i].get()->GetName());
+                    err = _kernels_ptr[i].get()->SetKernelArgs(
+                            memObjects[0], 0, memObjects[1], 0, memObjects[3], 0, 1.0f);
+                } else {
+                    err = _kernels_ptr[i].get()->SetKernelArgs(
+                            memObjects[0], 0, memObjects[1], 0, memObjects[3], 0, 1.0f, 0.0f);
+                }
+                if (!err) {
+                    ALOGE("Fail to set kernel args :" << err);
+                    return SaberInvalidValue;
+                }
+                list.push_back(_kernels_ptr[i]);
+
+                if (isBias) {
+                    if (isActive) {
+                        err = _kernels_ptr[++i].get()->SetKernelArgs(
+                                memObjects[3],
+                                memObjects[3],
+                                memObjects[2],
+                                param.activation_param.negative_slope,
+                                (inputs[0]->num()),
+                                (outputs[0]->channel()),
+                                (outputs[0]->height()),
+                                (outputs[0]->width()),
+                                1,
+                                1);
+                    } else {
+                        err = _kernels_ptr[++i].get()->SetKernelArgs(
+                                memObjects[3],
+                                memObjects[3],
+                                memObjects[2],
+                                1.0f,
+                                (inputs[0]->num()),
+                                (outputs[0]->channel()),
+                                (outputs[0]->height()),
+                                (outputs[0]->width()));
+                    }
+                    if (!err) {
+                        ALOGE("Fail to set kernel args :" << err);
+                        return SaberInvalidValue;
+                    }
+                    list.push_back(_kernels_ptr[i]);
+                } else {
+                    if (isActive) {
+                        err = _kernels_ptr[++i].get()->SetKernelArgs(
+                                memObjects[3],
+                                memObjects[3],
+                                param.activation_param.negative_slope);
+
+                        if (!err) {
+                            ALOGE("Fail to set kernel args :" << err);
+                            return SaberInvalidValue;
+                        }
+                        list.push_back(_kernels_ptr[i]);
+                    }
+                }
             }
         }
         err = LaunchKernel(cm, list);
