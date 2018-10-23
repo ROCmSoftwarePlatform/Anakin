@@ -23,8 +23,7 @@
 #include <openssl/md5.h>
 #include <miopen/db.hpp>
 
-namespace anakin {
-namespace saber {
+namespace miopen {
 
 std::string temp_directory_path();
 bool is_directory(const std::string& path);
@@ -35,27 +34,8 @@ std::string unique_path();
 bool exists(std::string path);
 std::string parent_path(const std::string& path);
 bool create_directories(std::string path);
-
-std::string
-GetCacheFile(const std::string& device, const std::string& name, const std::string& args);
-
-std::string GetCachePath();
-
-void SaveBinary(
-        const std::string& binary_path,
-        const std::string& device,
-        const std::string& name,
-        const std::string& args);
-
-std::string
-LoadBinaryPath(const std::string& device, const std::string& name, const std::string& args);
-
-std::string LoadFile(const std::string& s);
-std::string md5(std::string s);
-miopen::Db GetDb(std::string device_name, int max_CU);
 std::string genTempFilePath(std::string name);
 void writeFile(const std::string& content, const std::string& name);
 
-} // namespace saber
-} // namespace anakin
+} // namespace miopen
 #endif

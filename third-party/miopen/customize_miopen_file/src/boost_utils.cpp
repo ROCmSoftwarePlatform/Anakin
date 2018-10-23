@@ -1,47 +1,44 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-*/
-#include "amd_file_utils.h"
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+#include <miopen/boost_utils.hpp>
 #include <miopen/db_path.hpp>
+#include <miopen/errors.hpp>
+#include <miopen/logger.hpp>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
-#include "amd_logger.h"
-#include "amd_error.h"
 #include <vector>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
-namespace anakin {
-namespace saber {
+#include <unistd.h>
 
-#define SABER_CACHE_DIR "~/.cache/amd_saber/"
-#define separator "/"
-
-std::string md5(std::string s) {
-    std::array<unsigned char, MD5_DIGEST_LENGTH> result{};
-    MD5(reinterpret_cast<const unsigned char*>(s.data()), s.length(), result.data());
-
-    std::ostringstream sout;
-    sout << std::hex << std::setfill('0');
-    for (auto c : result)
-        sout << std::setw(2) << int{c};
-
-    return sout.str();
-}
+namespace miopen {
 
 inline std::string
 ReplaceString(std::string subject, const std::string& search, const std::string& replace) {
@@ -60,7 +57,7 @@ bool is_directory_separator(char c) {
 bool is_root_separator(const char* str, size_t pos) {
     // pos is position of the separator
     if (str != nullptr && !is_directory_separator(str[pos]))
-        AMD_LOGD("precondition violation");
+        MIOPEN_LOG_I("precondition violation");
 
     // subsequent logic expects pos to be for leftmost slash of a set
     while (pos > 0 && is_directory_separator(str[pos - 1]))
@@ -157,7 +154,7 @@ std::string temp_directory_path() {
 
     const char* default_tmp = "/tmp";
     std::string temp_directory((val != 0) ? val : default_tmp);
-    AMD_LOGD("temp directory path :" << temp_directory);
+    MIOPEN_LOG_I("temp directory path :" << temp_directory);
     return temp_directory;
 }
 
@@ -165,16 +162,16 @@ bool is_directory(const std::string& path) {
     struct stat info;
     if (stat(path.c_str(), &info) == 0) {
         if (info.st_mode & S_IFDIR) {
-            AMD_LOGD("it's a directory");
+            MIOPEN_LOG_I("it's a directory");
             return true;
         } else if (info.st_mode & S_IFREG) {
-            AMD_LOGD("it's a file");
+            MIOPEN_LOG_I("it's a file");
             return false;
         } else {
-            AMD_LOGD("not file or directory");
+            MIOPEN_LOG_I("not file or directory");
         }
     } else {
-        AMD_LOGD("path not exist");
+        MIOPEN_LOG_I("path not exist");
     }
     return false;
 }
@@ -220,10 +217,10 @@ std::string unique_path() {
 bool exists(std::string path) {
     int state = access(path.c_str(), R_OK | W_OK);
     if (state == 0) {
-        AMD_LOGD("file path exist");
+        MIOPEN_LOG_I("file path exist");
         return true;
     } else {
-        AMD_LOGD("file path not exist, path :" << path);
+        MIOPEN_LOG_I("file path not exist, path :" << path);
         return false;
     }
 }
@@ -258,7 +255,7 @@ bool filename_is_dot_dot(std::string p) {
 }
 
 bool create_directory(const std::string& p) {
-    AMD_LOGD("path :" << p);
+    MIOPEN_LOG_I("path :" << p);
     int flag = mkdir(p.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
     if (flag == 0)
         return true;
@@ -268,16 +265,16 @@ bool create_directory(const std::string& p) {
         return false;
     }
     //  attempt to create directory failed && it doesn't already exist
-    AMD_LOGD("attempt to create directory failed && it doesn't already exist");
+    MIOPEN_LOG_I("attempt to create directory failed && it doesn't already exist");
     return false;
 }
 
 bool create_directories(const std::string p) {
     if (p.length() == 0) {
-        AMD_LOGD("invalid argument for path");
+        MIOPEN_LOG_I("invalid argument for path");
         return false;
     }
-    AMD_LOGD("path :" << p);
+    MIOPEN_LOG_I("path :" << p);
     if (filename_is_dot(p) || filename_is_dot_dot(p))
         return create_directories(parent_path(p));
 
@@ -286,7 +283,7 @@ bool create_directories(const std::string p) {
 
     std::string parent = parent_path(p);
     if (parent == p)
-        AMD_LOGD("internal error: path == parent path");
+        MIOPEN_LOG_I("internal error: path == parent path");
 
     if (parent.length() > 0) {
         // if the parent does not exist, create the parent
@@ -297,67 +294,6 @@ bool create_directories(const std::string p) {
 
     // create the directory
     return create_directory(p);
-}
-
-// original functions
-std::string ComputeCachePath() {
-    std::string cache_dir = SABER_CACHE_DIR;
-
-    auto p = ReplaceString(cache_dir, "~", getenv("HOME"));
-    if (!exists(p))
-        create_directories(p);
-    AMD_LOGD("Get program path :" << p);
-    return p;
-}
-
-std::string GetCachePath() {
-    static const std::string path = ComputeCachePath();
-    return path;
-}
-
-std::string
-GetCacheFile(const std::string& device, const std::string& name, const std::string& args) {
-    std::string filename = name + ".o";
-    return GetCachePath() + md5(device + ":" + args) + "/" + filename;
-}
-
-std::string
-LoadBinaryPath(const std::string& device, const std::string& name, const std::string& args) {
-    auto f = GetCacheFile(device, name, args);
-    if (exists(f)) {
-        return f;
-    } else {
-        return {};
-    }
-}
-
-void SaveBinary(
-        const std::string& binary_path,
-        const std::string& device,
-        const std::string& name,
-        const std::string& args) {
-    AMD_LOGD("binary_path :" << binary_path);
-    auto p = GetCacheFile(device, name, args);
-    create_directories(parent_path(p));
-    AMD_LOGD("target path :" << p);
-    rename(binary_path.c_str(), p.c_str());
-}
-
-std::string LoadFile(const std::string& s) {
-    std::ifstream t(s);
-    std::stringstream buffer;
-    buffer << t.rdbuf();
-    return buffer.str();
-}
-
-miopen::Db GetDb(std::string device_name, int max_CU) {
-    auto p = ReplaceString(miopen::GetDbPath(), "~", getenv("HOME"));
-    AMD_LOGD("db path :" << p);
-    if (!exists(p))
-        create_directories(p);
-    std::string dbFileName = p + "/" + device_name + "_" + std::to_string(max_CU) + ".cd.pad.txt";
-    AMD_LOGD("db file name :" << dbFileName);
-    return {dbFileName};
 }
 
 std::string genTempFilePath(std::string name) {
@@ -373,7 +309,7 @@ std::string genTempFilePath(std::string name) {
 
     if (!std::ofstream{file_path, std::ios_base::out | std::ios_base::in | std::ios_base::trunc}
                  .good()) {
-        AMD_THROW("Failed to create temp file: " + file_path);
+        MIOPEN_THROW("Failed to create temp file: " + file_path);
     }
     return file_path;
 }
@@ -382,10 +318,9 @@ void writeFile(const std::string& content, const std::string& name) {
     FILE* fd = std::fopen(name.c_str(), "w");
     if (std::fwrite(content.c_str(), 1, content.size(), fd) != content.size()) {
         std::fclose(fd);
-        AMD_THROW("Failed to write to src file");
+        MIOPEN_THROW("Failed to write to src file");
     }
     std::fclose(fd);
 }
 
-} // namespace saber
-} // namespace anakin
+} // namespace miopen

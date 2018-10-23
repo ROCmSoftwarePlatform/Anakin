@@ -183,7 +183,6 @@ endif()
 if(AMD_GPU)
     set(ANAKIN_TEMP_THIRD_PARTY_PATH ${CMAKE_BINARY_DIR}/third-party)
     include(cmake/amd.cmake)
-    amd_find_boost()
     include(cmake/external/miopen.cmake)
 endif()
 

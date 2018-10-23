@@ -15,7 +15,6 @@ message(STATUS "Scanning external modules ${Green}MIOPEN${ColourReset} ...")
 
 ExternalProject_Add(
     ${MIOPEN_PROJECT}
-    DEPENDS               boost
     GIT_REPOSITORY        https://github.com/ROCmSoftwarePlatform/MIOpen.git
     GIT_TAG               1.4.2
     #URL                   https://github.com/ROCmSoftwarePlatform/MIOpen/archive/1.4.2.zip

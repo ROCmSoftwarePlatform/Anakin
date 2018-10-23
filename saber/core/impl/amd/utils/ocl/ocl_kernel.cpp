@@ -65,10 +65,9 @@ void WriteProgramToFile(cl_program cl_prg, cl_device_id device_id, KernelInfo* k
     else
         kernelKey = ki->kernel_file;
     std::string deviceName = GetDeviceName(device_id);
-    auto path              = GetCachePath() / boost::filesystem::unique_path();
-    SaveProgramBinary(cl_prg, path.string());
-
-    SaveBinary(path.string(), deviceName, kernelKey, ki->comp_options);
+    auto path              = GetCachePath() + unique_path();
+    SaveProgramBinary(cl_prg, path);
+    SaveBinary(path, deviceName, kernelKey, ki->comp_options);
 }
 
 cl_program LoadBinaryProgram(
@@ -365,8 +364,7 @@ bool OCLKernel::run(
     return true;
 }
 
-std::string OCLKernel::GetName()
-{
+std::string OCLKernel::GetName() {
     return kernel_info.kernel_name;
 }
 

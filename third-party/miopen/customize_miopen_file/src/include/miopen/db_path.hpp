@@ -23,17 +23,16 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-#include <cstdlib>
-#include <miopen/db_path.hpp>
+#ifndef GUARD_MIOPEN_DB_PATH_HPP
+#define GUARD_MIOPEN_DB_PATH_HPP
+
+#include <string>
 
 namespace miopen {
 
-std::string GetDbPath() {
-    auto p = std::getenv("ANAKIN_DB_PATH"); /// \todo Read env once - use GetStringEnv().
-    if (p == nullptr)
-        return "~/.cache/amd_saber/db";
-    else
-        return p;
-}
+std::string GetDbPath();
+const std::string& GetUserDbPath();
 
 } // namespace miopen
+
+#endif

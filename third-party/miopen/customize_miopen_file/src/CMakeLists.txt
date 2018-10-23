@@ -62,6 +62,7 @@ set( MIOpen_Source
 #    convolution.cpp
 #    convolution_api.cpp
 #    convolution_fft.cpp
+    boost_utils.cpp
     db.cpp
     db_record.cpp
     find_controls.cpp
@@ -69,7 +70,7 @@ set( MIOpen_Source
 #    pooling_api.cpp
      kernel_warnings.cpp
      logger.cpp
-    lock_file.cpp
+    #lock_file.cpp
 #    lrn_api.cpp
 #    activ_api.cpp
 #    handle_api.cpp
@@ -78,7 +79,7 @@ set( MIOpen_Source
 #    batch_norm_api.cpp
 #    rnn.cpp
 #    rnn_api.cpp
-    temp_file.cpp
+    #temp_file.cpp
 #    include/miopen/temp_file.hpp
     include/miopen/db.hpp
     include/miopen/db_record.hpp
@@ -131,7 +132,8 @@ set( MIOpen_Source
     )
 
 #list(APPEND MIOpen_Source tmp_dir.cpp binary_cache.cpp md5.cpp)
-list(APPEND MIOpen_Source tmp_dir.cpp md5.cpp)
+#list(APPEND MIOpen_Source tmp_dir.cpp md5.cpp)
+list(APPEND MIOpen_Source md5.cpp)
 
 if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_BACKEND STREQUAL "HIP")
     set(MIOPEN_KERNEL_INCLUDES
@@ -352,13 +354,7 @@ endif()
 #endif()
 #
 #target_link_libraries(MIOpen PRIVATE OpenSSL::Crypto)
-target_include_directories(MIOpen PUBLIC $<BUILD_INTERFACE:${Boost_INCLUDE_DIRS}>)
-target_internal_library(MIOpen
-    optimized ${Boost_FILESYSTEM_LIBRARY_RELEASE}
-    optimized ${Boost_SYSTEM_LIBRARY_RELEASE}
-    debug ${Boost_FILESYSTEM_LIBRARY_DEBUG}
-    debug ${Boost_SYSTEM_LIBRARY_DEBUG}
-)
+
 if(NOT WIN32 AND NOT APPLE)
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lib.def "
 MIOPEN_${MIOPEN_BACKEND}_1

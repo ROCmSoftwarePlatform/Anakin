@@ -144,9 +144,6 @@ else()
 endif()
 
 find_package(OpenSSL REQUIRED)
-set(BOOST_COMPONENTS filesystem system)
-add_definitions(-DBOOST_ALL_NO_LIB=1)
-find_package(Boost 1.66.0 REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 
 find_path(HALF_INCLUDE_DIR half.hpp)
 
