@@ -30,6 +30,9 @@
 #include "saber/funcs/impl/x86/saber_conv_eltwise.h"
 #endif
 
+#ifdef AMD_GPU
+#include "saber/funcs/impl/amd/include/saber_conv_eltwise.h"
+#endif
 
 namespace anakin {
 namespace saber {
