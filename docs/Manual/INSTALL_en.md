@@ -140,10 +140,10 @@ Not support yet.
 
     Any problems for protobuf installation, Please see [here](https://github.com/google/protobuf/blob/master/src/README.md)
     
- - 4.1.9 cmake 3.5.1
-    Download source from https://cmake.org/files/v3.5/cmake-3.5.1.tar.gz
-    >tar -zxvf cmake-3.5.1.tar.gz  
-    >$ cd cmake-3.5.1   
+ - 4.1.9 cmake 3.2.0
+    Download source from https://cmake.org/files/v3.2/cmake-3.2.0.tar.gz
+    >tar -zxvf cmake-3.2.0.tar.gz  
+    >$ cd cmake-3.2.0
     >$ ./bootstrap   
     >$ make -j4    
     >$ make install  
@@ -225,10 +225,10 @@ For more detials of ROCm please see [RadeonOpenCompute/ROCm](https://github.com/
 
     Any problems for protobuf installation, Please see [here](https://github.com/google/protobuf/blob/master/src/README.md)
 
- - 1.1.9 cmake 3.5.1
-    Download source from https://cmake.org/files/v3.5/cmake-3.5.1.tar.gz
-    >$ tar -zxvf cmake-3.5.1.tar.gz
-    >$ cd cmake-3.5.1
+ - 1.1.9 cmake 3.2.0
+    Download source from https://cmake.org/files/v3.2/cmake-3.2.0.tar.gz
+    >$ tar -zxvf cmake-3.2.0.tar.gz
+    >$ cd cmake-3.2.0
     >$ ./bootstrap
     >$ make -j4
     >$ make install
