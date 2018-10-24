@@ -43,77 +43,7 @@ ExternalProject_Add_Step(
     ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize
     DEPENDEES         download
     DEPENDERS         build
-    COMMAND           cp ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/CMakeLists.txt ${MIOPEN_SOURCE_DIR}
-    ALWAYS            1
-    EXCLUDE_FORM_MAIN 1
-    LOG               1
-)
-
-ExternalProject_Add_Step(
-    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_2
-    DEPENDEES         download
-    DEPENDERS         build
-    COMMAND           cp ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/CMakeLists.txt ${MIOPEN_SOURCE_DIR}/src
-    ALWAYS            1
-    EXCLUDE_FORM_MAIN 1
-    LOG               1
-)
-
-ExternalProject_Add_Step(
-    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_3
-    DEPENDEES         download
-    DEPENDERS         build
-    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/ -maxdepth 1 -name *.cpp -exec cp {} ${MIOPEN_SOURCE_DIR}/src \\$<SEMICOLON>
-    ALWAYS            1
-    EXCLUDE_FORM_MAIN 1
-    LOG               1
-)
-
-ExternalProject_Add_Step(
-    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_4
-    DEPENDEES         download
-    DEPENDERS         build
-    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/include/miopen/ -name *.hpp -exec cp {} ${MIOPEN_SOURCE_DIR}/src/include/miopen \\$<SEMICOLON>
-    ALWAYS            1
-    EXCLUDE_FORM_MAIN 1
-    LOG               1
-)
-
-ExternalProject_Add_Step(
-    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_5
-    DEPENDEES         download
-    DEPENDERS         build
-    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/solver/ -name *.cpp -exec cp {} ${MIOPEN_SOURCE_DIR}/src/solver \\$<SEMICOLON>;
-    ALWAYS            1
-    EXCLUDE_FORM_MAIN 1
-    LOG               1
-)
-
-ExternalProject_Add_Step(
-    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_6
-    DEPENDEES         download
-    DEPENDERS         build
-    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/ocl/ -name *.cpp -exec cp {} ${MIOPEN_SOURCE_DIR}/src/ocl/ \\$<SEMICOLON>;
-    ALWAYS            1
-    EXCLUDE_FORM_MAIN 1
-    LOG               1
-)
-
-ExternalProject_Add_Step(
-    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_7
-    DEPENDEES         download
-    DEPENDERS         build
-    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/kernels/ -name *.cl -exec cp {} ${MIOPEN_SOURCE_DIR}/src/kernels/ \\$<SEMICOLON>;
-    ALWAYS            1
-    EXCLUDE_FORM_MAIN 1
-    LOG               1
-)
-
-ExternalProject_Add_Step(
-    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize_8
-    DEPENDEES         download
-    DEPENDERS         build
-    COMMAND           find ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file/src/kernels/ -name *.so -exec cp {} ${MIOPEN_SOURCE_DIR}/src/kernels/ \\$<SEMICOLON>;
+    COMMAND           ${CMAKE_COMMAND} -E copy_directory ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file ${MIOPEN_SOURCE_DIR}
     ALWAYS            1
     EXCLUDE_FORM_MAIN 1
     LOG               1
