@@ -223,6 +223,7 @@ MIOpenConv1x1(const __global _FLOAT* __restrict in_ptr,
             q += MLO_OUT_CHANNEL_STRIDE;
         }
     }
+    barrier(CLK_GLOBAL_MEM_FENCE);
 #endif
 
     for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
@@ -410,4 +411,25 @@ MIOpenConv1x1(const __global _FLOAT* __restrict in_ptr,
         q += MLO_OUT_CHANNEL_STRIDE;
 #endif
     }
+
+#if ((MLO_N_LCL_IN_MAPS != MLO_N_INPUTS) && (MLO_CONV_BIAS || MLO_CONV_PRELU))
+    barrier(CLK_GLOBAL_MEM_FENCE);
+    q = out_ptr + gbl_out_off;
+    if(in_grp_block == 0)
+    {
+       for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+       {
+           _FLOAT temp = *q;
+#if MLO_CONV_BIAS
+           temp += bias[out_id + o];
+#endif
+#if MLO_CONV_PRELU
+           temp = (temp > 0) ? temp : temp * negSlope;
+#endif
+           *q = temp;
+           q += MLO_OUT_CHANNEL_STRIDE;
+       }
+    }
+#endif
+
 }
