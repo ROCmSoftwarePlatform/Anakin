@@ -81,7 +81,7 @@ Status EltwiseReluHelper<Ttype, Ptype>::InitParam() {
     //    tdcoeff_p->copy_from(thcoeff);
     //
     //    saber::EltwiseParam<Ttype>    eltwise_param(elt_type, tdcoeff_p);
-    saber::EltwiseParam<Ttype>  eltwise_param(elt_type, coeff.vector());
+    saber::EltwiseParam<Ttype>  eltwise_param(elt_type, coeff.vector(), activation_param);
     //EltwiseActiveParam<Ttype> eltwise_relu_param(eltwise_param, activation_param);
     _param_eltwise_relu =eltwise_param;// eltwise_relu_param;
     return Status::OK();

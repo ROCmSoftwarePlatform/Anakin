@@ -35,7 +35,9 @@ SaberStatus SaberEltwise<AMD, OpDtype>::init(
     _with_relu        = param.has_eltwise && param.activation_param.active == Active_relu;
     _other_activation = param.has_eltwise && param.activation_param.active != Active_relu
                         && param.activation_param.active != Active_unknow;
-
+    ALOGD("param.has_eltwise=" << param.has_eltwise << " param.activation_param.active="
+                               << param.activation_param.active << " _with_relu=" << _with_relu
+                               << " _other_activation=" << _other_activation);
     if (_other_activation) {
         SABER_CHECK(_saber_activation.init(inputs, outputs, param.activation_param, ctx));
     }
@@ -51,7 +53,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
     if (_other_activation) {
         SABER_CHECK(_saber_activation.create(inputs, outputs, param.activation_param, ctx));
     }
-    const int count = outputs[0]->size();
+    const int count = outputs[0]->valid_size();
 
     int global_size = count;
     int local_size  = 256;
