@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-__attribute__((reqd_work_group_size(64, 1, 1))) __kernel void Depthwiseconv(
+__kernel void Depthwiseconv(
         global float* din,
         const int num,
         const int channels,
