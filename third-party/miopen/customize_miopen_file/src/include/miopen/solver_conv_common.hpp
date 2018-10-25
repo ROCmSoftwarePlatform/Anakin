@@ -67,7 +67,8 @@ public:
         }
     }
     void init();
-    Conv1x1Type* getKernelInfo(int dev, int stride, int channel, int width, int output_num);
+    Conv1x1Type*
+    getKernelInfo(int dev, int batch, int stride, int channel, int width, int output_num);
 
 private:
     std::vector<Conv1x1Type*> conv1x1type;

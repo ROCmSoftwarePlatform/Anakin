@@ -34,7 +34,9 @@ namespace solver {
 bool ConvOclDirectFwd1x1::IsApplicable(const ConvolutionContext& params) const
 {
 
-    return (params.kernel_size0 == 1 && params.kernel_size1 == 1);
+    return (params.kernel_dilation0 == 1 && params.kernel_dilation1 == 1)
+           && (params.kernel_size0 == 1 && params.kernel_size1 == 1)
+           && (params.pad0 == 0 && params.pad1 == 0);
 }
 
 ConvSolution ConvOclDirectFwd1x1::GetSolution(const ConvolutionContext& params,
@@ -51,8 +53,7 @@ ConvSolution ConvOclDirectFwd1x1::GetSolution(const ConvolutionContext& params,
             params.n_outputs % 16 == 0) &&
            (params.in_data_type == "FP32"))
         {
-
-            int N_LCL_IN_MAPS = result.n_in_data_tiles;
+            int N_LCL_IN_MAPS = 2048;// result.n_in_data_tiles;
 
             int N_LCL_OUT_MAPS = result.n_out_pix_tiles;
             // 0 or 1
