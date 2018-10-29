@@ -65,7 +65,7 @@ Device<AMD>::Device(int max_stream) : _max_stream(max_stream){
     cl_uint device_nums;
     clGetDeviceIDs(Env<AMD>::get_platform_id(), CL_DEVICE_TYPE_GPU, (cl_uint)nums, device_ids, &device_nums);
     id = device_ids[AMD_API::get_device_id()];
-    free(device_ids);
+    delete []device_ids;
 
     //init context, one by one mapping to device.
     cl_int errNum;

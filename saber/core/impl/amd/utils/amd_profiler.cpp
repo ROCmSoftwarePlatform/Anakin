@@ -142,8 +142,8 @@ void AMDProfiler::pop() {
                         + std::string(" ms\n"));
             }
 
-            delete s_waits;
-            delete s_executes;
+            delete []s_waits;
+            delete []s_executes;
             s_waits = s_executes = NULL;
         }
 
