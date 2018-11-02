@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2018 Advanced Micro Devices, Inc.
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +34,9 @@ namespace solver {
 bool ConvOclDirectFwd1x1::IsApplicable(const ConvolutionContext& params) const
 {
 
-    return (params.kernel_size0 == 1 && params.kernel_size1 == 1);
+    return (params.kernel_dilation0 == 1 && params.kernel_dilation1 == 1)
+           && (params.kernel_size0 == 1 && params.kernel_size1 == 1)
+           && (params.pad0 == 0 && params.pad1 == 0);
 }
 
 ConvSolution ConvOclDirectFwd1x1::GetSolution(const ConvolutionContext& params,

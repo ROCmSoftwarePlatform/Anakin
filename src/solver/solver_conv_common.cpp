@@ -26,29 +26,6 @@
 #include "miopen/solver_conv_common.hpp"
 
 namespace miopen {
-const int WidthArray[6] = {1, 7, 14, 28, 56, 112};
-const int ChannelArray[18] =
-        {16, 24, 32, 64, 96, 128, 144, 160, 192, 256, 320, 384, 512, 576, 960, 1024, 1280, 2048};
-const int OutputNumArray[19] = {16,
-                                24,
-                                32,
-                                64,
-                                96,
-                                128,
-                                144,
-                                160,
-                                192,
-                                256,
-                                320,
-                                384,
-                                512,
-                                576,
-                                960,
-                                1000,
-                                1024,
-                                1280,
-                                2048};
-const int BatchArray[5]      = {1, 2, 4, 8, 32};
 
 void ConvCommon::init() {
 
@@ -895,15 +872,15 @@ void ConvCommon::init() {
 }
 
 Conv1x1Type*
-ConvCommon::getKernelInfo(int dev, int stride, int channel, int width, int output_num) {
+ConvCommon::getKernelInfo(int dev, int batch, int stride, int channel, int width, int output_num) {
 
     init();
 
     Conv1x1Type* mType;
     for (int i = 0; i < conv1x1type.size(); i++) {
-        if (conv1x1type[i]->dev == dev && conv1x1type[i]->stride == stride
-            && conv1x1type[i]->channel == channel && conv1x1type[i]->width == width
-            && conv1x1type[i]->output_num == output_num) {
+        if (conv1x1type[i]->dev == dev && conv1x1type[i]->batch == batch
+            && conv1x1type[i]->stride == stride && conv1x1type[i]->channel == channel
+            && conv1x1type[i]->width == width && conv1x1type[i]->output_num == output_num) {
             mType = conv1x1type[i];
             ALOGD("Got kernel:" << mType->kernel_name << "!!");
             return mType;

@@ -34,6 +34,7 @@ bool ConvOclDirectFwd1x1AMD::IsApplicable(const ConvolutionContext& params) cons
     bool result =
             params.direction.IsForward() && (params.kernel_size0 == 1 && params.kernel_size1 == 1)
             && (params.batch_sz <= 2) && (params.kernel_stride0 <= 2)
+            && (params.pad0 == 0 && params.pad1 == 0)
             && (params.n_inputs == 16 || params.n_inputs == 24 || params.n_inputs == 32
                 || params.n_inputs == 64 || params.n_inputs == 96 || params.n_inputs == 128
                 || params.n_inputs == 144 || params.n_inputs == 160 || params.n_inputs == 192
@@ -61,7 +62,12 @@ bool ConvOclDirectFwd1x1AMD::IsApplicable(const ConvolutionContext& params) cons
         }
         ConvCommon cc;
         Conv1x1Type* conv11_param = cc.getKernelInfo(
-                dev, params.kernel_stride0, params.n_inputs, params.in_width, params.n_outputs);
+                dev,
+                params.batch_sz,
+                params.kernel_stride0,
+                params.n_inputs,
+                params.in_width,
+                params.n_outputs);
 
         if (conv11_param == NULL) {
             result = false;
@@ -89,7 +95,12 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
 
     ConvCommon cc;
     Conv1x1Type* conv11_param = cc.getKernelInfo(
-            dev, params.kernel_stride0, params.n_inputs, params.in_width, params.n_outputs);
+            dev,
+            params.batch_sz,
+            params.kernel_stride0,
+            params.n_inputs,
+            params.in_width,
+            params.n_outputs);
 
     KernelInfo kernelInfo;
     if (conv11_param != NULL) {
