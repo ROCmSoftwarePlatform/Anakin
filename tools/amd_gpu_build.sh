@@ -20,6 +20,11 @@ echo "-- Anakin root dir is: $ANAKIN_ROOT"
 echo "delete cache files"
 rm -rf ~/.cache/amd_saber/
 
+echo "create miopen customized folder"
+mkdir -p $ANAKIN_ROOT/third-party/miopen/customize_miopen_file
+
+$ANAKIN_ROOT/run_setup.sh
+
 # build the target into gpu_build.
 BUILD_ROOT=$ANAKIN_ROOT/amd_gpu_build
 
@@ -31,6 +36,7 @@ echo "-- Build anakin gpu(AMD) into: $BUILD_ROOT"
 # Now, actually build the gpu target.
 echo "-- Building anakin ..."
 cd $BUILD_ROOT
+GIT_USER_NAME=$(git config user.name)
 
 cmake \
     -DCMAKE_BUILD_TYPE=Release \
@@ -54,6 +60,7 @@ cmake \
     -DUSE_OPENCV=NO \
     -DBUILD_EXAMPLES=NO \
     -DBUILD_WITH_LITE=NO \
+    -DGIT_USER=${GIT_USER_NAME} \
     ..
         
 
