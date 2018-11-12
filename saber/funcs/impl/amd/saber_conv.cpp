@@ -14,9 +14,9 @@
 */
 #include "saber/funcs/impl/amd/include/saber_conv.h"
 #include "saber/funcs/conv.h"
-#include "third-party/miopen/include/miopen/solver.hpp"
 #include "saber/core/impl/amd/utils/amd_file_utils.h"
 #include "saber/funcs/impl/amd/include/amd_utils.h"
+#include <miopen/solver.hpp>
 
 namespace anakin {
 namespace saber {
