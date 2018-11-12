@@ -67,8 +67,8 @@ bool ConvBinWinograd3x3U::IsApplicable(const ConvolutionContext& params) const
         && params.pad1 == 1
         && params.kernel_size0 == 3
         && params.kernel_size1 == 3
-        && params.kernel_stride0 == 1
-        && params.kernel_stride1 == 1
+        && ((params.kernel_stride0 == 1 && params.kernel_stride1 == 1)
+             || (params.kernel_stride0 == 2 && params.kernel_stride1 == 2))
         && params.batch_sz < std::pow(2, 16)
         && params.n_inputs < std::pow(2, 16)
         && params.n_outputs < std::pow(2, 16)
@@ -98,10 +98,10 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
     const auto name     = params.GetStream().GetDeviceName();
 
     KernelInfo kernel;
-    KernelInfo kernel2;
+    //KernelInfo kernel2;
 
     kernel.g_wk.clear();
-    kernel.g_wk.push_back(512 * n_groups);
+    kernel.g_wk.push_back(32768);
     kernel.g_wk.push_back(1);
     kernel.g_wk.push_back(1);
 
@@ -120,14 +120,49 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
         else if(params.rmv == rocm_meta_version::V3)
             kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_m30.so";
         else if(params.rmv == rocm_meta_version::AMDHSA_1_0) {
-            if (params.has_active && params.bias)
-                kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu.so";
-            else if (params.has_active && !params.bias)
-                kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_prelu.so";
-            else if (!params.has_active && params.bias)
-                kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias.so";
-            else
-                kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10.so";
+            if (params.has_active && params.bias) {
+                if (params.kernel_stride0 == 1) {
+                    if ((params.n_inputs == 128 && params.n_outputs == 128
+                         && params.in_height == 28 && params.in_width == 28 && params.batch_sz == 1)
+                       || (params.n_inputs == 1024 && params.n_outputs == 1024
+                         && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 2)
+                       || (params.n_inputs == 512 && params.n_outputs == 512
+                         && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 4)
+                       || (params.n_inputs == 512 && params.n_outputs == 512
+                         && params.in_height == 14 && params.in_width == 14 && params.batch_sz == 1)
+                       || (params.n_inputs == 256 && params.n_outputs == 256
+                         && params.in_height == 14 && params.in_width == 14 && params.batch_sz <= 2)) {
+                        //todo: remove n_inputs = n_outputs
+                        kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_sw.so";
+                    } else
+                        kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu.so";
+                } else if (params.kernel_stride0 == 2
+                           && params.n_inputs == 1024 && params.in_height == 14 && params.in_width == 14) {
+                    kernel.kernel_file =   "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_stride2.so"                 ;
+                } else
+                    return result;
+                if (params.has_pooling && params.kernel_stride0 == 1) {
+                    kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_pooling.so";
+                }
+            }
+            else if (params.has_active && !params.bias) {
+                if (params.kernel_stride0 == 1)
+                    kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_prelu.so";
+                else
+                    return result;
+            }
+            else if (!params.has_active && params.bias) {
+                if (params.kernel_stride0 == 1)
+                    kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias.so";
+                else
+                    return result;
+            }
+            else {
+                if (params.kernel_stride0 == 1)
+                    kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10.so";
+                else
+                    return result;
+            }
         }
         else
             MIOPEN_THROW("conv_3x3_wheel_alpha_v3_0b_gfx803: Unsupported metadata version.");
@@ -137,14 +172,49 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
         if(params.rmv == rocm_meta_version::V3)
             kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900.so";
         else if(params.rmv == rocm_meta_version::AMDHSA_1_0) {
-            if (params.has_active && params.bias)
-                kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu.so";
-            else if (params.has_active && !params.bias)
-                kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_prelu.so";
-            else if (!params.has_active && params.bias)
-                kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias.so";
-            else
-                kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10.so";
+            if (params.has_active && params.bias) {
+                if (params.kernel_stride0 == 1) {
+                    if ((params.n_inputs == 128 && params.n_outputs == 128
+                         && params.in_height == 28 && params.in_width == 28 && params.batch_sz == 1)
+                       || (params.n_inputs == 1024 && params.n_outputs == 1024
+                         && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 2)
+                       || (params.n_inputs == 512 && params.n_outputs == 512
+                         && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 4)
+                       || (params.n_inputs == 512 && params.n_outputs == 512
+                         && params.in_height == 14 && params.in_width == 14 && params.batch_sz == 1)
+                       || (params.n_inputs == 256 && params.n_outputs == 256
+                         && params.in_height == 14 && params.in_width == 14 && params.batch_sz <= 2)) {
+                        //todo: remove n_inputs = n_outputs
+                        kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu_sw.so";
+                    } else
+                        kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu.so";
+                } else if (params.kernel_stride0 == 2
+                           && params.n_inputs == 1024 && params.in_height == 14 && params.in_width == 14) {
+                    kernel.kernel_file =   "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu_stride2.so"                 ;
+                } else
+                    return result;
+                if (params.has_pooling && params.kernel_stride0 == 1) {
+                    kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu_pooling.so";
+                }
+            }
+            else if (params.has_active && !params.bias) {
+                if (params.kernel_stride0 == 1)
+                    kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_prelu.so";
+                else
+                    return result;
+            }
+            else if (!params.has_active && params.bias) {
+                if (params.kernel_stride0 == 1)
+                    kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias.so";
+                else
+                    return result;
+            }
+            else {
+                if (params.kernel_stride0 == 1)
+                    kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10.so";
+                else
+                    return result;
+            }
         }
         else
             MIOPEN_THROW("conv_3x3_wheel_alpha_v7_0_3b_gfx900: Unsupported metadata version.");
@@ -163,9 +233,9 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
     result.construction_params.push_back(kernel);
 
     // Start to do pooling...
-    if (params.has_pooling) {
-        addPoolingKernel(params, result);
-    }
+    if (params.has_pooling
+        &&(!(params.has_active && params.bias) || params.kernel_stride0 != 1))
+            addPoolingKernel(params, result);
 
     return result;
 }
