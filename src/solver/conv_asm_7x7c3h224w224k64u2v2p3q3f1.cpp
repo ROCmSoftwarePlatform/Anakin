@@ -64,8 +64,15 @@ bool ConvAsm7x7c3h224w224k64u2v2p3q3f1::IsApplicable(const ConvolutionContext& p
         && params.kernel_size1 == 7    // -y
         && params.n_inputs == 3        // -c
         && params.n_outputs == 64      // -k
-        && params.in_width == 224      // -W
-        && params.in_height == 224     // -H
+        && ((params.in_width == 224 /*-W*/ && params.in_height == 224 /*-H*/)
+             || (params.in_width == 448 /*-W*/ && params.in_height == 448 /*-H*/ && params.has_pooling
+                 && params.poolingContext.pooling_type == 1 //Pooling_max
+                 && params.poolingContext.kernel_size0 == 2
+                 && params.poolingContext.kernel_size1 == 2
+                 && params.poolingContext.kernel_stride0 == 2
+                 && params.poolingContext.kernel_stride1 == 2
+                 && params.poolingContext.pad0 == 0
+                 && params.poolingContext.pad1 == 0))
         && params.float_size == 32
         && params.in_layout == "NCHW";
         // && (isForwardDirection() ? _weights_layout == "KCHW" : _weights_layout == "CKHW" )
@@ -75,30 +82,35 @@ bool ConvAsm7x7c3h224w224k64u2v2p3q3f1::IsApplicable(const ConvolutionContext& p
 ConvSolution ConvAsm7x7c3h224w224k64u2v2p3q3f1::GetSolution(const ConvolutionContext& params) const
 {
     ConvSolution result;
-    const int out_w =
-        (params.in_width + params.pad0 * 2 + params.kernel_stride0 - params.kernel_size0) /
-        params.kernel_stride0; // (inp_w + 2*pad_w + inp_u - wei_w) / inp_u
-    const int out_h =
-        (params.in_height + params.pad1 * 2 + params.kernel_stride1 - params.kernel_size1) /
-        params.kernel_stride1; // (inp_h + 2*pad_h + inp_v - wei_h) / inp_v
-
-    std::ostringstream options;
-    GenerateClangDefsym(
-        options, "ROCM_METADATA_VERSION", (params.rmv == rocm_meta_version::V3) ? 3 : 4);
     KernelInfo constr_params;
-    constr_params.comp_options = options.str();
+    constr_params.comp_options = "";
 
     constr_params.l_wk.push_back(64);
     constr_params.l_wk.push_back(8);
     constr_params.l_wk.push_back(1);
 
-    // global-work = [align(out_w,64), (align(out_h,4)/4)*align(wei_k/2,8), batch_n]
-    constr_params.g_wk.push_back(AlignUp(out_w, 64));
-    constr_params.g_wk.push_back(AlignUp(out_h, 4) / 4 * AlignUp(params.n_outputs / 2, 8));
+    constr_params.g_wk.push_back(AlignUp(params.out_width, 64));
+    constr_params.g_wk.push_back(AlignUp(params.out_height, 4) / 4 *
+                                      AlignUp(params.n_outputs / 2, 8));
     constr_params.g_wk.push_back(params.batch_sz);
 
-    constr_params.kernel_file = "conv7x7c3h224w224k64u2v2p3q3f1.s";
-    constr_params.kernel_name = "gcnAsmConv7x7c3h224w224k64u2v2p3q3f1";
+    if (params.in_width == 224) {
+        if (params.bias) {
+            constr_params.kernel_file = "conv7x7c3h224w224k64u2v2p3q3f1b1prelu.s";
+            constr_params.kernel_name = "conv7x7c3h224w224k64u2v2p3q3f1b1prelu";
+        } else {
+            constr_params.kernel_file = "conv7x7c3h224w224k64u2v2p3q3f1b0prelu.s";
+            constr_params.kernel_name = "conv7x7c3h224w224k64u2v2p3q3f1b0prelu";
+        }
+    } else if (params.in_width == 448) {
+        if (params.bias) {
+            constr_params.kernel_file = "conv7x7c3h448w448k64u2v2p3q3f1b1prelupooling.s";
+            constr_params.kernel_name = "conv7x7c3h448w448k64u2v2p3q3f1b1prelupooling";
+        } else {
+            constr_params.kernel_file = "conv7x7c3h448w448k64u2v2p3q3f1b0prelupooling.s";
+            constr_params.kernel_name = "conv7x7c3h448w448k64u2v2p3q3f1b0prelupooling";
+        }
+    }
 
     result.construction_params.push_back(constr_params);
     return result;
