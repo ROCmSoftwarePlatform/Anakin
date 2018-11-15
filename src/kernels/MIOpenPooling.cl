@@ -64,6 +64,7 @@
 #ifndef MLO_POOLING_OP_ID
 #define MLO_POOLING_OP_ID 0
 #endif
+
 // max
 #if MLO_POOLING_OP_ID == MLO_POOLING_OP_MAX
 #define MLO_POOLING_OP(A, B) fmax(A, B);
@@ -80,10 +81,23 @@
 #define MLO_BOT_DATA_SZ1 \
     (MLO_POOLING_N_VERT_OUT_PIX * MLO_POOLING_STRIDE1 + MLO_POOLING_KERNEL_SZ1 - 1)
 
+#ifndef MLO_CONV_BIAS
+#define MLO_CONV_BIAS 0
+#endif
+#ifndef MLO_CONV_PRELU
+#define MLO_CONV_PRELU 0
+#endif
+
 __attribute__((reqd_work_group_size(MLO_POOLING_GROUP_SZ0,
                                     MLO_POOLING_GROUP_SZ1,
                                     MLO_POOLING_GROUP_SZ2))) __kernel void
 mloPoolingG(const __global _FLOAT* bot,
+#if MLO_CONV_BIAS
+            const __global _FLOAT* bias,
+#endif
+#if MLO_CONV_PRELU
+            _FLOAT negSlope,
+#endif
             __global _FLOAT* top,
 #if !defined(MLO_POOLING_DO_BACKWARD) || MLO_POOLING_OP_ID != MLO_POOLING_OP_MAX
             UNUSED
@@ -108,6 +122,7 @@ mloPoolingG(const __global _FLOAT* bot,
 #if defined(MLO_POOLING_DO_BACKWARD) && MLO_POOLING_OP_ID == MLO_POOLING_OP_MAX
     _INT_MASK_LOCAL mask_private[MLO_POOLING_N_VERT_OUT_PIX][MLO_POOLING_N_HORIZ_OUT_PIX];
 #endif
+
     for(int k = 0; k < MLO_POOLING_N_VERT_OUT_PIX; k++)
     {
         for(int l = 0; l < MLO_POOLING_N_HORIZ_OUT_PIX; l++)
@@ -132,13 +147,26 @@ mloPoolingG(const __global _FLOAT* bot,
                         (run_x >= 0 && run_x < MLO_POOLING_BOT_WIDTH))
                            ? true
                            : false;
-            bot_data[j][i] = (vis) ? bot[bot_gbl_off] :
+            if(vis)
+            {
+                bot_data[j][i] = bot[bot_gbl_off];
+#if MLO_CONV_BIAS
+                bot_data[j][i] += bias[o];
+#endif
+#if MLO_CONV_PRELU
+                bot_data[j][i] = (bot_data[j][i] > 0) ? bot_data[j][i] : bot_data[j][i] * negSlope;
+#endif
+            }
+            else
+            {
+                bot_data[j][i] =
 #if MLO_POOLING_OP_ID == MLO_POOLING_OP_MAX
-                                   (_FLOAT)(-MAX_VAL)
+                    (_FLOAT)(-MAX_VAL)
 #elif MLO_POOLING_OP_ID == MLO_POOLING_OP_AVE
-                                   (_FLOAT)(0)
+                    (_FLOAT)(0)
 #endif
                 ;
+            }
         }
     }
 
