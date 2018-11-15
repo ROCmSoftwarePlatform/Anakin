@@ -68,7 +68,8 @@ bool ConvBinWinograd3x3U::IsApplicable(const ConvolutionContext& params) const
         && params.kernel_size0 == 3
         && params.kernel_size1 == 3
         && ((params.kernel_stride0 == 1 && params.kernel_stride1 == 1)
-             || (params.kernel_stride0 == 2 && params.kernel_stride1 == 2))
+             || (params.kernel_stride0 == 2 && params.kernel_stride1 == 2
+                  && params.n_inputs == 1024 && params.in_height == 14 && params.in_width == 14))
         && params.batch_sz < std::pow(2, 16)
         && params.n_inputs < std::pow(2, 16)
         && params.n_outputs < std::pow(2, 16)
