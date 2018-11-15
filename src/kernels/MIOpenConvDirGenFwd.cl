@@ -487,9 +487,10 @@ MIOpenCDFGen4(const __global _FLOAT* __restrict bot,
             uint lcl_o   = i / (MLO_FLTR_SZ0 * MLO_FLTR_SZ1);
             uint lcl_o_i = i & (MLO_FLTR_SZ0 * MLO_FLTR_SZ1 - 1);
 #endif
-
-            lcl_wei[i] =
-                weights[wei_off + lcl_o * MLO_N_IN_CHNLS * MLO_FLTR_SZ0 * MLO_FLTR_SZ1 + lcl_o_i];
+            if (o_id * MLO_LCL_N_OUT_CHNLS + lcl_o < MLO_N_OUT_CHNLS)
+            {
+                lcl_wei[i] = weights[wei_off + lcl_o * MLO_N_IN_CHNLS * MLO_FLTR_SZ0 * MLO_FLTR_SZ1 + lcl_o_i];
+            }
         }
 
         readDataTile(&lcl_img[MLO_LCL_IMG_SIZE * MLO_LCL_N_IN_CHNLS * proc_tile1],
