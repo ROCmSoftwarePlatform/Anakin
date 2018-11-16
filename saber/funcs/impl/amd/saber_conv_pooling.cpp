@@ -745,9 +745,7 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
                                   (PtrDtype)outputs[0]->mutable_data(),
                                   (PtrDtype) nullptr);
                     }
-                }
-                else
-                {
+                } else {
                     if (isActive) {
                         err = it->get()->SetKernelArgs(
                                   (PtrDtype)_outConvRelu->data(),
@@ -847,19 +845,43 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
         } else if (it->get()->GetName() == "sp3AsmConv3x3F") {
             int d_n_groups = 64, d_flags = 0;
             PtrDtype biasMemObject = isBias ? param.conv_param.bias()->data() : 0;
-            err                    = it->get()->SetKernelArgs(
-                                         (unsigned int)inputs[0]->num(),
-                                         (unsigned int)inputs[0]->channel(),
-                                         (unsigned int)inputs[0]->height(),
-                                         (unsigned int)inputs[0]->width(),
-                                         (unsigned int)param.conv_param.weight()->num(),
-                                         (unsigned int)d_n_groups,
-                                         (unsigned int)d_flags,
-                                         (float)param.conv_param.activation_param.negative_slope,
-                                         (PtrDtype)inputs[0]->data(),
-                                         (PtrDtype)param.conv_param.weight()->data(),
-                                         (PtrDtype)_outConvRelu->mutable_data(),
-                                         (PtrDtype)biasMemObject);
+
+            if (isBias && isActive
+                    && param.pooling_param.pooling_type == Pooling_max
+                    && param.pooling_param.window_h == 2
+                    && param.pooling_param.window_w == 2
+                    && param.pooling_param.stride_h == 2
+                    && param.pooling_param.stride_w == 2
+                    && param.pooling_param.pad_h == 0
+                    && param.pooling_param.pad_w == 0) {
+                err                    = it->get()->SetKernelArgs(
+                                             (unsigned int)inputs[0]->num(),
+                                             (unsigned int)inputs[0]->channel(),
+                                             (unsigned int)inputs[0]->height(),
+                                             (unsigned int)inputs[0]->width(),
+                                             (unsigned int)param.conv_param.weight()->num(),
+                                             (unsigned int)d_n_groups,
+                                             (unsigned int)d_flags,
+                                             (float)param.conv_param.activation_param.negative_slope,
+                                             (PtrDtype)inputs[0]->data(),
+                                             (PtrDtype)param.conv_param.weight()->data(),
+                                             (PtrDtype)outputs[0]->mutable_data(),
+                                             (PtrDtype)biasMemObject);
+            } else {
+                err                    = it->get()->SetKernelArgs(
+                                             (unsigned int)inputs[0]->num(),
+                                             (unsigned int)inputs[0]->channel(),
+                                             (unsigned int)inputs[0]->height(),
+                                             (unsigned int)inputs[0]->width(),
+                                             (unsigned int)param.conv_param.weight()->num(),
+                                             (unsigned int)d_n_groups,
+                                             (unsigned int)d_flags,
+                                             (float)param.conv_param.activation_param.negative_slope,
+                                             (PtrDtype)inputs[0]->data(),
+                                             (PtrDtype)param.conv_param.weight()->data(),
+                                             (PtrDtype)_outConvRelu->mutable_data(),
+                                             (PtrDtype)biasMemObject);
+            }
 
             if (!err) {
                 ALOGE("Fail to set execution");
