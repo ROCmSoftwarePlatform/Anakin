@@ -35,7 +35,6 @@ void set_offsets_to_uint(std::string& clstr);
 } // namespace tempfix
 
 void Im2ColGPU(
-    KernelInfo& kernelInfo,
     AMDKernelPtr& kptr,
     int device_id,
     int c,
@@ -53,7 +52,6 @@ void Im2ColGPU(
     int dilation_w);
 
 void transpose_NCHW2CNHW(
-    KernelInfo& kernelInfo,
     AMDKernelPtr& kptr,
     int device_id,
     int n,
@@ -68,7 +66,6 @@ void transpose_NCHW2CNHW(
     int w_stride);
 
 void transpose_CNHW2NCHW(
-    KernelInfo& kernelInfo,
     AMDKernelPtr& kptr,
     int device_id,
     int n,
@@ -81,8 +78,7 @@ void transpose_CNHW2NCHW(
     int out_offset,
     int h_stride,
     int w_stride,
-    bool isBias,
-    bool needExtraKernel);
+    bool isBias);
 
 void BiasReluPool(
     std::vector<AMDKernelPtr>& vkptr,

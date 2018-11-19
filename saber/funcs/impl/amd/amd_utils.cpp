@@ -155,10 +155,11 @@ void set_offsets_to_uint(std::string& clstr) {
 #define WG_SIZE 256
 #define MAX_ACTIVE_THREADS (64 * 4 * 64)
 
-void Im2ColGPU(KernelInfo& kernelInfo, AMDKernelPtr& kptr, int device_id, int c,
+void Im2ColGPU(AMDKernelPtr& kptr, int device_id, int c,
                int h, int w, int wei_h, int wei_w, int out_h, int out_w,
                int pad_h, int pad_w, int stride_h, int stride_w, int dilation_h,
                int dilation_w) {
+    KernelInfo kernelInfo;
     kernelInfo.kernel_file = "MIOpenUtilKernels.cl";
     kernelInfo.kernel_name = "Im2Col";
     kernelInfo.kernel_type = MIOPEN;
@@ -215,11 +216,11 @@ void Im2ColGPU(KernelInfo& kernelInfo, AMDKernelPtr& kptr, int device_id, int c,
     kptr = CreateKernel(device_id, &kernelInfo);
 }
 
-void transpose_NCHW2CNHW(KernelInfo& kernelInfo, AMDKernelPtr& kptr,
+void transpose_NCHW2CNHW(AMDKernelPtr& kptr,
                          int device_id, int n, int c, int h_in, int w_in,
                          int h_out, int w_out, int in_offset, int out_offset,
                          int h_stride, int w_stride) {
-
+    KernelInfo kernelInfo;
     kernelInfo.kernel_file = "MIOpenUtilKernels4.cl";
 
     if (h_stride == 1 && w_stride == 1) {
@@ -269,16 +270,17 @@ void transpose_NCHW2CNHW(KernelInfo& kernelInfo, AMDKernelPtr& kptr,
         kernelInfo.comp_options += " -DN=" + std::to_string(n);
         kernelInfo.comp_options += " -DC=" + std::to_string(c);
         kernelInfo.comp_options += " -DHW_IN=" + std::to_string(h_in * w_in);
-        kernelInfo.comp_options += " -DHW_OUT=" + std::to_string(h_out * w_out);
+        //kernelInfo.comp_options += " -DHW_OUT=" + std::to_string(h_out * w_out);
+        kernelInfo.comp_options += " -DHW_OUT=" + std::to_string((h_in / h_stride) * (w_in / w_stride));
         kernelInfo.comp_options += " -DW_IN=" + std::to_string(w_in);
-        kernelInfo.comp_options += " -DW_OUT=" + std::to_string(w_out);
+        kernelInfo.comp_options += " -DW_OUT=" + std::to_string((w_in / w_stride));
         kernelInfo.comp_options += " -DH_STRIDE=" + std::to_string(h_stride);
         kernelInfo.comp_options += " -DW_STRIDE=" + std::to_string(w_stride);
         kernelInfo.comp_options += " -DIN_OFF=" + std::to_string(in_offset);
         kernelInfo.comp_options += " -DOUT_OFF=" + std::to_string(out_offset);
 
         size_t ld0 = WG_SIZE;
-        size_t gd0 = c * h_out * w_out;
+        size_t gd0 = c * (h_in / h_stride) * (w_in / w_stride);
         kernelInfo.l_wk = {ld0, 1, 1};
         kernelInfo.g_wk = {gd0, 1, 1};
 
@@ -292,20 +294,15 @@ void transpose_NCHW2CNHW(KernelInfo& kernelInfo, AMDKernelPtr& kptr,
     }
 }
 
-void transpose_CNHW2NCHW(KernelInfo& kernelInfo, AMDKernelPtr& kptr,
+void transpose_CNHW2NCHW(AMDKernelPtr& kptr,
                          int device_id, int n, int c, int h_out, int w_out,
                          int h_in, int w_in, int in_offset, int out_offset,
-                         int h_stride, int w_stride, bool isBias, bool nfusion) {
-
+                         int h_stride, int w_stride, bool isBias) {
+    KernelInfo kernelInfo;
     kernelInfo.kernel_file = "MIOpenUtilKernels4.cl";
 
     if (h_stride == 1 && w_stride == 1) {
-        if (!nfusion) {
-            kernelInfo.kernel_name = "transpose_CNHW2NCHW_opt_bias_prelu";
-        } else {
-            kernelInfo.kernel_name = "transpose_CNHW2NCHW_opt";
-        }
-
+        kernelInfo.kernel_name = "transpose_CNHW2NCHW_opt_bias_prelu";
         kernelInfo.kernel_type = MIOPEN;
 
         int RD_BLCK =

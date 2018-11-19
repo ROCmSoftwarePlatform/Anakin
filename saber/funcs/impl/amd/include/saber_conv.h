@@ -20,9 +20,6 @@
 #include "saber/funcs/impl/impl_conv.h"
 #include "saber/core/impl/amd/utils/amd_kernel.h"
 #include "saber/funcs/funcs_utils.h"
-#include <miopengemm/miogemm.hpp>
-#include <miopengemm/gemm.hpp>
-#include <miopengemm/geometry.hpp>
 
 namespace anakin {
 
@@ -35,12 +32,12 @@ public:
     typedef AMD_API::TPtr PtrDtype;
 
     SaberConv2D() {
-        _multikernel = false;
         _kernels_ptr.clear();
         _outGemmWorkspace = nullptr;
     }
     ~SaberConv2D() {
         _kernels_ptr.clear();
+
         if (_outGemmWorkspace) {
             delete _outGemmWorkspace;
         }
@@ -59,27 +56,27 @@ public:
            Context<AMD>& ctx) override;
 
     virtual SaberStatus dispatch(
-            const std::vector<Tensor<AMD>*>& inputs,
-            std::vector<Tensor<AMD>*>& outputs,
-            ConvParam<AMD>& param) override;
+        const std::vector<Tensor<AMD>*>& inputs,
+        std::vector<Tensor<AMD>*>& outputs,
+        ConvParam<AMD>& param) override;
 
-    SaberStatus trans_weights(Tensor<AMD> &target_weights, Tensor<AMD> &target_bias,
+    SaberStatus trans_weights(Tensor<AMD>& target_weights, Tensor<AMD>& target_bias,
                               int pad_h, int pad_w, int dilation_h, int dilation_w,
                               int stride_h, int stride_w, int group) {
         if (target_weights.valid_size() > 0) {
             // conv_trans_weights<AMD, AMDHX86>(
             //        target_weights, stride_h, stride_w, group, true, nullptr);
         }
+
         _extern_trans = true;
         _in_place     = true;
         return SaberSuccess;
     }
 
 private:
-    bool _in_place{false};
-    bool _extern_trans{false};
-    std::vector<AMDKernelPtr> _kernels_ptr{nullptr};
-    bool _multikernel{false};
+    bool _in_place {false};
+    bool _extern_trans {false};
+    std::vector<AMDKernelPtr> _kernels_ptr {nullptr};
     Tensor<AMD>* _outGemmWorkspace;
 };
 } // namespace saber
