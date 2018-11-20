@@ -54,25 +54,25 @@ SaberStatus SaberFc<AMD, OpDtype>::init(
 #define VGG16_FC7_NT_LOCAL_WORK_SIZE_BS32 (256)
 #define VGG16_FC7_NT_GLOBAL_WORK_SIZE_BS32 (4096 * 16)
 
-#define VGG16_FC8_NT_LOCAL_WORK_SIZE_BS1 (256)
-#define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS1 (8192 * 2)
-#define VGG16_FC8_NT_LOCAL_WORK_SIZE_BS2 (128)
-#define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS2 (8192 * 4)
+#define VGG16_FC8_NT_LOCAL_WORK_SIZE_BS1 (64)
+#define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS1 (64 * 64 * 16)
+#define VGG16_FC8_NT_LOCAL_WORK_SIZE_BS2 (64)
+#define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS2 (64 * 64 * 16)
 #define VGG16_FC8_NT_LOCAL_WORK_SIZE_BS4 (64)
-#define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS4 (8192 * 4)
+#define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS4 (64 * 64 * 16)
 #define VGG16_FC8_NT_LOCAL_WORK_SIZE_BS8 (64)
-#define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS8 (8192 * 8)
+#define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS8 (64 * 64 * 16)
 #define VGG16_FC8_NT_LOCAL_WORK_SIZE_BS32 (64)
-#define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS32 (8192 * 8)
+#define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS32 (64 * 64 * 16)
 
-#define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS1 (256)
-#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS1 (8192 * 2)
-#define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS2 (128)
-#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS2 (8192 * 4)
+#define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS1 (64)
+#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS1 (64 * 64 * 16)
+#define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS2 (64)
+#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS2 (64 * 64 * 16)
 #define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS4 (64)
-#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS4 (8192 * 4)
+#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS4 (64 * 64 * 16)
 #define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS8 (64)
-#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS8 (8192 * 8)
+#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS8 (64 * 64 * 16)
 #define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS32 (64)
 #define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS32 (8192 * 8)
 
@@ -108,16 +108,16 @@ SaberStatus SaberFc<AMD, OpDtype>::init(
 #define VGG16_FC7_NT_KERNEL_FILE_NAME_BS4 "InnerProductBNTFC7M4.cl"
 #define VGG16_FC7_NT_KERNEL_FILE_NAME_BS8 "InnerProductBNTFC7M8.cl"
 #define VGG16_FC7_NT_KERNEL_FILE_NAME_BS32 "InnerProductBNTFC7M32.cl"
-#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS1 "InnerProductBNTFC8M1.cl"
-#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS2 "InnerProductBNTFC8M2.cl"
-#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS4 "InnerProductBNTFC8M4.cl"
-#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS8 "InnerProductBNTFC8M8.cl"
+#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS1 "Conv1x1FC7.cl"
+#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS2 "Conv1x1FC7.cl"
+#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS4 "Conv1x1FC7.cl"
+#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS8 "Conv1x1FC7.cl"
 #define VGG16_FC8_NT_KERNEL_FILE_NAME_BS32 "InnerProductBNTFC8M32.cl"
 
-#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS1 "InnerProductBNTFC1000M1.cl"
-#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS2 "InnerProductBNTFC1000M2.cl"
-#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS4 "InnerProductBNTFC1000M4.cl"
-#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS8 "InnerProductBNTFC1000M8.cl"
+#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS1 "Conv1x1FC7.cl"
+#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS2 "Conv1x1FC7.cl"
+#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS4 "Conv1x1FC7.cl"
+#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS8 "Conv1x1FC7.cl"
 #define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS32 "InnerProductBNTFC1000M32.cl"
 
 #define YOLO_FC25_NT_KERNEL_FILE_NAME_BS1 "InnerProductBNTFC25M1.cl"
@@ -546,8 +546,13 @@ SaberStatus SaberFc<AMD, OpDtype>::create(
 
     if (optmized) {
         // set comp_options...
-        kernelInfo.comp_options = std::string(" -DM=") + std::to_string(M) + std::string(" -DN=")
-                                  + std::to_string(N) + std::string(" -DK=") + std::to_string(K);
+        kernelInfo.comp_options = std::string(" -DSTRIDE=") + std::to_string(inputs[0]->channel()) +
+                                  std::string(" -DN=") + std::to_string(inputs[0]->num());
+
+        if (param.bias != nullptr && param.bias->valid_size() > 0) {
+            kernelInfo.comp_options += std::string(" -DBIAS");
+        }
+
         kernelInfo.kernel_type = SABER;
 
         kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
@@ -622,11 +627,20 @@ SaberStatus SaberFc<AMD, OpDtype>::dispatch(
                 return SaberInvalidValue;
             }
 
-            err = _kernels_ptr[0].get()->SetKernelArgs(
-                      (PtrDtype)memObjects[0],
-                      (PtrDtype)memObjects[1],
-                      (PtrDtype)memObjects[2],
-                      (PtrDtype)memObjects[3]);
+            if (param.bias != nullptr && param.bias->valid_size() > 0) {
+                err = _kernels_ptr[0].get()->SetKernelArgs(
+                          (PtrDtype)memObjects[0],
+                          (PtrDtype)memObjects[1],
+                          (PtrDtype)memObjects[2],
+                          (PtrDtype)memObjects[3],
+                          1.0f);
+            } else {
+                err = _kernels_ptr[0].get()->SetKernelArgs(
+                          (PtrDtype)memObjects[0],
+                          (PtrDtype)memObjects[1],
+                          (PtrDtype)memObjects[3],
+                          1.0f);
+            }
 
             if (!err) {
                 ALOGE("Fail to set kernel args :" << err);
