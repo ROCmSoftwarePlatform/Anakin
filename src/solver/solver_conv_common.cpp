@@ -27,28 +27,38 @@
 
 namespace miopen {
 
-bool ConvCommon::getKernelInfo(int dev, int batch, int stride, int channel, int width, int output_num, Conv1x1Type& mType) {
+bool ConvCommon::getKernelInfo(int dev, int batch, int stride, int channel, int width,
+                               int output_num, Conv1x1Type& mType) {
 
     for (int i = 0; i < conv1x1type.size(); i++) {
         if (conv1x1type[i].dev == dev && conv1x1type[i].batch == batch
-            && conv1x1type[i].stride == stride && conv1x1type[i].channel == channel
-            && conv1x1type[i].width == width && conv1x1type[i].output_num == output_num) {
+                && conv1x1type[i].stride == stride && conv1x1type[i].channel == channel
+                && conv1x1type[i].width == width && conv1x1type[i].output_num == output_num) {
             mType = conv1x1type[i];
             ALOGD("Got kernel:" << mType.kernel_name << "!!");
             return true;
         }
+
         if (conv1x1type[i].dev == dev
-            && ((conv1x1type[i].channel == channel && channel == 1024)
-                 || (conv1x1type[i].channel == channel && channel == 1280))
-            && (conv1x1type[i].output_num == output_num && output_num == 1000)
-            && (conv1x1type[i].stride == stride && stride == 1)
-            && (conv1x1type[i].width == width && width == 1)
-            && conv1x1type[i].batch >= batch) {
+                && ((conv1x1type[i].channel == channel && channel == 1024)
+                    || (conv1x1type[i].channel == channel && channel == 1280))
+                && (conv1x1type[i].output_num == output_num && output_num == 1000)
+                && (conv1x1type[i].stride == stride && stride == 1)
+                && (conv1x1type[i].width == width && width == 1)
+                && conv1x1type[i].batch >= batch) {
             mType = conv1x1type[i];
             ALOGD("Got kernel:" << mType.kernel_name << "!!");
             return true;
         }
     }
+
+    if ((batch == 1 && stride == 1) || (width <= 14 && stride == 1)
+            || (stride == 2)) {
+        mType.kernel_name = "xGemm";
+        ALOGD("Got kernel:" << mType.kernel_name << "!!");
+        return true;
+    }
+
     return false;
 }
 

@@ -115,6 +115,7 @@ void addPoolingKernel(const ConvolutionContext& params, ConvSolution& result) {
         std::string(" -DBATCH_NUM=") + std::to_string(params.poolingContext.batch_sz) +
         std::string(" -DCU_NUM=64") +
         std::string(" -DMLO_CONV_BIAS=0") +
+        std::string(" -DMLO_CONV_PRELU=0") +
         std::string(" -DMIOPEN_USE_FP32=1");
     result.construction_params.push_back(kernel2);
 }

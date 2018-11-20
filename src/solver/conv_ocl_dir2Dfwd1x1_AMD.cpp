@@ -33,24 +33,26 @@ namespace solver {
 bool ConvOclDirectFwd1x1AMD::IsApplicable(const ConvolutionContext& params) const {
     bool result =
         params.direction.IsForward() && (params.kernel_size0 == 1 && params.kernel_size1 == 1)
-        && (params.batch_sz <= 8) && (params.kernel_stride0 <= 2)
-        && (params.pad0 == 0 && params.pad1 == 0)
-        && (params.n_inputs == 16 || params.n_inputs == 24 || params.n_inputs == 32
-            || params.n_inputs == 64 || params.n_inputs == 96 || params.n_inputs == 128
-            || params.n_inputs == 144 || params.n_inputs == 160 || params.n_inputs == 192
-            || params.n_inputs == 256 || params.n_inputs == 320 || params.n_inputs == 384
-            || params.n_inputs == 512 || params.n_inputs == 576 || params.n_inputs == 960
-            || params.n_inputs == 1024 || params.n_inputs == 1280 || params.n_inputs == 2048)
-        && ((params.in_height == params.in_width)
-            && (params.in_height == 1 || params.in_height == 7 || params.in_height == 14
-                || params.in_height == 28 || params.in_height == 56 || params.in_height == 112))
-        && (params.n_outputs == 16 || params.n_outputs == 24 || params.n_outputs == 32
-            || params.n_outputs == 64 || params.n_outputs == 96 || params.n_outputs == 128
-            || params.n_outputs == 144 || params.n_outputs == 160 || params.n_outputs == 192
-            || params.n_outputs == 256 || params.n_outputs == 320 || params.n_outputs == 384
-            || params.n_outputs == 512 || params.n_outputs == 576 || params.n_outputs == 960
-            || params.n_outputs == 1000 || params.n_outputs == 1024 || params.n_outputs == 1280
-            || params.n_outputs == 2048);
+        && /*(params.batch_sz <= 8) &&*/ (params.kernel_stride0 <= 2)
+        && (params.kernel_stride0 == params.kernel_stride1)
+        && (params.pad0 == 0 && params.pad1 == 0)  && (params.in_height == params.in_width);
+#if 0
+    && (params.n_inputs == 16 || params.n_inputs == 24 || params.n_inputs == 32
+        || params.n_inputs == 64 || params.n_inputs == 96 || params.n_inputs == 128
+        || params.n_inputs == 144 || params.n_inputs == 160 || params.n_inputs == 192
+        || params.n_inputs == 256 || params.n_inputs == 320 || params.n_inputs == 384
+        || params.n_inputs == 512 || params.n_inputs == 576 || params.n_inputs == 960
+        || params.n_inputs == 1024 || params.n_inputs == 1280 || params.n_inputs == 2048)
+    && ((params.in_height == params.in_width);
+        && (params.in_height == 1 || params.in_height == 7 || params.in_height == 14
+            || params.in_height == 28 || params.in_height == 56 || params.in_height == 112))
+    && (params.n_outputs == 16 || params.n_outputs == 24 || params.n_outputs == 32
+        || params.n_outputs == 64 || params.n_outputs == 96 || params.n_outputs == 128
+        || params.n_outputs == 144 || params.n_outputs == 160 || params.n_outputs == 192
+        || params.n_outputs == 256 || params.n_outputs == 320 || params.n_outputs == 384
+        || params.n_outputs == 512 || params.n_outputs == 576 || params.n_outputs == 960
+        || params.n_outputs == 1000 || params.n_outputs == 1024 || params.n_outputs == 1280
+        || params.n_outputs == 2048);
 
     if (result) {
         int dev;
@@ -78,6 +80,7 @@ bool ConvOclDirectFwd1x1AMD::IsApplicable(const ConvolutionContext& params) cons
                   << conv11_param.kernel_name);
         }
     }
+#endif
 
     return result;
 }
@@ -179,11 +182,14 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
 
             kernelInfo.l_wk = {1024, 1, 1};
             kernelInfo.g_wk = {1024 * 64, 1, 1};
+        } else if (conv11_param.kernel_name == "xGemm") {
+            kernelInfo.kernel_name = "xGemm";
         }
 
         kernelInfo.isMIOpenKernel = false;
         result.construction_params.push_back(kernelInfo);
     } else {
+        result.status = miopenStatusInternalError;
         ALOGE("can NOT get solution");
     }
 
