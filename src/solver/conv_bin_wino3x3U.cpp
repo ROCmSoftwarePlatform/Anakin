@@ -142,7 +142,14 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
                     kernel.kernel_file =   "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_stride2.so"                 ;
                 } else
                     return result;
-                if (params.has_pooling && params.kernel_stride0 == 1) {
+                if (params.has_pooling && params.kernel_stride0 == 1
+                    && params.poolingContext.pooling_type == 1 //Pooling_max
+                    && params.poolingContext.kernel_size0 == 2
+                    && params.poolingContext.kernel_size1 == 2
+                    && params.poolingContext.kernel_stride0 == 2
+                    && params.poolingContext.kernel_stride1 == 2
+                    && params.poolingContext.pad0 == 0
+                    && params.poolingContext.pad1 == 0) {
                     kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_pooling.so";
                 }
             }
@@ -194,7 +201,14 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
                     kernel.kernel_file =   "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu_stride2.so"                 ;
                 } else
                     return result;
-                if (params.has_pooling && params.kernel_stride0 == 1) {
+                if (params.has_pooling && params.kernel_stride0 == 1
+                    && params.poolingContext.pooling_type == 1 //Pooling_max
+                    && params.poolingContext.kernel_size0 == 2
+                    && params.poolingContext.kernel_size1 == 2
+                    && params.poolingContext.kernel_stride0 == 2
+                    && params.poolingContext.kernel_stride1 == 2
+                    && params.poolingContext.pad0 == 0
+                    && params.poolingContext.pad1 == 0) {
                     kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu_pooling.so";
                 }
             }
@@ -235,7 +249,8 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
 
     // Start to do pooling...
     if (params.has_pooling
-        &&(!(params.has_active && params.bias) || params.kernel_stride0 != 1))
+        && (kernel.kernel_file != "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu_pooling.so")
+        && (kernel.kernel_file != "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_pooling.so"))
             addPoolingKernel(params, result);
 
     return result;
