@@ -37,9 +37,16 @@ public:
     typedef typename DataTrait<AMD, OpDtype>::Dtype OpDataType;
     typedef AMD_API::TPtr PtrDtype;
 
-    SaberConcat() = default;
+    SaberConcat() {
+        in_cont_flag = false;
+        out_cont_flag = false;
+        _v_kernels_ptr.clear();
 
-    ~SaberConcat() {}
+    }
+
+    ~SaberConcat() {
+        _v_kernels_ptr.clear();
+    }
 
     virtual SaberStatus
     init(const std::vector<Tensor<AMD>*>& inputs,
@@ -54,14 +61,16 @@ public:
            Context<AMD>& ctx) override;
 
     virtual SaberStatus dispatch(
-            const std::vector<Tensor<AMD>*>& inputs,
-            std::vector<Tensor<AMD>*>& outputs,
-            ConcatParam<AMD>& param) override;
+        const std::vector<Tensor<AMD>*>& inputs,
+        std::vector<Tensor<AMD>*>& outputs,
+        ConcatParam<AMD>& param) override;
 
 private:
     int _num_concats;
     int _concat_input_size;
-    AMDKernelPtr _kernel_concat_normal;
+    bool out_cont_flag;
+    bool in_cont_flag;
+    std::vector<AMDKernelPtr> _v_kernels_ptr;
 };
 
 template class SaberConcat<AMD, AK_FLOAT>;
