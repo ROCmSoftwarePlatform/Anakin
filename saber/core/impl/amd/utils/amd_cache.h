@@ -16,6 +16,7 @@
 #define ANAKIN_SABER_FUNCS_IMPL_AMD_UTILS_AMDCACHE_H
 #include <memory>
 #include <map>
+#include <mutex>
 #include <iostream>
 #include "ocl/ocl_kernel.h"
 #include "anakin_config.h"
@@ -32,26 +33,32 @@ public:
         if (_instance.get() == NULL) {
             _instance = std::unique_ptr<AMDCache<T, U>>(new AMDCache<T, U>);
         }
+
         return _instance.get();
     }
 
     size_t getSize() {
+        std::lock_guard<std::recursive_mutex> lock(m_mutex);
         return cache_size;
     }
 
     // lookup the binary given the file name
     T lookup(U key) {
+        std::lock_guard<std::recursive_mutex> lock(m_mutex);
         typename MType::iterator iter;
         iter = cache_map.find(key);
+
         if (iter != cache_map.end()) {
             AMD_LOGD("[" << typeid(T).name() << "] found cache!");
             return iter->second;
-        } else
+        } else {
             return NULL;
+        }
     }
 
     // add program to the cache
     void add(U key, T t) {
+        std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
         if (!lookup(key)) {
             AMD_LOGD("[" << typeid(T).name() << "] insert cache to slot, size: " << cache_size);
@@ -85,6 +92,7 @@ private:
     static typename std::unique_ptr<AMDCache<T, U>> _instance;
     MType cache_map;
     unsigned int cache_size;
+    std::recursive_mutex m_mutex;
 };
 
 template <class T, typename U>
