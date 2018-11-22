@@ -959,6 +959,42 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
                 ALOGE("Fail to set kernel args :" << err);
                 return SaberInvalidValue;
             }
+        } else if (it->get()->GetName() == "conv7x7c3h224w224k64u2v2p3q3f1b1prelu") {
+            float paddingVal = 0.0f;
+            err = it->get()->SetKernelArgs(
+                      (PtrDtype)inputs[0]->data(),
+                      (PtrDtype)param.conv_param.weight()->data(),
+                      (PtrDtype)_outConvRelu->mutable_data(),
+                      paddingVal,
+                      slope,
+                      (PtrDtype)param.conv_param.bias()->data());
+
+            if (!err) {
+                ALOGE("Fail to set kernel args :" << err);
+                return SaberInvalidValue;
+            }
+        } else if (it->get()->GetName() == "conv7x7c3h224w224k64u2v2p3q3f1b0prelu") {
+            float paddingVal = 0.0f;
+            err = it->get()->SetKernelArgs(
+                      (PtrDtype)inputs[0]->data(),
+                      (PtrDtype)param.conv_param.weight()->data(),
+                      (PtrDtype)_outConvRelu->mutable_data(),
+                      paddingVal,
+                      slope);
+
+            if (!err) {
+                ALOGE("Fail to set kernel args :" << err);
+                return SaberInvalidValue;
+            }
+        } else if (it->get()->GetName() == "pooling_f3x3_s2x2") {
+            err = it->get()->SetKernelArgs(
+                      (PtrDtype)_outConvRelu->data(),
+                      (PtrDtype)outputs[0]->mutable_data());
+
+            if (!err) {
+                ALOGE("Fail to set kernel args :" << err);
+                return SaberInvalidValue;
+            }
         } else {
             ALOGD("disptach non-implementation kernel: " << it->get()->GetName());
         }
