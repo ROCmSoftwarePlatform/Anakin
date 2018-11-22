@@ -29,44 +29,54 @@
 namespace miopen {
 namespace solver {
 
-void addPoolingKernel(const ConvolutionContext& params, ConvSolution& result)
-{
+void addPoolingKernel(const ConvolutionContext& params, ConvSolution& result) {
+    KernelInfo kernel2;
+
+    if (params.poolingContext.kernel_size0 == 7 && params.poolingContext.kernel_size1 == 7) {
+        kernel2.l_wk = { 1024, 1, 1 };
+        kernel2.g_wk = { 1024 * 64, 1, 1 };
+        kernel2.kernel_file = "Pooling_3x3_2x2.cl";
+        kernel2.kernel_name = "pooling_f3x3_s2x2";
+        kernel2.isMIOpenKernel = false;
+        // set comp_options...
+        kernel2.comp_options = std::string(" -DN=") + std::to_string(params.batch_sz);
+        result.construction_params.push_back(kernel2);
+        return;
+    }
+
     int _grp_tile0 = 8;
     int _grp_tile1 = 8;
 
     int _out_pix_tile0 = std::max(1, 8 / params.poolingContext.kernel_stride0);
     int _out_pix_tile1 = std::max(1, 8 / params.poolingContext.kernel_stride1);
 
-    while(_out_pix_tile0 * _grp_tile0 > params.poolingContext.out_width * 2 && _out_pix_tile0 > 1)
-    {
+    while (_out_pix_tile0 * _grp_tile0 > params.poolingContext.out_width * 2 && _out_pix_tile0 > 1) {
         _out_pix_tile0 >>= 1;
     }
 
-    while(_out_pix_tile1 * _grp_tile1 > params.poolingContext.out_height * 2 && _out_pix_tile1 > 1)
-    {
+    while (_out_pix_tile1 * _grp_tile1 > params.poolingContext.out_height * 2 && _out_pix_tile1 > 1) {
         _out_pix_tile1 >>= 1;
     }
 
     int g_wk_width =
-        ((params.poolingContext.out_width + _grp_tile0 * _out_pix_tile0 - 1) / (_grp_tile0 * _out_pix_tile0));
+        ((params.poolingContext.out_width + _grp_tile0 * _out_pix_tile0 - 1) /
+         (_grp_tile0 * _out_pix_tile0));
     int g_wk_height =
-        ((params.poolingContext.out_height + _grp_tile1 * _out_pix_tile1 - 1) / (_grp_tile1 * _out_pix_tile1));
+        ((params.poolingContext.out_height + _grp_tile1 * _out_pix_tile1 - 1) /
+         (_grp_tile1 * _out_pix_tile1));
 
-    KernelInfo kernel2;
-    if(params.poolingContext.kernel_size1 == 2 && params.poolingContext.kernel_size0 == 2)
-    {
+    if (params.poolingContext.kernel_size1 == 2 && params.poolingContext.kernel_size0 == 2) {
         kernel2.l_wk        = {256, 1, 1};
         kernel2.g_wk        = {64 * 64 * 40, 1, 1};
         kernel2.kernel_file = "BiasReLuPooling.cl";
         kernel2.kernel_name = "mloPooling";
         kernel2.isMIOpenKernel = false;
-    }
-    else
-    {
+    } else {
         kernel2.l_wk        = {_grp_tile0, _grp_tile1, 1};
         kernel2.g_wk        = {g_wk_width * _grp_tile0,
                                g_wk_height * _grp_tile1,
-                               params.poolingContext.n_inputs * params.poolingContext.batch_sz};
+                               params.poolingContext.n_inputs* params.poolingContext.batch_sz
+                              };
         kernel2.kernel_file = "MIOpenPooling.cl";
         kernel2.kernel_name = "mloPoolingG";
         kernel2.isMIOpenKernel = true;
@@ -89,15 +99,19 @@ void addPoolingKernel(const ConvolutionContext& params, ConvSolution& result)
         std::string(" -DMLO_POOLING_BOT_WIDTH=") + std::to_string(params.poolingContext.in_width) +
         std::string(" -DMLO_POOLING_BOT_HEIGHT=") + std::to_string(params.poolingContext.in_height) +
         std::string(" -DMLO_POOLING_BOT_STRIDE=") + std::to_string(params.poolingContext.in_width) +
-        std::string(" -DMLO_POOLING_BOT_CHANNEL_STRIDE=") + std::to_string(params.poolingContext.in_width * params.poolingContext.in_height) +
+        std::string(" -DMLO_POOLING_BOT_CHANNEL_STRIDE=") + std::to_string(params.poolingContext.in_width *
+                params.poolingContext.in_height) +
         std::string(" -DMLO_POOLING_BOT_BATCH_STRIDE=") +
-            std::to_string(params.poolingContext.in_width * params.poolingContext.in_height * params.poolingContext.n_inputs) +
+        std::to_string(params.poolingContext.in_width * params.poolingContext.in_height *
+                       params.poolingContext.n_inputs) +
         std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(params.poolingContext.out_width) +
         std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(params.poolingContext.out_height) +
         std::string(" -DMLO_POOLING_TOP_STRIDE=") + std::to_string(params.poolingContext.out_width) +
-        std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(params.poolingContext.out_width * params.poolingContext.out_height) +
+        std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(params.poolingContext.out_width *
+                params.poolingContext.out_height) +
         std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") +
-            std::to_string(params.poolingContext.out_width * params.poolingContext.out_height * params.poolingContext.n_outputs) +
+        std::to_string(params.poolingContext.out_width * params.poolingContext.out_height *
+                       params.poolingContext.n_outputs) +
         std::string(" -DBATCH_NUM=") + std::to_string(params.poolingContext.batch_sz) +
         std::string(" -DCU_NUM=64") +
         std::string(" -DMLO_CONV_BIAS=0") +

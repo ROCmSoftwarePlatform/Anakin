@@ -113,6 +113,13 @@ ConvSolution ConvAsm7x7c3h224w224k64u2v2p3q3f1::GetSolution(const ConvolutionCon
     }
 
     result.construction_params.push_back(constr_params);
+
+    // Start to do pooling...
+    if (params.has_pooling
+        && (constr_params.kernel_name == "conv7x7c3h224w224k64u2v2p3q3f1b1prelu"
+            || constr_params.kernel_name == "conv7x7c3h224w224k64u2v2p3q3f1b0prelu"))
+        addPoolingKernel(params, result);
+
     return result;
 }
 } // namespace solver
