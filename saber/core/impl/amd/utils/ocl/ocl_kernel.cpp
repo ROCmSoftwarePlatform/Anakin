@@ -282,6 +282,7 @@ cl_program CreateProgramFromSource(cl_context context, cl_device_id device_id, K
     return program;
 }
 
+#if 0
 ClKernelPtr LoadKernelFromMemCache(cl_program program, KernelInfo* ki) {
     std::string kernelKey;
 
@@ -320,6 +321,7 @@ void WriteKernelIntoMemCache(cl_program program, ClKernelPtr kernel, KernelInfo*
         AMD_LOGI("Warning: kernel cache has been full.\n");
     }
 }
+#endif
 
 cl_kernel CreateKernelFromSource(cl_program program, KernelInfo* ki) {
     cl_kernel kernel = NULL;
@@ -367,11 +369,15 @@ ClProgramPtr CreateProgram(cl_context context, cl_device_id device_id, KernelInf
 }
 
 ClKernelPtr CreateKernel(cl_program program, KernelInfo* kernel_info) {
+
+#if 0
+    //Kernel cache cannot work at multi-thread scenario
     ClKernelPtr kernel_ptr = LoadKernelFromMemCache(program, kernel_info);
 
     if (kernel_ptr != NULL) {
         return kernel_ptr;
     }
+#endif
 
     cl_kernel kernel = CreateKernelFromSource(program, kernel_info);
 
@@ -379,8 +385,8 @@ ClKernelPtr CreateKernel(cl_program program, KernelInfo* kernel_info) {
         return NULL;
     }
 
-    kernel_ptr = gen_shared_cl_kernel(kernel);
-    WriteKernelIntoMemCache(program, kernel_ptr, kernel_info);
+    ClKernelPtr kernel_ptr = gen_shared_cl_kernel(kernel);
+    //WriteKernelIntoMemCache(program, kernel_ptr, kernel_info);
 
     return kernel_ptr;
 }
