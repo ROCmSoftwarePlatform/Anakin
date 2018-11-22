@@ -136,12 +136,6 @@ TEST(NetTest, net_execute_base_test) {
         my_time.start(ctx);
 
         for (int i = 0; i < FLAGS_epoch; i++) {
-            for (auto& in : vin_name) {
-                auto d_tensor_in_p = net_executer.get_in(in.c_str());
-                Tensor<Target_H> th(d_tensor_in_p->valid_shape());
-                fill_tensor_const(th, 1.f);
-                d_tensor_in_p->copy_from(th);
-            }
             net_executer.prediction();
         }
         my_time.end(ctx);
