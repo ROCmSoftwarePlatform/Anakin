@@ -62,6 +62,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
     kernelInfo.l_wk        = {local_size};
     kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
     kernelInfo.kernel_file = "Eltwise.cl";
+    kernelInfo.comp_options = std::string(" -DMLO_CONV_ACTIVE_RELU=") + std::to_string(_with_relu);
     AMDKernelPtr kptr      = NULL;
     _kernels_ptr.clear();
 
@@ -279,8 +280,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)inputs[0]->data(),
                           (PtrDtype)inputs[1]->data(),
-                          (int)count,
-                          (int)with_relu);
+                          (int)count);
 
                 if (!err) {
                     ALOGE("Fail to set kernel args :" << err);
@@ -289,7 +289,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
 
                 list.push_back(_kernels_ptr[0]);
             } else {
-                with_relu = 0;
+                with_relu = 1;
 
                 if (_kernels_ptr[0] == NULL || _kernels_ptr[0].get() == NULL) {
                     ALOGE("Kernel is not exist");
@@ -300,8 +300,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)inputs[0]->data(),
                           (PtrDtype)inputs[1]->data(),
-                          (int)count,
-                          (int)with_relu);
+                          (int)count);
 
                 if (!err) {
                     ALOGE("Fail to set kernel args :" << err);
@@ -320,8 +319,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                               (PtrDtype)outputs[0]->mutable_data(),
                               (PtrDtype)outputs[0]->mutable_data(),
                               (PtrDtype)inputs[i]->data(),
-                              (int)count,
-                              (int)with_relu);
+                              (int)count);
 
                     if (!err) {
                         ALOGE("Fail to set kernel args :" << err);
@@ -343,8 +341,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)inputs[inputs.size() - 1]->data(),
-                          (int)count,
-                          (int)with_relu);
+                          (int)count);
 
                 if (!err) {
                     ALOGE("Fail to set kernel args :" << err);
@@ -367,8 +364,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                       (PtrDtype)outputs[0]->mutable_data(),
                       (PtrDtype)inputs[0]->data(),
                       (PtrDtype)inputs[1]->data(),
-                      (int)count,
-                      (int)with_relu);
+                      (int)count);
 
             if (!err) {
                 ALOGE("Fail to set kernel args :" << err);
@@ -387,8 +383,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)inputs[i]->data(),
-                          (int)count,
-                          (int)with_relu);
+                          (int)count);
 
                 if (!err) {
                     ALOGE("Fail to set kernel args :" << err);
@@ -416,8 +411,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                       (PtrDtype)inputs[1]->data(),
                       (float)param.coeff[0],
                       (float)param.coeff[1],
-                      (int)count,
-                      (int)with_relu);
+                      (int)count);
 
             if (!err) {
                 ALOGE("Fail to set kernel args :" << err);
@@ -440,8 +434,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                       (PtrDtype)inputs[1]->data(),
                       (float)param.coeff[0],
                       (float)param.coeff[1],
-                      (int)count,
-                      (int)with_relu);
+                      (int)count);
 
             if (!err) {
                 ALOGE("Fail to set kernel args :" << err);
@@ -468,8 +461,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)inputs[0]->data(),
                           (PtrDtype)inputs[1]->data(),
-                          (int)count,
-                          (int)with_relu);
+                          (int)count);
 
                 if (!err) {
                     ALOGE("Fail to set kernel args :" << err);
@@ -478,7 +470,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
 
                 list.push_back(_kernels_ptr[0]);
             } else {
-                with_relu = 0;
+                with_relu = 1;
 
                 if (_kernels_ptr[0].get() == NULL || _kernels_ptr[0].get() == NULL) {
                     ALOGE("Kernel is not exist");
@@ -489,8 +481,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)inputs[0]->data(),
                           (PtrDtype)inputs[1]->data(),
-                          (int)count,
-                          (int)with_relu);
+                          (int)count);
 
                 if (!err) {
                     ALOGE("Fail to set kernel args :" << err);
@@ -509,8 +500,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                               (PtrDtype)outputs[0]->mutable_data(),
                               (PtrDtype)outputs[0]->mutable_data(),
                               (PtrDtype)inputs[i]->data(),
-                              (int)count,
-                              (int)with_relu);
+                              (int)count);
 
                     if (!err) {
                         ALOGE("Fail to set kernel args :" << err);
@@ -532,8 +522,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)inputs[inputs.size() - 1]->data(),
-                          (int)count,
-                          (int)with_relu);
+                          (int)count);
 
                 if (!err) {
                     ALOGE("Fail to set kernel args :" << err);
@@ -555,8 +544,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                       (PtrDtype)outputs[0]->mutable_data(),
                       (PtrDtype)inputs[0]->data(),
                       (PtrDtype)inputs[1]->data(),
-                      (int)count,
-                      (int)with_relu);
+                      (int)count);
 
             if (!err) {
                 ALOGE("Fail to set kernel args :" << err);
@@ -575,8 +563,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)inputs[i]->data(),
-                          (int)count,
-                          (int)with_relu);
+                          (int)count);
 
                 if (!err) {
                     ALOGE("Fail to set kernel args :" << err);

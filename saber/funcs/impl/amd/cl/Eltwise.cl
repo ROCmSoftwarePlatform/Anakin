@@ -13,45 +13,42 @@
    limitations under the License.
 */
 __kernel void ker_elt_production(
-        global float* out_data,
-        global const float* in_data_a,
-        global const float* in_data_b,
-        int count,
-        int with_relu) {
+    global float* out_data,
+    global const float* in_data_a,
+    global const float* in_data_b,
+    int count) {
     int idx   = get_global_id(0);
     float tmp = in_data_a[idx] * in_data_b[idx];
 
-    if (with_relu) {
-        out_data[idx] = tmp > 0.0f ? tmp : 0.0f;
-    } else {
-        out_data[idx] = tmp;
-    }
+#if MLO_CONV_ACTIVE_RELU
+    out_data[idx] = tmp > 0.0f ? tmp : 0.0f;
+#else
+    out_data[idx] = tmp;
+#endif
 }
 
 __kernel void ker_elt_sum(
-        global float* out_data,
-        global const float* in_data1,
-        global const float* in_data2,
-        float coeff1,
-        float coeff2,
-        int count,
-        int with_relu) {
+    global float* out_data,
+    global const float* in_data1,
+    global const float* in_data2,
+    float coeff1,
+    float coeff2,
+    int count) {
     int idx   = get_global_id(0);
     float tmp = coeff1 * in_data1[idx] + coeff2 * in_data2[idx];
 
-    if (with_relu) {
-        out_data[idx] = tmp > 0.0f ? tmp : 0.0f;
-    } else {
-        out_data[idx] = tmp;
-    }
+#if MLO_CONV_ACTIVE_RELU
+    out_data[idx] = tmp > 0.0f ? tmp : 0.0f;
+#else
+    out_data[idx] = tmp;
+#endif
 }
 
 __kernel void ker_elt_max(
-        global float* out_data,
-        global const float* in_data_a,
-        global const float* in_data_b,
-        int count,
-        int with_relu) {
+    global float* out_data,
+    global const float* in_data_a,
+    global const float* in_data_b,
+    int count) {
 
     int idx = get_global_id(0);
     float tmp;
@@ -60,9 +57,9 @@ __kernel void ker_elt_max(
     int a_gt_b  = var_a > var_b;
     tmp         = a_gt_b ? var_a : var_b;
 
-    if (with_relu) {
-        out_data[idx] = tmp > 0.0f ? tmp : 0.0f;
-    } else {
-        out_data[idx] = tmp;
-    }
+#if MLO_CONV_ACTIVE_RELU
+    out_data[idx] = tmp > 0.0f ? tmp : 0.0f;
+#else
+    out_data[idx] = tmp;
+#endif
 }
