@@ -41,6 +41,10 @@ public:
         if (_outGemmWorkspace) {
             delete _outGemmWorkspace;
         }
+
+        if (_slot) {
+            delete _slot;
+        }
     }
 
     virtual SaberStatus
@@ -78,6 +82,8 @@ private:
     bool _extern_trans {false};
     std::vector<AMDKernelPtr> _kernels_ptr {nullptr};
     Tensor<AMD>* _outGemmWorkspace;
+    Tensor<AMD>* _slot;
+    Tensor<AMD> _tensile_bias;
 };
 } // namespace saber
 } // namespace anakin
