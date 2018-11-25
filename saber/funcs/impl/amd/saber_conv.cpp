@@ -236,8 +236,7 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
                 if (kernelInfo.kernel_name == "xGemm") {
                     _outGemmWorkspace = new Tensor<AMD>();
                     std::vector<AMDKernelPtr> vkptr;
-                    PoolingParam<AMD> pool_param(0, 0, 0, 0, 0, 0, 0);
-
+                    bool needExtrakernel = false;
                     _outGemmWorkspace->re_alloc(
                         Shape({(inputs[0]->num() * 2),
                                std::max({inputs[0]->channel(),
@@ -248,9 +247,32 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
                                std::max((inputs[0]->width()), (outputs[0]->width()))
                               }));
 
-                    if (!findGenericGemm(true, vkptr, inputs, outputs, param, pool_param,
-                                         _outGemmWorkspace, ctx)) {
+                    if (!findGenericGemm(true, vkptr, inputs, outputs[0], param,
+                                         _outGemmWorkspace, ctx, needExtrakernel)) {
                         return SaberInvalidValue;
+                    }
+
+                    if (needExtrakernel) {
+                        BiasReluPool(
+                            vkptr,
+                            inputs[0]->device_id(),
+                            inputs[0]->num(),
+                            param.weight()->num(),
+                            0,
+                            0,
+                            0,
+                            outputs[0]->height(),
+                            outputs[0]->width(),
+                            outputs[0]->channel(),
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            isBias,
+                            param.activation_param.has_active);
                     }
 
                     for (int i = 0; i < vkptr.size(); i++) {
@@ -284,7 +306,7 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
             // not 1x1
             _outGemmWorkspace = new Tensor<AMD>();
             std::vector<AMDKernelPtr> vkptr;
-            PoolingParam<AMD> pool_param(0, 0, 0, 0, 0, 0, 0);
+            bool needExtrakernel = false;
             _outGemmWorkspace->re_alloc(
                 Shape({(param.weight()->height() * param.weight()->width()),
                        std::max({inputs[0]->channel(),
@@ -297,13 +319,36 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
 
             if (!findGenericGemm(false, vkptr,
                                  inputs,
-                                 outputs,
+                                 outputs[0],
                                  param,
-                                 pool_param,
                                  _outGemmWorkspace,
-                                 ctx)) {
+                                 ctx, needExtrakernel)) {
                 return SaberInvalidValue;
             }
+
+            if (needExtrakernel) {
+                BiasReluPool(
+                    vkptr,
+                    inputs[0]->device_id(),
+                    inputs[0]->num(),
+                    param.weight()->num(),
+                    0,
+                    0,
+                    0,
+                    outputs[0]->height(),
+                    outputs[0]->width(),
+                    outputs[0]->channel(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    isBias,
+                    param.activation_param.has_active);
+            }
+
 
             for (int i = 0; i < vkptr.size(); i++) {
                 _kernels_ptr.push_back(vkptr[i]);
@@ -838,7 +883,7 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                         list.push_back(_kernels_ptr[i++]);
                         err = _kernels_ptr[i].get()->SetKernelArgs(
                                   (PtrDtype)_outGemmWorkspace->mutable_data(),
-                                  in_offset,
+                                  0,
                                   (PtrDtype)param.weight()->data(),
                                   0,
                                   (PtrDtype)outputs[0]->mutable_data(),

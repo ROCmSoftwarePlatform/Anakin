@@ -189,7 +189,9 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::create(
             if (kernelInfo.kernel_name == "xGemm") {
                 _outGemmWorkspace = new Tensor<AMD>();
                 std::vector<AMDKernelPtr> vkptr;
-
+                bool needBiasRelu = false;
+                bool bias = false;
+                bool relu = false;
                 _outGemmWorkspace->re_alloc(
                     Shape({(inputs[0]->num() * 2),
                            std::max({inputs[0]->channel(),
@@ -200,10 +202,36 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::create(
                            std::max((inputs[0]->width()), (outputs[0]->width()))
                           }));
 
-                if (!findGenericGemm(true, vkptr, inputs, outputs, param.conv_param, param.pooling_param,
-                                     _outConvRelu, ctx)) {
+                if (!findGenericGemm(true, vkptr, inputs, _outConvRelu, param.conv_param,
+                                     _outGemmWorkspace, ctx, needBiasRelu)) {
                     return SaberInvalidValue;
                 }
+
+                if (needBiasRelu) {
+                    bias = isBias;
+                    relu = param.conv_param.activation_param.has_active;
+                }
+
+                BiasReluPool(
+                    vkptr,
+                    inputs[0]->device_id(),
+                    inputs[0]->num(),
+                    param.conv_param.weight()->num(),
+                    _outConvRelu->height(),
+                    _outConvRelu->width(),
+                    _outConvRelu->channel(),
+                    outputs[0]->height(),
+                    outputs[0]->width(),
+                    outputs[0]->channel(),
+                    param.pooling_param.window_h,
+                    param.pooling_param.window_w,
+                    param.pooling_param.stride_h,
+                    param.pooling_param.stride_w,
+                    param.pooling_param.pad_h,
+                    param.pooling_param.pad_w,
+                    param.pooling_param.pooling_type,
+                    bias,
+                    relu);
 
                 for (int i = 0; i < vkptr.size(); i++) {
                     _kernels.push_back(vkptr[i]);
@@ -222,6 +250,7 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::create(
     } else {
         ALOGD("No solution found!!!");
         // not 1x1
+        bool needExtrakernel = false;
         std::vector<AMDKernelPtr> vkptr;
         _outGemmWorkspace = new Tensor<AMD>();
         _outGemmWorkspace->re_alloc(
@@ -236,13 +265,33 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::create(
 
         if (!findGenericGemm(false, vkptr,
                              inputs,
-                             outputs,
-                             param.conv_param,
-                             param.pooling_param,
                              _outConvRelu,
-                             ctx)) {
+                             param.conv_param,
+                             _outConvRelu,
+                             ctx, needExtrakernel)) {
             return SaberInvalidValue;
         }
+
+        BiasReluPool(
+            vkptr,
+            inputs[0]->device_id(),
+            inputs[0]->num(),
+            param.conv_param.weight()->num(),
+            _outConvRelu->height(),
+            _outConvRelu->width(),
+            _outConvRelu->channel(),
+            outputs[0]->height(),
+            outputs[0]->width(),
+            outputs[0]->channel(),
+            param.pooling_param.window_h,
+            param.pooling_param.window_w,
+            param.pooling_param.stride_h,
+            param.pooling_param.stride_w,
+            param.pooling_param.pad_h,
+            param.pooling_param.pad_w,
+            param.pooling_param.pooling_type,
+            isBias,
+            param.conv_param.activation_param.has_active);
 
         for (int i = 0; i < vkptr.size(); i++) {
             _kernels.push_back(vkptr[i]);
@@ -264,7 +313,7 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
     bool err;
     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
     amd_kernel_list list;
-    bool isGemm = false;
+    bool needBias = false;
     bool isBias   = (param.conv_param.bias()->size() > 0) ? true : false;
     bool isActive = param.conv_param.activation_param.has_active;
     float negative_slope = 1.0f;
@@ -462,7 +511,7 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
                 return SaberInvalidValue;
             }
         } else if (it->get()->GetName() == "mloPooling") {
-            if (isGemm) {
+            if (needBias) {
                 if (isBias) {
                     err = it->get()->SetKernelArgs(
                               (PtrDtype)_outConvRelu->data(),
@@ -495,7 +544,7 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
                 return SaberInvalidValue;
             }
         } else if (it->get()->GetName() == "mloPoolingG") {
-            if (isGemm) {
+            if (needBias) {
                 if (isBias) {
                     if (isActive) {
                         err = it->get()->SetKernelArgs(
@@ -547,7 +596,6 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
         } else if (it->get()->GetName() == "transpose_NCHW2CNHW_opt"
                    || it->get()->GetName() == "transpose_NCHW2CNHW") {
             ALOGD("GEMM 1x1, 14x14");
-            isGemm = true;
 
             err = it->get()->SetKernelArgs(
                       (PtrDtype)inputs[0]->data(),
@@ -561,7 +609,7 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
             list.push_back(*(it++));
 
             out_offset = (inputs[0]->num()) * (inputs[0]->channel())
-                         * (outputs[0]->height()) * (outputs[0]->width());
+                         * (_outConvRelu->height()) * (_outConvRelu->width());
 
             if (it->get()->GetName() != "miog_betac_alphaab") {
                 err = it->get()->SetKernelArgs(
@@ -630,7 +678,10 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
         } else if (it->get()->GetName() == "miog_betac_alphaab"
                    || it->get()->GetName() == "miog_betac") {
             ALOGD("GEMM 1x1");
-            isGemm = true;
+
+            if (it->get()->GetName() != "miog_betac_alphaab" || inputs[0]->num() > 1) {
+                needBias = true;
+            }
 
             for (int j = 0; j < (inputs[0]->num()); j++) { //so far, only responsible for batch size is 1
                 in_offset = j * (inputs[0]->channel()) * (inputs[0]->height())
@@ -699,7 +750,7 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
             }
         } else if (it->get()->GetName() == "Im2Col") {
             ALOGD("GEMM Not 1x1");
-            isGemm = true;
+            needBias = true;
             std::vector<AMDKernelPtr> v_temp;
             bool firstpush = true;
             int data_size = (inputs[0]->num()) * (inputs[0]->channel())

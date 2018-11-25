@@ -32,11 +32,11 @@ typedef AMD_API::TPtr PtrDtype;
 
 bool findGenericGemm(bool solver, std::vector<AMDKernelPtr>& kptr,
                      const std::vector<Tensor<AMD>*>& inputs,
-                     std::vector<Tensor<AMD>*>& outputs,
+                     Tensor<AMD>*& output,
                      ConvParam<AMD>& param,
-                     PoolingParam<AMD>& pool_param,
                      Tensor<AMD>*& workspace,
-                     Context<AMD>& ctx);
+                     Context<AMD>& ctx,
+                     bool& needBiasRelu);
 
 } // namespace saber
 } // namespace anakin
