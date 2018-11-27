@@ -39,20 +39,39 @@ bool ConvOclDirectFwd::IsApplicable(const ConvolutionContext& params) const
         && (params.GetBackwardPad0() < 0 || params.GetBackwardPad1() < 0))
         return false;
 
-    return params.kernel_stride0 == params.kernel_stride1
-        && params.pad0 == params.pad1
-        && !(params.kernel_size0 == 1 && params.kernel_size1 == 1)
-        /// Disable ConvOclDirectFwd for stride > 1 due to incorrect results 
-        /// \todo need to fix the issue for stride > 1
-        && !(params.direction.IsForward() && (params.kernel_stride0 > 1 || params.kernel_stride1 > 1))
-        && !(params.direction.IsBackwardData() && (params.kernel_stride0 > 2 || params.kernel_stride1 > 2))
-        /// \todo Workaround to avoid FP16 precision issue:
-        /// While MIOpenConvUni is up to 4x faster than MIOpenCDFGen (even not auto-tuned),
-        /// it seems that is has 4x..20x worse precision, and some "test_conv --half" tests fail.
-        && !(params.direction.IsForward()
-            && params.float_size == 16
-            && params.kernel_stride0 == 2)
-        && IsValidPerformanceConfig(params, GetPerformanceConfig(params));
+    if (params.group_counts < 2)
+    {
+        return params.kernel_stride0 == params.kernel_stride1
+            && params.pad0 == params.pad1
+            && !(params.kernel_size0 == 1 && params.kernel_size1 == 1)
+            /// Disable ConvOclDirectFwd for stride > 1 due to incorrect results
+            /// \todo need to fix the issue for stride > 1
+            && !(params.direction.IsForward() && (params.kernel_stride0 > 1 || params.kernel_stride1 > 1))
+            && !(params.direction.IsBackwardData() && (params.kernel_stride0 > 2 || params.kernel_stride1 > 2))
+            /// \todo Workaround to avoid FP16 precision issue:
+            /// While MIOpenConvUni is up to 4x faster than MIOpenCDFGen (even not auto-tuned),
+            /// it seems that is has 4x..20x worse precision, and some "test_conv --half" tests fail.
+            && !(params.direction.IsForward()
+                && params.float_size == 16
+                && params.kernel_stride0 == 2)
+            && IsValidPerformanceConfig(params, GetPerformanceConfig(params));
+    }
+    else
+    {
+        return params.kernel_stride0 == params.kernel_stride1
+            && params.pad0 == params.pad1
+            && (params.group_counts > 16)
+            && !(params.kernel_size0 == 1 && params.kernel_size1 == 1)
+            /// \todo need to make sure support stride > 2, should support but not tested
+            && !(params.kernel_stride0 > 2 || params.kernel_stride1 > 2)
+            /// \todo Workaround to avoid FP16 precision issue:
+            /// While MIOpenConvUni is up to 4x faster than MIOpenCDFGen (even not auto-tuned),
+            /// it seems that is has 4x..20x worse precision, and some "test_conv --half" tests fail.
+            && !(params.direction.IsForward()
+                 && params.float_size == 16
+                 && params.kernel_stride0 == 2)
+            && IsValidPerformanceConfig(params, GetPerformanceConfig(params));
+    }
     // clang-format on
 }
 
@@ -76,9 +95,9 @@ bool ConvOclDirectFwd::IsValidPerformanceConfig(
     //     pad0 = params.kernel_size0 - 1 - pad0;
     //     pad1 = params.kernel_size1 - 1 - pad1;
     // }
-
-    result.n_in_data_tiles = std::min(params.n_inputs, searched_params.n_in_data_tiles);
-    result.n_out_pix_tiles = std::min(params.n_outputs, searched_params.n_out_pix_tiles);
+    auto group_counts = params.group_counts;
+    result.n_in_data_tiles = std::min(params.n_inputs / group_counts, searched_params.n_in_data_tiles);
+    result.n_out_pix_tiles = std::min(params.n_outputs / group_counts, searched_params.n_out_pix_tiles);
 
     // hacky fix of the incorrect kernel local memory address calculation for data
     result.out_pix_tile1 = (!params.direction.IsForward() && params.kernel_stride1 > 1)
@@ -137,7 +156,7 @@ bool ConvOclDirectFwd::IsValidPerformanceConfig(
     // int n_out_tile_blocks1 = (params.out_height + result.in_tile1 - 1) / (result.in_tile1);
     int n_alu_tiles_perstack = (n_alus_perstack + alu_tiles_sz - 1) / alu_tiles_sz;
     int n_out_tiles_perstack = n_alu_tiles_perstack * result.n_out_pix_tiles;
-    n_out_tiles_perstack     = std::min(n_out_tiles_perstack, params.n_outputs);
+    n_out_tiles_perstack     = std::min(n_out_tiles_perstack, params.n_outputs / group_counts);
 
     // const auto mlo_hw_wave_sz=hw_wave_sz;
     const auto mlo_filter_size0 = static_cast<long long>(params.kernel_size0);
@@ -225,7 +244,7 @@ ConvSolution ConvOclDirectFwd::GetSolution(const ConvolutionContext& params,
     searched_params.CopyTo(result);
     auto pad0 = params.pad0;
     auto pad1 = params.pad1;
-
+    auto group_counts = params.group_counts;
     auto hw_wave_sz = 64;
     // auto dev_local_mem_sz = localMemSize; // in bytes
 
@@ -236,8 +255,8 @@ ConvSolution ConvOclDirectFwd::GetSolution(const ConvolutionContext& params,
         pad1 = params.kernel_size1 - 1 - pad1;
     }
 
-    result.n_in_data_tiles = std::min(params.n_inputs, searched_params.n_in_data_tiles);
-    result.n_out_pix_tiles = std::min(params.n_outputs, searched_params.n_out_pix_tiles);
+    result.n_in_data_tiles = std::min(params.n_inputs / group_counts, searched_params.n_in_data_tiles);
+    result.n_out_pix_tiles = std::min(params.n_outputs / group_counts, searched_params.n_out_pix_tiles);
 
     // hacky fix of the incorrect kernel local memory address calculation for data
     result.out_pix_tile1 = (!params.direction.IsForward() && params.kernel_stride1 > 1)
@@ -300,7 +319,7 @@ ConvSolution ConvOclDirectFwd::GetSolution(const ConvolutionContext& params,
     int n_alu_tiles_perstack = (n_alus_perstack + alu_tiles_sz - 1) / alu_tiles_sz;
     int n_out_tiles_perstack = n_alu_tiles_perstack * result.n_out_pix_tiles;
 
-    n_out_tiles_perstack = std::min(n_out_tiles_perstack, params.n_outputs);
+    n_out_tiles_perstack = std::min(n_out_tiles_perstack, params.n_outputs / group_counts);
 
     KernelInfo kernel_params;
 
@@ -369,6 +388,18 @@ ConvSolution ConvOclDirectFwd::GetSolution(const ConvolutionContext& params,
         std::to_string(static_cast<long long>(alu_tile1)) + std::string(" -DMLO_WITH_RELU=") +
         std::to_string(static_cast<long long>(params.has_active)) + params.general_compile_options;
 
+    if (group_counts >= 2)
+    {
+        kernel_params.comp_options += (std::string(" -DMLO_GROUP_COUNTS=") +
+                                       std::to_string(static_cast<long long>(group_counts)));
+        kernel_params.comp_options +=
+            (std::string(" -DMLO_GROUP_TILES=") +
+             std::to_string(static_cast<long long>(params.n_outputs / group_counts)));
+        kernel_params.comp_options +=
+            (std::string(" -DMLO_STACK_PERGROUP=") +
+             std::to_string(static_cast<long long>(
+                 (params.n_outputs / group_counts + n_out_tiles_perstack - 1) / n_out_tiles_perstack)));
+    }
     kernel_params.l_wk.push_back(result.grp_tile1 * result.grp_tile0);
     kernel_params.l_wk.push_back(1);
     kernel_params.l_wk.push_back(1);
@@ -380,15 +411,18 @@ ConvSolution ConvOclDirectFwd::GetSolution(const ConvolutionContext& params,
         MIOPEN_LOG_E("n_out_tiles_perstack == 0");
         return ConvSolution(miopenStatusInternalError);
     }
-    size_t gbl_wk1 = (params.n_outputs + n_out_tiles_perstack - 1) / n_out_tiles_perstack;
+    size_t gbl_wk1 = group_counts >= 2
+                         ? (((params.n_outputs / group_counts + n_out_tiles_perstack - 1) /
+                             n_out_tiles_perstack) * group_counts)
+                         : ((params.n_outputs + n_out_tiles_perstack - 1) / n_out_tiles_perstack);
     size_t gbl_wk2 = (params.batch_sz + result.n_stacks - 1) / result.n_stacks;
 
     kernel_params.g_wk.push_back(gbl_wk0 * kernel_params.l_wk[0]);
     kernel_params.g_wk.push_back(gbl_wk1);
     kernel_params.g_wk.push_back(gbl_wk2);
 
-    kernel_params.kernel_file = "MIOpenConvDirUni.cl";
-    kernel_params.kernel_name = "MIOpenConvUni";
+    kernel_params.kernel_file = group_counts >= 2 ? "MIOpenGroupConvDirUni.cl" : "MIOpenConvDirUni.cl";
+    kernel_params.kernel_name = group_counts >= 2 ? "MIOpenGroupConvUni" : "MIOpenConvUni";
 
     result.construction_params.push_back(kernel_params);
 

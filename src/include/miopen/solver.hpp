@@ -253,6 +253,12 @@ void ExpandSearch(const Context& search_params, Db& db, Solution& solution, T& n
     return;
 }
 
+template <class Context, class Solution, class Db, class T>
+void ExpandSearch(const Context& search_params, Db& db, Solution& solution, T& no_perf_filtering)
+{
+
+}
+
 template <class Context, class Solution, class Db, class T, class Solver, class... Solvers>
 void ExpandSearch(const Context& search_params, Db& db, Solution& solution, T& no_perf_filtering, Solver&& solver, Solvers&&... solvers)
 {
