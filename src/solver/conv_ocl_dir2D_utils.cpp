@@ -32,7 +32,7 @@ namespace solver {
 void addPoolingKernel(const ConvolutionContext& params, ConvSolution& result) {
     KernelInfo kernel2;
 
-    if (params.poolingContext.kernel_size0 == 7 && params.poolingContext.kernel_size1 == 7) {
+    if (params.kernel_size0 == 7 && params.kernel_size1 == 7) {
         kernel2.l_wk = { 1024, 1, 1 };
         kernel2.g_wk = { 1024 * 64, 1, 1 };
         kernel2.kernel_file = "Pooling_3x3_2x2.cl";
