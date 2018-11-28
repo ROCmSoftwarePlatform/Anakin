@@ -34,6 +34,7 @@ public:
     SaberConv2D() {
         _kernels_ptr.clear();
         _outGemmWorkspace = nullptr;
+        _slot = nullptr;
     }
     ~SaberConv2D() {
         _kernels_ptr.clear();
