@@ -421,7 +421,11 @@ void Net<Ttype, Ptype, RunType>::prediction() {
 #endif
 
     for (auto & executer : _exec_funcs) {
+#ifdef ENABLE_AMD_PROFILING
+        if (RunType == OpRunType::SYNC || executer.need_sync) {
+#else
         if (RunType == OpRunType::SYNC || executer.need_sync || executer.op_name == "Output") {
+#endif
             for (int i = 0; i < executer.ins.size(); i++) {
                 // sync event record in multi_stream or syn when encountering output op
                 executer.ins[i]->sync();
