@@ -52,8 +52,8 @@ bool ConvCommon::getKernelInfo(int dev, int batch, int stride, int channel, int 
         }
     }
 
-    if ((batch == 1 && stride == 1) || (batch < 32 && width <= 14 && stride == 1)
-            || (batch < 32 && stride == 2)) {
+    if ((batch == 1 && stride == 1) || (width != 7 && width <= 14 && stride == 1) ||
+            (width == 7 && stride == 1 && batch < 16) || (stride == 2)) {
         mType.kernel_name = "xGemm";
         ALOGD("Got kernel:" << mType.kernel_name << "!!");
         return true;
