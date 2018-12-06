@@ -130,7 +130,7 @@ TEST(NetTest, net_execute_base_test) {
 #ifdef ENABLE_OP_TIMER
         net_executer.reset_op_time();
 #endif
-#ifdef AMD_GPU
+#ifdef ENABLE_AMD_OP_TIMER
         AMDProfiler::start_record();
 #endif
         my_time.start(ctx);
@@ -164,7 +164,7 @@ TEST(NetTest, net_execute_base_test) {
 
         LOG(INFO) << model_name << " batch_size " << FLAGS_num << " average time "<< my_time.get_average_ms() / FLAGS_epoch << " ms";
 
-#ifdef AMD_GPU
+#ifdef ENABLE_AMD_OP_TIMER
        AMDProfiler::stop_record();
        AMDProfiler::pop();
 #endif

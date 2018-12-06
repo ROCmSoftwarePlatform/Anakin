@@ -151,6 +151,7 @@ anakin_option(BUILD_STATIC "Build anakin static lib." YES if NOT BUILD_SHARED)
 anakin_option(ENABLE_OP_TIMER "Enable op timer mode." NO)
 # for AMD profile computing performance
 anakin_option(ENABLE_AMD_PROFILING "Enable amd profiling" NO)
+anakin_option(ENABLE_AMD_OP_TIMER "Enable AMD op timer mode." NO)
 # ----------------------------------------------------------------------------
 # section: anakin compiler and linker options
 # ----------------------------------------------------------------------------
