@@ -96,8 +96,8 @@ bool ConvOclDirectFwd::IsValidPerformanceConfig(
     //     pad1 = params.kernel_size1 - 1 - pad1;
     // }
     auto group_counts = params.group_counts;
-    result.n_in_data_tiles = std::min(params.n_inputs / group_counts, searched_params.n_in_data_tiles);
-    result.n_out_pix_tiles = std::min(params.n_outputs / group_counts, searched_params.n_out_pix_tiles);
+    result.n_in_data_tiles = std::min(params.n_inputs / (group_counts > 0 ? group_counts : 1), searched_params.n_in_data_tiles);
+    result.n_out_pix_tiles = std::min(params.n_outputs / (group_counts > 0 ? group_counts : 1), searched_params.n_out_pix_tiles);
 
     // hacky fix of the incorrect kernel local memory address calculation for data
     result.out_pix_tile1 = (!params.direction.IsForward() && params.kernel_stride1 > 1)
@@ -156,7 +156,7 @@ bool ConvOclDirectFwd::IsValidPerformanceConfig(
     // int n_out_tile_blocks1 = (params.out_height + result.in_tile1 - 1) / (result.in_tile1);
     int n_alu_tiles_perstack = (n_alus_perstack + alu_tiles_sz - 1) / alu_tiles_sz;
     int n_out_tiles_perstack = n_alu_tiles_perstack * result.n_out_pix_tiles;
-    n_out_tiles_perstack     = std::min(n_out_tiles_perstack, params.n_outputs / group_counts);
+    n_out_tiles_perstack     = std::min(n_out_tiles_perstack, params.n_outputs / (group_counts > 0 ? group_counts : 1));
 
     // const auto mlo_hw_wave_sz=hw_wave_sz;
     const auto mlo_filter_size0 = static_cast<long long>(params.kernel_size0);
@@ -255,8 +255,8 @@ ConvSolution ConvOclDirectFwd::GetSolution(const ConvolutionContext& params,
         pad1 = params.kernel_size1 - 1 - pad1;
     }
 
-    result.n_in_data_tiles = std::min(params.n_inputs / group_counts, searched_params.n_in_data_tiles);
-    result.n_out_pix_tiles = std::min(params.n_outputs / group_counts, searched_params.n_out_pix_tiles);
+    result.n_in_data_tiles = std::min(params.n_inputs / (group_counts > 0 ? group_counts : 1), searched_params.n_in_data_tiles);
+    result.n_out_pix_tiles = std::min(params.n_outputs / (group_counts > 0 ? group_counts : 1), searched_params.n_out_pix_tiles);
 
     // hacky fix of the incorrect kernel local memory address calculation for data
     result.out_pix_tile1 = (!params.direction.IsForward() && params.kernel_stride1 > 1)
@@ -319,7 +319,7 @@ ConvSolution ConvOclDirectFwd::GetSolution(const ConvolutionContext& params,
     int n_alu_tiles_perstack = (n_alus_perstack + alu_tiles_sz - 1) / alu_tiles_sz;
     int n_out_tiles_perstack = n_alu_tiles_perstack * result.n_out_pix_tiles;
 
-    n_out_tiles_perstack = std::min(n_out_tiles_perstack, params.n_outputs / group_counts);
+    n_out_tiles_perstack = std::min(n_out_tiles_perstack, params.n_outputs / (group_counts > 0 ? group_counts : 1));
 
     KernelInfo kernel_params;
 
