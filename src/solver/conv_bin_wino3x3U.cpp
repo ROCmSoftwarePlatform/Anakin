@@ -68,8 +68,7 @@ bool ConvBinWinograd3x3U::IsApplicable(const ConvolutionContext& params) const
         && params.kernel_size0 == 3
         && params.kernel_size1 == 3
         && ((params.kernel_stride0 == 1 && params.kernel_stride1 == 1)
-             || (params.kernel_stride0 == 2 && params.kernel_stride1 == 2
-                  && params.n_inputs == 1024 && params.in_height == 14 && params.in_width == 14))
+             || (params.kernel_stride0 == 2 && params.kernel_stride1 == 2))
         && params.batch_sz < std::pow(2, 16)
         && params.n_inputs < std::pow(2, 16)
         && params.n_outputs < std::pow(2, 16)
@@ -137,8 +136,7 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_sw.so";
                     } else
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu.so";
-                } else if (params.kernel_stride0 == 2
-                           && params.n_inputs == 1024 && params.in_height == 14 && params.in_width == 14) {
+                } else if (params.kernel_stride0 == 2) {
                     kernel.kernel_file =   "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_stride2.so"                 ;
                 } else
                     return result;
