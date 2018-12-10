@@ -160,6 +160,10 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
                     + std::string(" -DN=") + std::to_string(params.batch_sz);
             }
 
+            if (params.has_active) {
+                kernelInfo.comp_options += std::string(" -DRELU");
+            }
+
             kernelInfo.l_wk = {64, 1, 1};
             kernelInfo.g_wk = {64 * 64 * 16, 1, 1};
         } else if (conv11_param.kernel_name == "Conv1x1C320H7W7K1280Pool.cl" ||
