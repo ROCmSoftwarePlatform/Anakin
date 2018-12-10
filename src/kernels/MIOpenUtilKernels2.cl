@@ -51,6 +51,7 @@
 #define _FLOAT4 PPCAT(_FLOAT, FOUR)
 #define _FLOAT8 PPCAT(_FLOAT, EIGHT)
 
+#define _FLOAT float
 __kernel void Col2Im(global _FLOAT* col,
                      const int col_h,
                      const int col_w,
@@ -102,4 +103,75 @@ __kernel void Col2Im(global _FLOAT* col,
         }
     }
     im_off[gid] = tmp;
+}
+__kernel void
+Col2ImBiasRelu(global float* col,
+               const int col_h,
+               const int col_w,
+               const int wei_h,
+               const int wei_w,
+               const int pad_h,
+               const int pad_w,
+               const int stride_h,
+               const int stride_w,
+               const int dilation_h,
+               const int dilation_w,
+               const int height,
+               const int width,
+               global float* im,
+               int im_offset,
+               global float* bias,
+               float slope,
+               int N,
+               int C,
+               //int H,
+               //int W,
+               int isBias,
+               int relu_flag) {
+    global float* im_off = im + im_offset;
+    int gid              = (int)get_global_id(0);
+
+    int im_ch  = gid / (width * height);
+    int im_pix = gid % (width * height);
+    int im_h   = (im_pix / width) + pad_h;
+    int im_w   = (im_pix % width) + pad_w;
+
+    int start_h = (im_h < dilation_h * (wei_h - 1) + 1)
+                  ? 0
+                  : (im_h - (dilation_h * (wei_h - 1) + 1)) / stride_h + 1;
+    int end_h   = min(col_h, im_h / stride_h + 1);
+    int start_w = (im_w < dilation_w * (wei_w - 1) + 1)
+                  ? 0
+                  : (im_w - (dilation_w * (wei_w - 1) + 1)) / stride_w + 1;
+    int end_w = min(col_w, im_w / stride_w + 1);
+
+    int ch_offset = im_ch * col_w * col_h * wei_w * wei_h;
+    col += ch_offset;
+
+    float tmp = (float)0.0f;
+
+    for (int cy = start_h; cy < end_h; cy++) {
+        for (int cx = start_w; cx < end_w; cx++) {
+            if ((im_h - cy * stride_h) % dilation_h == 0
+                    && (im_w - cx * stride_w) % dilation_w == 0) {
+                int col_off_y = cy + (((im_h - cy * stride_h) / dilation_h) * wei_w * col_h);
+                int col_off_x = cx + (((im_w - cx * stride_w) / dilation_w) * col_w * col_h);
+
+                tmp += col[col_off_y * col_w + col_off_x];
+            }
+        }
+    }
+
+    if (isBias) {
+        tmp = tmp + bias[(gid % (C * height * width)) / (height * width)];
+        if (relu_flag) {
+            tmp = tmp * (tmp > 0.0f ? 1.0f : slope);
+        }
+    } else {
+        if (relu_flag) {
+            tmp = tmp * (tmp > 0.0f ? 1.0f : slope);
+        }
+    }
+    im_off[gid] = tmp;
+
 }
