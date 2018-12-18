@@ -130,6 +130,7 @@ set( MIOpen_Source
     solver/conv_ocl_dir2D_utils.cpp
     solver/conv_ocl_dir2Dfwd1x1_AMD.cpp
     solver/conv_ocl_dir2Dfwd1x1_gemm.cpp
+    solver/conv_ocl_dir2Dfwd1x1_Tensile.cpp
     solver/solver_conv_common.cpp
     )
 
@@ -386,6 +387,9 @@ elseif(MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_BACKEND STREQUAL "HIP")
     list(APPEND PACKAGE_DEPENDS PACKAGE hip)
     set(BACKEND_PACKAGE "hip")
 endif()
+
+target_include_directories(MIOpen PRIVATE ${CMAKE_SOURCE_DIR}/src/tensile/include)
+target_link_libraries( MIOpen PUBLIC ${CMAKE_SOURCE_DIR}/src/tensile/lib/libTensileConv.a )
 #
 ############################################################
 # MIOpen depends on miopengemm
@@ -458,6 +462,7 @@ set(COPY_HEADERS
     ${PROJECT_SOURCE_DIR}/src/include/miopen/db_path.hpp
     ${PROJECT_SOURCE_DIR}/src/include/miopen/mlo_internal.hpp
     ${PROJECT_SOURCE_DIR}/src/include/miopen/legacy_exhaustive_search.hpp
+    ${PROJECT_SOURCE_DIR}/src/include/miopen/tensile_exhaustive_search.hpp
     ${PROJECT_SOURCE_DIR}/src/include/miopen/env.hpp
     ${PROJECT_SOURCE_DIR}/src/include/miopen/type_name.hpp
     ${PROJECT_SOURCE_DIR}/include/miopen/miopen.h
@@ -490,9 +495,8 @@ rocm_export_targets(
 
 ## Install db files
 install(FILES
-    kernels/gfx803_64.cd.pad.txt
 #    kernels/gfx803_36.cd.pdb.txt
-#    kernels/gfx803_64.cd.pdb.txt
+    kernels/gfx803_64.cd.pad.txt
 #    kernels/gfx900_64.cd.pdb.txt
 #    kernels/gfx900_56.cd.pdb.txt
 #    kernels/gfx906_64.cd.pdb.txt

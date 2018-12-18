@@ -34,8 +34,7 @@
 namespace miopen {
 namespace solver {
 
-struct LegacyPerformanceConfig : Serializable<LegacyPerformanceConfig>
-{
+struct LegacyPerformanceConfig : Serializable<LegacyPerformanceConfig> {
     int grp_tile1       = 0;
     int grp_tile0       = 0;
     int in_tile1        = 0;
@@ -45,11 +44,10 @@ struct LegacyPerformanceConfig : Serializable<LegacyPerformanceConfig>
     int n_out_pix_tiles = 0;
     int n_in_data_tiles = 0;
     int n_stacks        = 0;
-    double min_proc_time = 0;
+    double min_proc_time = std::numeric_limits<float>::max();
 
     template <class Solution>
-    void CopyTo(Solution& iud) const
-    {
+    void CopyTo(Solution& iud) const {
         iud.grp_tile0       = grp_tile0;
         iud.grp_tile1       = grp_tile1;
         iud.in_tile0        = in_tile0;
@@ -63,8 +61,7 @@ struct LegacyPerformanceConfig : Serializable<LegacyPerformanceConfig>
     }
 
     template <class Self, class F>
-    static void Visit(Self&& self, F f)
-    {
+    static void Visit(Self&& self, F f) {
         f(self.grp_tile1, "temp.grp_tile1");
         f(self.grp_tile0, "temp.grp_tile0");
         f(self.in_tile1, "temp.in_tile1");

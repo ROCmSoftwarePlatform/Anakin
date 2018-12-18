@@ -464,7 +464,7 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
             kernelInfo.g_wk = {100352, 1, 1};
         }
 
-        //kernelInfo.isMIOpenKernel = false;
+        kernelInfo.isMIOpenKernel = true;
         result.construction_params.push_back(kernelInfo);
     } else {
         result.status = miopenStatusInternalError;
