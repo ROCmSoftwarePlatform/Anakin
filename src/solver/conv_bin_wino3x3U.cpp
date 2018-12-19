@@ -124,15 +124,21 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
             if (params.has_active && params.bias) {
                 if (params.kernel_stride0 == 1) {
                     if ((params.n_inputs == 128 && params.n_outputs == 128
-                            && params.in_height == 28 && params.in_width == 28 && params.batch_sz == 1)
-                            || (params.n_inputs == 1024 && params.n_outputs == 1024
-                                && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 2)
-                            || (params.n_inputs == 512 && params.n_outputs == 512
-                                && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 4)
-                            || (params.n_inputs == 512 && params.n_outputs == 512
-                                && params.in_height == 14 && params.in_width == 14 && params.batch_sz == 1)
-                            || (params.n_inputs == 256 && params.n_outputs == 256
-                                && params.in_height == 14 && params.in_width == 14 && params.batch_sz <= 2)) {
+                         && params.in_height == 28 && params.in_width == 28 && params.batch_sz == 1)
+                       || (params.n_inputs == 1024 && params.n_outputs == 1024
+                         && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 2)
+                       || (params.n_inputs == 512 && params.n_outputs == 512
+                         && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 4)
+                       || (params.n_inputs == 512 && params.n_outputs == 512
+                         && params.in_height == 14 && params.in_width == 14 && params.batch_sz == 1)
+                       || (params.n_inputs == 256 && params.n_outputs == 256
+                         && params.in_height == 14 && params.in_width == 14 && params.batch_sz <= 2)
+                       || (params.n_outputs == 384 && params.in_height == 13
+                         && params.in_width == 13 && params.batch_sz <= 1)
+                       || (params.n_outputs == 128 && params.in_height == 6
+                         && params.in_width == 64 && params.batch_sz <= 2)
+                       || (params.n_outputs == 64 && params.in_height == 12
+                         && params.in_width == 128 && params.batch_sz <= 1)) {
                         //todo: remove n_inputs = n_outputs
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_sw.so";
                     } else {
