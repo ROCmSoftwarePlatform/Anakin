@@ -35,16 +35,6 @@ ExternalProject_Add(
     
 )
 
-ExternalProject_Add_Step(
-    ${MIOPEN_PROJECT} ${MIOPEN_PROJECT}_customize
-    DEPENDEES         download
-    DEPENDERS         build
-    COMMAND           ${CMAKE_COMMAND} -E copy_directory ${ANAKIN_THIRD_PARTY_PATH}/miopen/customize_miopen_file ${MIOPEN_SOURCE_DIR}
-    ALWAYS            1
-    EXCLUDE_FORM_MAIN 1
-    LOG               1
-)
-
 include_directories(${MIOPEN_INSTALL_ROOT}/include)
 add_library(miopen SHARED IMPORTED GLOBAL)
 SET_PROPERTY(TARGET miopen PROPERTY IMPORTED_LOCATION ${MIOPEN_LIB})
