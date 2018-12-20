@@ -225,6 +225,33 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_m21.so
         kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_m10.so
         kernels/MIOpenConvBwdBias.cl
+        kernels/ConvFwd1x1_7x7x512x2048x1.s
+        kernels/ConvFwd1x1_7x7x2048x512x1.s
+        kernels/ConvFwd1x1_14x14x256x1024x1.s
+        kernels/ConvFwd1x1_14x14x1024x256x1.s
+        kernels/ConvFwd1x1_28x28x128x512x1.s
+        kernels/ConvFwd1x1_28x28x512x128x1.s
+        kernels/ConvFwd1x1_56x56x64x64x1.s
+        kernels/ConvFwd1x1_56x56x64x256x1.s
+        kernels/ConvFwd1x1_56x56x256x64x1.s
+        kernels/ConvFwd1x1_7x7x512x2048x2.s
+        kernels/ConvFwd1x1_7x7x2048x512x2.s
+        kernels/ConvFwd1x1_14x14x256x1024x2.s
+        kernels/ConvFwd1x1_14x14x1024x256x2.s
+        kernels/ConvFwd1x1_28x28x128x512x2.s
+        kernels/ConvFwd1x1_28x28x512x128x2.s
+        kernels/ConvFwd1x1_56x56x64x64x2.s
+        kernels/ConvFwd1x1_56x56x64x256x2.s
+        kernels/ConvFwd1x1_56x56x256x64x2.s
+        kernels/ConvFwd1x1_7x7x512x2048x4.s
+        kernels/ConvFwd1x1_7x7x2048x512x4.s
+        kernels/ConvFwd1x1_14x14x256x1024x4.s
+        kernels/ConvFwd1x1_14x14x1024x256x4.s
+        kernels/ConvFwd1x1_28x28x128x512x4.s
+        kernels/ConvFwd1x1_28x28x512x128x4.s
+        kernels/ConvFwd1x1_56x56x64x64x4.s
+        kernels/ConvFwd1x1_56x56x64x256x4.s
+        kernels/ConvFwd1x1_56x56x256x64x4.s
 )
 
     add_kernels("${MIOPEN_KERNELS}")

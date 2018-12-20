@@ -191,8 +191,8 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
             kernelInfo.kernel_name = "xGemm";
         } else if (conv11_param.kernel_name == "ConvFwd1x1_7x7x512x2048x1.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {64, 1, 1};
-            kernelInfo.g_wk = {65536, 1, 1};
+            kernelInfo.l_wk = {256, 1, 1};
+            kernelInfo.g_wk = {262144, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_7x7x2048x512x1.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
             kernelInfo.l_wk = {128, 1, 1};
@@ -203,24 +203,24 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
             kernelInfo.g_wk = {32768, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_14x14x1024x256x1.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {128, 1, 1};
-            kernelInfo.g_wk = {32968, 1, 1};
+            kernelInfo.l_wk = {64, 1, 1};
+            kernelInfo.g_wk = {32768, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_28x28x128x512x1.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
             kernelInfo.l_wk = {512, 1, 1};
             kernelInfo.g_wk = {32768, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_28x28x512x128x1.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {256, 1, 1};
+            kernelInfo.l_wk = {512, 1, 1};
             kernelInfo.g_wk = {32768, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_56x56x64x64x1.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {256, 1, 1};
-            kernelInfo.g_wk = {26624, 1, 1};
+            kernelInfo.l_wk = {512, 1, 1};
+            kernelInfo.g_wk = {28672, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_56x56x64x256x1.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {128, 1, 1};
-            kernelInfo.g_wk = {25600, 1, 1};
+            kernelInfo.l_wk = {256, 1, 1};
+            kernelInfo.g_wk = {106496, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_56x56x256x64x1.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
             kernelInfo.l_wk = {256, 1, 1};
@@ -231,8 +231,8 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
             kernelInfo.g_wk = {65536, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_7x7x2048x512x2.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {128, 1, 1};
-            kernelInfo.g_wk = {32768, 1, 1};
+            kernelInfo.l_wk = {256, 1, 1};
+            kernelInfo.g_wk = {65536, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_14x14x256x1024x2.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
             kernelInfo.l_wk = {64, 1, 1};
@@ -240,7 +240,7 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
         } else if (conv11_param.kernel_name == "ConvFwd1x1_14x14x1024x256x2.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
             kernelInfo.l_wk = {64, 1, 1};
-            kernelInfo.g_wk = {28762, 1, 1};
+            kernelInfo.g_wk = {28672, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_28x28x128x512x2.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
             kernelInfo.l_wk = {512, 1, 1};
@@ -251,16 +251,16 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
             kernelInfo.g_wk = {26624, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_56x56x64x64x2.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {512, 1, 1};
-            kernelInfo.g_wk = {53248, 1, 1};
+            kernelInfo.l_wk = {256, 1, 1};
+            kernelInfo.g_wk = {51200, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_56x56x64x256x2.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {512, 1, 1};
-            kernelInfo.g_wk = {212992, 1, 1};
+            kernelInfo.l_wk = {256, 1, 1};
+            kernelInfo.g_wk = {102400, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_56x56x256x64x2.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {512, 1, 1};
-            kernelInfo.g_wk = {53248, 1, 1};
+            kernelInfo.l_wk = {256, 1, 1};
+            kernelInfo.g_wk = {51200, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_7x7x512x2048x4.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
             kernelInfo.l_wk = {128, 1, 1};
@@ -279,24 +279,24 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
             kernelInfo.g_wk = {32768, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_28x28x128x512x4.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {256, 1, 1};
-            kernelInfo.g_wk = {106496, 1, 1};
+            kernelInfo.l_wk = {64, 1, 1};
+            kernelInfo.g_wk = {100352, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_28x28x512x128x4.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {64, 1, 1};
-            kernelInfo.g_wk = {25088, 1, 1};
+            kernelInfo.l_wk = {256, 1, 1};
+            kernelInfo.g_wk = {53248, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_56x56x64x64x4.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {512, 1, 1};
-            kernelInfo.g_wk = {51200, 1, 1};
+            kernelInfo.l_wk = {256, 1, 1};
+            kernelInfo.g_wk = {50176, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_56x56x64x256x4.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {512, 1, 1};
-            kernelInfo.g_wk = {204800, 1, 1};
+            kernelInfo.l_wk = {128, 1, 1};
+            kernelInfo.g_wk = {200704, 1, 1};
         } else if (conv11_param.kernel_name == "ConvFwd1x1_56x56x256x64x4.s") {
             kernelInfo.kernel_name = "ConvFwd1x1";
-            kernelInfo.l_wk = {512, 1, 1};
-            kernelInfo.g_wk = {51200, 1, 1};
+            kernelInfo.l_wk = {256, 1, 1};
+            kernelInfo.g_wk = {100352, 1, 1};
         }
 
         kernelInfo.isMIOpenKernel = false;
