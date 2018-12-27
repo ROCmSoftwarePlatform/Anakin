@@ -93,7 +93,7 @@
 
 kernel void Im2Col(const int data_size_off,
                    global _FLOAT* im,
-                   size_t im_offset,
+                   const int im_offset,
                    const int h,
                    const int w,
                    const int wei_h,
