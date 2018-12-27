@@ -39,6 +39,9 @@ bool ConvOclDirectFwd::IsApplicable(const ConvolutionContext& params) const
         && (params.GetBackwardPad0() < 0 || params.GetBackwardPad1() < 0))
         return false;
 
+    if (params.kernel_dilation0 != 1 || params.kernel_dilation1 != 1)
+        return false;
+
     if (params.group_counts < 2)
     {
         return params.kernel_stride0 == params.kernel_stride1
