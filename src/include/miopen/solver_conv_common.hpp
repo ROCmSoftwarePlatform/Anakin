@@ -64,7 +64,7 @@ public:
     ~ConvCommon() {}
 
     bool getKernelInfo(int dev, int batch, int stride, int channel, int width, int output_num,
-                       Conv1x1Type& mType);
+                       Conv1x1Type& mType, bool hasPooling);
 
 private:
     std::vector<Conv1x1Type> conv1x1type {
@@ -280,7 +280,7 @@ private:
         {GFX803, 1, 1, 7, 0, 192, "Conv1x1.cl", { 12, 16, 16, 32, 2, 1, 1, 1 }},
         // W7CXK128
         {GFX803, 1, 1, 7, 0, 128, "Conv1x1.cl", { 12, 16, 16, 32, 2, 1, 1, 1 }},
- 
+
         // VGG-SSD
         // W19C1024K1024
         {GFX803, 1, 1, 19, 1024, 1024, "Conv1x1.cl", { 4, 16, 64, 64, 8, 2, 1, 1 }},
@@ -336,7 +336,7 @@ private:
         {GFX803, 2, 1, 7, 0, 192, "Conv1x1.cl", { 12, 16, 16, 32, 2, 1, 1, 1 }},
         // W7CXK128
         {GFX803, 2, 1, 7, 0, 128, "Conv1x1.cl", { 12, 16, 16, 32, 2, 1, 1, 1 }},
- 
+
         // VGG-SSD
         // W19C1024K1024
         {GFX803, 2, 1, 19, 1024, 1024, "Conv1x1.cl", { 4, 16, 64, 64, 8, 2, 1, 1 }},
@@ -558,7 +558,7 @@ private:
         {GFX900, 1, 1, 7, 0, 192, "Conv1x1.cl", { 12, 16, 16, 32, 2, 1, 1, 1 }},
         // W7CXK128
         {GFX900, 1, 1, 7, 0, 128, "Conv1x1.cl", { 12, 16, 16, 32, 2, 1, 1, 1 }},
- 
+
         // VGG-SSD
         // W19C1024K1024
         {GFX900, 1, 1, 19, 1024, 1024, "Conv1x1.cl", { 4, 16, 64, 64, 8, 2, 1, 1 }},
@@ -614,7 +614,7 @@ private:
         {GFX900, 2, 1, 7, 0, 192, "Conv1x1.cl", { 12, 16, 16, 32, 2, 1, 1, 1 }},
         // W7CXK128
         {GFX900, 2, 1, 7, 0, 128, "Conv1x1.cl", { 12, 16, 16, 32, 2, 1, 1, 1 }},
- 
+
         // VGG-SSD
         // W19C1024K1024
         {GFX900, 2, 1, 19, 1024, 1024, "Conv1x1.cl", { 4, 16, 64, 64, 8, 2, 1, 1 }},

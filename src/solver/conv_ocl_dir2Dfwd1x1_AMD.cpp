@@ -110,7 +110,8 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
                    params.n_inputs,
                    params.in_width,
                    params.n_outputs,
-                   conv11_param);
+                   conv11_param,
+                   params.has_pooling);
 
     KernelInfo kernelInfo;
 

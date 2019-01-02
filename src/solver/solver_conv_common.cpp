@@ -28,16 +28,23 @@
 namespace miopen {
 
 bool ConvCommon::getKernelInfo(int dev, int batch, int stride, int channel, int width,
-                               int output_num, Conv1x1Type& mType) {
+                               int output_num, Conv1x1Type& mType, bool hasPooling) {
 
     for (int i = 0; i < conv1x1type.size(); i++) {
         if (conv1x1type[i].dev == dev && conv1x1type[i].batch == batch
                 && conv1x1type[i].stride == stride && (conv1x1type[i].channel == channel
                         || conv1x1type[i].channel == 0)
                 && conv1x1type[i].width == width && conv1x1type[i].output_num == output_num && channel % 16 == 0) {
-            mType = conv1x1type[i];
-            ALOGD("Got kernel:" << mType.kernel_name << "!!");
-            return true;
+
+            if (hasPooling && (conv1x1type[i].kernel_name.find("Pool") != std::string::npos)) {
+                mType = conv1x1type[i];
+                ALOGD("Got kernel:" << mType.kernel_name << "!!");
+                return true;
+            } else if (conv1x1type[i].kernel_name.find("Pool") == std::string::npos) {
+                mType = conv1x1type[i];
+                ALOGD("Got kernel:" << mType.kernel_name << "!!");
+                return true;
+            }
         }
 
         if (conv1x1type[i].dev == dev
