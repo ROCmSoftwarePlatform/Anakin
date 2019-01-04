@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -183,19 +183,44 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                                              _kernels_ptr[i].get()->GetName();
 
         if (_kernels_ptr[i].get()->GetName() == "conv1x1_act") {
-            if (isBias) {
-                err = _kernels_ptr[i].get()->SetKernelArgs(
-                          (PtrDtype)param.weight()->data(),
-                          (PtrDtype)inputs[0]->data(),
-                          (PtrDtype)param.bias()->data(),
-                          (PtrDtype)outputs[0]->mutable_data(),
-                          negative_slope);
+            if (_usemacro) {
+                if (isBias) {
+                    err = _kernels_ptr[i].get()->SetKernelArgs(
+                              (PtrDtype)param.weight()->data(),
+                              (PtrDtype)inputs[0]->data(),
+                              (PtrDtype)param.bias()->data(),
+                              (PtrDtype)outputs[0]->mutable_data(),
+                              negative_slope);
+                } else {
+                    err = _kernels_ptr[i].get()->SetKernelArgs(
+                              (PtrDtype)param.weight()->data(),
+                              (PtrDtype)inputs[0]->data(),
+                              (PtrDtype)outputs[0]->mutable_data(),
+                              negative_slope);
+                }
             } else {
-                err = _kernels_ptr[i].get()->SetKernelArgs(
-                          (PtrDtype)param.weight()->data(),
-                          (PtrDtype)inputs[0]->data(),
-                          (PtrDtype)outputs[0]->mutable_data(),
-                          negative_slope);
+                if (isBias) {
+                    err = _kernels_ptr[i].get()->SetKernelArgs(
+                              (PtrDtype)param.weight()->data(),
+                              (PtrDtype)inputs[0]->data(),
+                              (PtrDtype)param.bias()->data(),
+                              (PtrDtype)outputs[0]->mutable_data(),
+                              negative_slope,
+                              (unsigned int)inputs[0]->channel(),
+                              (unsigned int)inputs[0]->height(),
+                              (unsigned int)inputs[0]->width(),
+                              (unsigned int)param.weight()->num());
+                } else {
+                    err = _kernels_ptr[i].get()->SetKernelArgs(
+                              (PtrDtype)param.weight()->data(),
+                              (PtrDtype)inputs[0]->data(),
+                              (PtrDtype)outputs[0]->mutable_data(),
+                              negative_slope,
+                              (unsigned int)inputs[0]->channel(),
+                              (unsigned int)inputs[0]->height(),
+                              (unsigned int)inputs[0]->width(),
+                              (unsigned int)param.weight()->num());
+                }
             }
 
             if (!err) {

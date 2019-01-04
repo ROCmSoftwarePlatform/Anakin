@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -187,7 +187,7 @@ bool BuildProgram(cl_program program, cl_device_id device_id, KernelInfo* ki) {
     auto is_asm = miopen::EndsWith(ki->kernel_file, ".s");
 
     if (is_asm) {
-        clBuildProgram(program, 1, &device_id, "", NULL, NULL);
+        errNum = clBuildProgram(program, 1, &device_id, "", NULL, NULL);
     } else {
         errNum = clBuildProgram(program, 1, &device_id, ki->comp_options.c_str(), NULL, NULL);
     }

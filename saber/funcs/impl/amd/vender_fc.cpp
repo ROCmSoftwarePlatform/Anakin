@@ -32,6 +32,13 @@ SaberStatus VenderFc<AMD, OpDtype>::init(
     return create(inputs, outputs, param, ctx);
 }
 
+enum FCType {
+    FC6,
+    FC7,
+    FC,
+    FC_NUM
+};
+
 #define VGG16_FC6_NT_LOCAL_WORK_SIZE_BS1 (128)
 #define VGG16_FC6_NT_GLOBAL_WORK_SIZE_BS1 (8192 * 8)
 #define VGG16_FC6_NT_LOCAL_WORK_SIZE_BS2 (64)
@@ -43,16 +50,8 @@ SaberStatus VenderFc<AMD, OpDtype>::init(
 #define VGG16_FC6_NT_LOCAL_WORK_SIZE_BS32 (256)
 #define VGG16_FC6_NT_GLOBAL_WORK_SIZE_BS32 (4096 * 16)
 
-#define VGG16_FC7_NT_LOCAL_WORK_SIZE_BS1 (128)
-#define VGG16_FC7_NT_GLOBAL_WORK_SIZE_BS1 (8192 * 8)
-#define VGG16_FC7_NT_LOCAL_WORK_SIZE_BS2 (64)
-#define VGG16_FC7_NT_GLOBAL_WORK_SIZE_BS2 (8192 * 4)
-#define VGG16_FC7_NT_LOCAL_WORK_SIZE_BS4 (64)
-#define VGG16_FC7_NT_GLOBAL_WORK_SIZE_BS4 (8192 * 4)
-#define VGG16_FC7_NT_LOCAL_WORK_SIZE_BS8 (64)
-#define VGG16_FC7_NT_GLOBAL_WORK_SIZE_BS8 (8192 * 4)
-#define VGG16_FC7_NT_LOCAL_WORK_SIZE_BS32 (256)
-#define VGG16_FC7_NT_GLOBAL_WORK_SIZE_BS32 (4096 * 16)
+
+
 
 #define VGG16_FC8_NT_LOCAL_WORK_SIZE_BS1 (64)
 #define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS1 (64 * 64 * 16)
@@ -65,84 +64,52 @@ SaberStatus VenderFc<AMD, OpDtype>::init(
 #define VGG16_FC8_NT_LOCAL_WORK_SIZE_BS32 (64)
 #define VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS32 (64 * 64 * 16)
 
-#define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS1 (64)
-#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS1 (64 * 64 * 16)
-#define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS2 (64)
-#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS2 (64 * 64 * 16)
-#define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS4 (64)
-#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS4 (64 * 64 * 16)
-#define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS8 (64)
-#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS8 (64 * 64 * 16)
-#define RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS32 (64)
-#define RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS32 (8192 * 8)
 
-#define YOLO_FC25_NT_LOCAL_WORK_SIZE_BS1 (128)
-#define YOLO_FC25_NT_GLOBAL_WORK_SIZE_BS1 (8192 * 8)
-#define YOLO_FC25_NT_LOCAL_WORK_SIZE_BS2 (64)
-#define YOLO_FC25_NT_GLOBAL_WORK_SIZE_BS2 (8192 * 4)
-#define YOLO_FC25_NT_LOCAL_WORK_SIZE_BS4 (64)
-#define YOLO_FC25_NT_GLOBAL_WORK_SIZE_BS4 (8192 * 8)
-#define YOLO_FC25_NT_LOCAL_WORK_SIZE_BS8 (64)
-#define YOLO_FC25_NT_GLOBAL_WORK_SIZE_BS8 (8192 * 4)
-#define YOLO_FC25_NT_LOCAL_WORK_SIZE_BS32 (256)
-#define YOLO_FC25_NT_GLOBAL_WORK_SIZE_BS32 (4096 * 16)
 
-#define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS1 (256)
-#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS1 (4096 * 6)
-#define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS2 (128)
-#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS2 (4096 * 12)
+
+#define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS1 (64)
+#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS1 (64 * ((param.weights->height() + 1023) / 1024 * 1024))
+#define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS2 (64)
+#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS2 (64 * ((param.weights->height() + 1023) / 1024 * 1024))
 #define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS4 (64)
-#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS4 (4096 * 12)
+#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS4 (64 * ((param.weights->height() + 1023) / 1024 * 1024))
 #define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS8 (64)
-#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS8 (4096 * 24)
+#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS8 (64 * ((param.weights->height() + 1023) / 1024 * 1024))
 #define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS32 (64)
 #define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS32 (4096 * 24)
 
-#define VGG16_FC6_NT_KERNEL_FILE_NAME_BS1 "InnerProductBNTFC6M1.cl"
-#define VGG16_FC6_NT_KERNEL_FILE_NAME_BS2 "InnerProductBNTFC6M2.cl"
-#define VGG16_FC6_NT_KERNEL_FILE_NAME_BS4 "InnerProductBNTFC6M4.cl"
-#define VGG16_FC6_NT_KERNEL_FILE_NAME_BS8 "InnerProductBNTFC6M8.cl"
-#define VGG16_FC6_NT_KERNEL_FILE_NAME_BS32 "InnerProductBNTFC6M32.cl"
-#define VGG16_FC7_NT_KERNEL_FILE_NAME_BS1 "InnerProductBNTFC7M1.cl"
-#define VGG16_FC7_NT_KERNEL_FILE_NAME_BS2 "InnerProductBNTFC7M2.cl"
-#define VGG16_FC7_NT_KERNEL_FILE_NAME_BS4 "InnerProductBNTFC7M4.cl"
-#define VGG16_FC7_NT_KERNEL_FILE_NAME_BS8 "InnerProductBNTFC7M8.cl"
-#define VGG16_FC7_NT_KERNEL_FILE_NAME_BS32 "InnerProductBNTFC7M32.cl"
-#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS1 "Conv1x1FC7.cl"
-#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS2 "Conv1x1FC7.cl"
-#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS4 "Conv1x1FC7.cl"
-#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS8 "Conv1x1FC7.cl"
-#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS32 "InnerProductBNTFC8M32.cl"
 
-#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS1 "Conv1x1FC7.cl"
-#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS2 "Conv1x1FC7.cl"
-#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS4 "Conv1x1FC7.cl"
-#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS8 "Conv1x1FC7.cl"
-#define RESNET_FC1000_NT_KERNEL_FILE_NAME_BS32 "InnerProductBNTFC1000M32.cl"
 
-#define YOLO_FC25_NT_KERNEL_FILE_NAME_BS1 "InnerProductBNTFC25M1.cl"
-#define YOLO_FC25_NT_KERNEL_FILE_NAME_BS2 "InnerProductBNTFC25M2.cl"
-#define YOLO_FC25_NT_KERNEL_FILE_NAME_BS4 "InnerProductBNTFC25M4.cl"
-#define YOLO_FC25_NT_KERNEL_FILE_NAME_BS8 "InnerProductBNTFC25M8.cl"
-#define YOLO_FC25_NT_KERNEL_FILE_NAME_BS32 "InnerProductBNTFC25M32.cl"
-#define YOLO_FC26_NT_KERNEL_FILE_NAME_BS1 "InnerProductBNTFC26M1.cl"
-#define YOLO_FC26_NT_KERNEL_FILE_NAME_BS2 "InnerProductBNTFC26M2.cl"
-#define YOLO_FC26_NT_KERNEL_FILE_NAME_BS4 "InnerProductBNTFC26M4.cl"
-#define YOLO_FC26_NT_KERNEL_FILE_NAME_BS8 "InnerProductBNTFC26M8.cl"
-#define YOLO_FC26_NT_KERNEL_FILE_NAME_BS32 "InnerProductBNTFC26M32.cl"
+
+#define VGG16_FC6_NT_KERNEL_FILE_NAME_BS1 "Conv1x1FC.cl"
+#define VGG16_FC6_NT_KERNEL_FILE_NAME_BS2 "Conv1x1FC.cl"
+#define VGG16_FC6_NT_KERNEL_FILE_NAME_BS4 "Conv1x1FC.cl"
+#define VGG16_FC6_NT_KERNEL_FILE_NAME_BS8 "Conv1x1FC.cl"
+#define VGG16_FC6_NT_KERNEL_FILE_NAME_BS32 "Conv1x1FC.cl"
+
+#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS1 "Conv1x1FC.cl"
+#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS2 "Conv1x1FC.cl"
+#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS4 "Conv1x1FC.cl"
+#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS8 "Conv1x1FC.cl"
+#define VGG16_FC8_NT_KERNEL_FILE_NAME_BS32 "Conv1x1FC.cl"
+
+#define YOLO_FC26_NT_KERNEL_FILE_NAME_BS1 "Conv1x1FC.cl"
+#define YOLO_FC26_NT_KERNEL_FILE_NAME_BS2 "Conv1x1FC.cl"
+#define YOLO_FC26_NT_KERNEL_FILE_NAME_BS4 "Conv1x1FC.cl"
+#define YOLO_FC26_NT_KERNEL_FILE_NAME_BS8 "Conv1x1FC.cl"
+#define YOLO_FC26_NT_KERNEL_FILE_NAME_BS32 "Conv1x1FC.cl"
+
 
 #define BATCH_SIZE_1_INDEX 0
 #define BATCH_SIZE_2_INDEX 1
 #define BATCH_SIZE_4_INDEX 2
 #define BATCH_SIZE_8_INDEX 3
 #define BATCH_SIZE_32_INDEX 4
+#define BATCH_SIZE_GE_INDEX 5
 
 #define FC6_INDEX 0
 #define FC7_INDEX 1
-#define FC8_INDEX 2
-#define FC1000_INDEX 3
-#define FC25_INDEX 4
-#define FC26_INDEX 5
+#define FC1_INDEX 2
 
 template <DataType OpDtype>
 SaberStatus VenderFc<AMD, OpDtype>::create(
@@ -171,128 +138,83 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
         N               = weight_size / K;
     }
 
-    const int gwk[5][6] = {{
+    const int gwk[5][FC_NUM] = {{
             VGG16_FC6_NT_GLOBAL_WORK_SIZE_BS1,
-            VGG16_FC7_NT_GLOBAL_WORK_SIZE_BS1,
             VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS1,
-            RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS1,
-            YOLO_FC25_NT_GLOBAL_WORK_SIZE_BS1,
             YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS1
         },
         {
             VGG16_FC6_NT_GLOBAL_WORK_SIZE_BS2,
-            VGG16_FC7_NT_GLOBAL_WORK_SIZE_BS2,
             VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS2,
-            RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS2,
-            YOLO_FC25_NT_GLOBAL_WORK_SIZE_BS2,
             YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS2
         },
         {
             VGG16_FC6_NT_GLOBAL_WORK_SIZE_BS4,
-            VGG16_FC7_NT_GLOBAL_WORK_SIZE_BS4,
             VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS4,
-            RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS4,
-            YOLO_FC25_NT_GLOBAL_WORK_SIZE_BS4,
             YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS4
         },
         {
             VGG16_FC6_NT_GLOBAL_WORK_SIZE_BS8,
-            VGG16_FC7_NT_GLOBAL_WORK_SIZE_BS8,
             VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS8,
-            RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS8,
-            YOLO_FC25_NT_GLOBAL_WORK_SIZE_BS8,
             YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS8
         },
         {
             VGG16_FC6_NT_GLOBAL_WORK_SIZE_BS32,
-            VGG16_FC7_NT_GLOBAL_WORK_SIZE_BS32,
             VGG16_FC8_NT_GLOBAL_WORK_SIZE_BS32,
-            RESNET_FC1000_NT_GLOBAL_WORK_SIZE_BS32,
-            YOLO_FC25_NT_GLOBAL_WORK_SIZE_BS32,
             YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS32
         }
     };
 
-    const int lwk[5][6] = {{
+    const int lwk[5][FC_NUM] = {{
             VGG16_FC6_NT_LOCAL_WORK_SIZE_BS1,
-            VGG16_FC7_NT_LOCAL_WORK_SIZE_BS1,
             VGG16_FC8_NT_LOCAL_WORK_SIZE_BS1,
-            RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS1,
-            YOLO_FC25_NT_LOCAL_WORK_SIZE_BS1,
             YOLO_FC26_NT_LOCAL_WORK_SIZE_BS1
         },
         {
             VGG16_FC6_NT_LOCAL_WORK_SIZE_BS2,
-            VGG16_FC7_NT_LOCAL_WORK_SIZE_BS2,
             VGG16_FC8_NT_LOCAL_WORK_SIZE_BS2,
-            RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS2,
-            YOLO_FC25_NT_LOCAL_WORK_SIZE_BS2,
             YOLO_FC26_NT_LOCAL_WORK_SIZE_BS2
         },
         {
             VGG16_FC6_NT_LOCAL_WORK_SIZE_BS4,
-            VGG16_FC7_NT_LOCAL_WORK_SIZE_BS4,
             VGG16_FC8_NT_LOCAL_WORK_SIZE_BS4,
-            RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS4,
-            YOLO_FC25_NT_LOCAL_WORK_SIZE_BS4,
             YOLO_FC26_NT_LOCAL_WORK_SIZE_BS4
         },
         {
             VGG16_FC6_NT_LOCAL_WORK_SIZE_BS8,
-            VGG16_FC7_NT_LOCAL_WORK_SIZE_BS8,
             VGG16_FC8_NT_LOCAL_WORK_SIZE_BS8,
-            RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS8,
-            YOLO_FC25_NT_LOCAL_WORK_SIZE_BS8,
             YOLO_FC26_NT_LOCAL_WORK_SIZE_BS8
         },
         {
             VGG16_FC6_NT_LOCAL_WORK_SIZE_BS32,
-            VGG16_FC7_NT_LOCAL_WORK_SIZE_BS32,
             VGG16_FC8_NT_LOCAL_WORK_SIZE_BS32,
-            RESNET_FC1000_NT_LOCAL_WORK_SIZE_BS32,
-            YOLO_FC25_NT_LOCAL_WORK_SIZE_BS32,
             YOLO_FC26_NT_LOCAL_WORK_SIZE_BS32
         }
     };
 
-    const std::string kfn[5][6] = {{
+    const std::string kfn[5][FC_NUM] = {{
             VGG16_FC6_NT_KERNEL_FILE_NAME_BS1,
-            VGG16_FC7_NT_KERNEL_FILE_NAME_BS1,
             VGG16_FC8_NT_KERNEL_FILE_NAME_BS1,
-            RESNET_FC1000_NT_KERNEL_FILE_NAME_BS1,
-            YOLO_FC25_NT_KERNEL_FILE_NAME_BS1,
             YOLO_FC26_NT_KERNEL_FILE_NAME_BS1
         },
         {
             VGG16_FC6_NT_KERNEL_FILE_NAME_BS2,
-            VGG16_FC7_NT_KERNEL_FILE_NAME_BS2,
             VGG16_FC8_NT_KERNEL_FILE_NAME_BS2,
-            RESNET_FC1000_NT_KERNEL_FILE_NAME_BS2,
-            YOLO_FC25_NT_KERNEL_FILE_NAME_BS2,
             YOLO_FC26_NT_KERNEL_FILE_NAME_BS2
         },
         {
             VGG16_FC6_NT_KERNEL_FILE_NAME_BS4,
-            VGG16_FC7_NT_KERNEL_FILE_NAME_BS4,
             VGG16_FC8_NT_KERNEL_FILE_NAME_BS4,
-            RESNET_FC1000_NT_KERNEL_FILE_NAME_BS4,
-            YOLO_FC25_NT_KERNEL_FILE_NAME_BS4,
             YOLO_FC26_NT_KERNEL_FILE_NAME_BS4
         },
         {
             VGG16_FC6_NT_KERNEL_FILE_NAME_BS8,
-            VGG16_FC7_NT_KERNEL_FILE_NAME_BS8,
             VGG16_FC8_NT_KERNEL_FILE_NAME_BS8,
-            RESNET_FC1000_NT_KERNEL_FILE_NAME_BS8,
-            YOLO_FC25_NT_KERNEL_FILE_NAME_BS8,
             YOLO_FC26_NT_KERNEL_FILE_NAME_BS8
         },
         {
             VGG16_FC6_NT_KERNEL_FILE_NAME_BS32,
-            VGG16_FC7_NT_KERNEL_FILE_NAME_BS32,
             VGG16_FC8_NT_KERNEL_FILE_NAME_BS32,
-            RESNET_FC1000_NT_KERNEL_FILE_NAME_BS32,
-            YOLO_FC25_NT_KERNEL_FILE_NAME_BS32,
             YOLO_FC26_NT_KERNEL_FILE_NAME_BS32
         }
     };
@@ -300,61 +222,72 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
     switch (inputs[0]->num()) {
     case 1:
         batch_size_index = BATCH_SIZE_1_INDEX;
+        _branch = 3;
         break;
 
     case 2:
         batch_size_index = BATCH_SIZE_2_INDEX;
+        _branch = 4;
         break;
 
     case 4:
         batch_size_index = BATCH_SIZE_4_INDEX;
+        _branch = 5;
         break;
 
     case 8:
         batch_size_index = BATCH_SIZE_8_INDEX;
+        _branch = 6;
         break;
 
     case 32:
         batch_size_index = BATCH_SIZE_32_INDEX;
         break;
-    }
-
-    switch (param.weights->width() * param.weights->height()) {
-    case 25088 * 4096:
-        fc_index = FC6_INDEX;
-        break;
-
-    case 4096 * 4096:
-        fc_index = FC7_INDEX;
-        break;
-
-    case 4096 * 1000:
-        fc_index = FC8_INDEX;
-        break;
-
-    case 2048 * 1000:
-        fc_index = FC1000_INDEX;
-        break;
-
-    case 50176 * 4096:
-        fc_index = FC25_INDEX;
-        break;
-
-    case 4096 * 1470:
-        fc_index = FC26_INDEX;
-        break;
 
     default:
-        optmized = false;
+        batch_size_index = BATCH_SIZE_GE_INDEX;
+        _branch = 1;
         break;
+    }
+
+    if (inputs[0]->num() <= 8) {
+        switch (param.weights->width() * param.weights->height()) {
+        case 25088 * 4096:
+        case 4096 * 4096:
+        case 50176 * 4096:
+            fc_index = FC6;
+            break;
+
+        case 4096 * 1000:
+        case 2048 * 1000:
+            fc_index = FC7;
+            _branch = 2;
+            break;
+
+        case 4096 * 1470:
+        case 1024 * 21841:
+        default:
+            fc_index = FC;
+            _branch = 1;
+            break;
+        }
+    } else {
+        _branch = 0;
     }
 
     if (!param.is_transpose_weights) {
-        if (optmized) {
-            kernelInfo.l_wk        = {lwk[batch_size_index][fc_index], 1, 1};
-            kernelInfo.g_wk        = {gwk[batch_size_index][fc_index], 1, 1};
-            kernelInfo.kernel_file = kfn[batch_size_index][fc_index];
-            kernelInfo.kernel_name = "InnerProduct";
+        if (_branch) {
+            if (batch_size_index == BATCH_SIZE_GE_INDEX) {
+                kernelInfo.l_wk        = {64, 1, 1};
+                kernelInfo.g_wk        = {(64 * ((outputs[0]->channel() + 1023) / 1024 * 1024)), 1, 1};
+                kernelInfo.kernel_file = "Conv1x1FC.cl";
+                kernelInfo.kernel_name = "InnerProduct";
+            } else {
+                kernelInfo.l_wk        = {lwk[batch_size_index][fc_index], 1, 1};
+                kernelInfo.g_wk        = {gwk[batch_size_index][fc_index], 1, 1};
+                kernelInfo.kernel_file = kfn[batch_size_index][fc_index];
+                kernelInfo.kernel_name = "InnerProduct";
+            }
         } else { // gemm
             _outGemmWorkspace = new Tensor<AMD>();
             _outGemmWorkspace->re_alloc(outputs[0]->shape());
@@ -451,7 +384,7 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
     } else {
         LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "Transpose Weights!";
         // gemm
-        optmized          = false;
+        _branch          = 0;
         _outGemmWorkspace = new Tensor<AMD>();
         _outGemmWorkspace->re_alloc(outputs[0]->shape());
 
@@ -545,16 +478,27 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
         _kernels_ptr.push_back(kptr);
     }
 
-    if (optmized) {
+    if (_branch) {
         // set comp_options...
-        kernelInfo.comp_options = std::string(" -DSTRIDE=") + std::to_string(inputs[0]->channel()) +
-                                  std::string(" -DN=") + std::to_string(inputs[0]->num());
+        if (_usemacro) {
+            kernelInfo.comp_options = std::string(" -DSTRIDE=") + std::to_string(inputs[0]->channel()) +
+                                      std::string(" -DMACRO") +
+                                      std::string(" -DN=") + std::to_string(inputs[0]->num()) +
+                                      std::string(" -DWIDTH=") + std::to_string(param.weights->width()) +
+                                      std::string(" -DOUTPUT=") + std::to_string(outputs[0]->channel()) +
+                                      std::string(" -DKERNEL_METHOD=") + std::to_string(_branch) +
+                                      std::string(" -DNO_SLOPE");
+        } else {
+            kernelInfo.comp_options = std::string(" -DSTRIDE=") + std::to_string(inputs[0]->channel()) +
+                                      std::string(" -DKERNEL_METHOD=") + std::to_string(_branch) +
+                                      std::string(" -DNO_SLOPE");
+        }
 
         if (param.bias != nullptr && param.bias->valid_size() > 0) {
             kernelInfo.comp_options += std::string(" -DBIAS");
         }
 
-        kernelInfo.kernel_type = SABER;
+        kernelInfo.kernel_type = MIOPEN;
 
         kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
@@ -620,7 +564,7 @@ SaberStatus VenderFc<AMD, OpDtype>::dispatch(
         PtrDtype memObjects[4] = {0, 0, 0, 0};
         cl_event event;
 
-        if (optmized) {
+        if (_branch) {
             memObjects[0] = (PtrDtype)inputs[0]->data();
             memObjects[1] = (PtrDtype)param.weights->data();
             memObjects[2] = (param.bias != nullptr) ? (PtrDtype)param.bias->data() : nullptr;
@@ -632,16 +576,39 @@ SaberStatus VenderFc<AMD, OpDtype>::dispatch(
             }
 
             if (param.bias != nullptr && param.bias->valid_size() > 0) {
-                err = _kernels_ptr[0].get()->SetKernelArgs(
-                          (PtrDtype)memObjects[0],
-                          (PtrDtype)memObjects[1],
-                          (PtrDtype)memObjects[2],
-                          (PtrDtype)memObjects[3]);
+                if (_usemacro) {
+                    err = _kernels_ptr[0].get()->SetKernelArgs(
+                              (PtrDtype)memObjects[0],
+                              (PtrDtype)memObjects[1],
+                              (PtrDtype)memObjects[2],
+                              (PtrDtype)memObjects[3]);
+                } else {
+                    err = _kernels_ptr[0].get()->SetKernelArgs(
+                              (PtrDtype)memObjects[0],
+                              (PtrDtype)memObjects[1],
+                              (PtrDtype)memObjects[2],
+                              (PtrDtype)memObjects[3],
+                              inputs[0]->num(),
+                              param.weights->width(),
+                              outputs[0]->channel()
+                          );
+                }
             } else {
-                err = _kernels_ptr[0].get()->SetKernelArgs(
-                          (PtrDtype)memObjects[0],
-                          (PtrDtype)memObjects[1],
-                          (PtrDtype)memObjects[3]);
+                if (_usemacro) {
+                    err = _kernels_ptr[0].get()->SetKernelArgs(
+                              (PtrDtype)memObjects[0],
+                              (PtrDtype)memObjects[1],
+                              (PtrDtype)memObjects[3]);
+                } else {
+                    err = _kernels_ptr[0].get()->SetKernelArgs(
+                              (PtrDtype)memObjects[0],
+                              (PtrDtype)memObjects[1],
+                              (PtrDtype)memObjects[3],
+                              inputs[0]->num(),
+                              param.weights->width(),
+                              outputs[0]->channel()
+                          );
+                }
             }
 
             if (!err) {
