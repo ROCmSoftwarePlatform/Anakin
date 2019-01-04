@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# Copyright (c) 2018 Advanced Micro Devices, Inc.
+# Copyright (c) 2019 Advanced Micro Devices, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -252,6 +252,8 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         kernels/ConvFwd1x1_56x56x64x64x4.s
         kernels/ConvFwd1x1_56x56x64x256x4.s
         kernels/ConvFwd1x1_56x56x256x64x4.s
+        kernels/Conv1x1.cl
+        kernels/Conv1x1FC.cl
 )
 
     add_kernels("${MIOPEN_KERNELS}")

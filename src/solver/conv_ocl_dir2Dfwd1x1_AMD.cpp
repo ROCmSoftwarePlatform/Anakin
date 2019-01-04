@@ -119,75 +119,107 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
         kernelInfo.kernel_file = conv11_param.kernel_name;
 
         if (conv11_param.kernel_name == "Conv1x1.cl") {
-            kernelInfo.kernel_name = "conv1x1_act";
+            kernelInfo.isMIOpenKernel = true;
 
-            kernelInfo.comp_options =
-                std::string(" -DBIAS=") + std::to_string(params.bias) + std::string(" -DN=")
-                + std::to_string(params.batch_sz) + std::string(" -DH=")
-                + std::to_string(params.in_height) + std::string(" -DW=")
-                + std::to_string(params.in_width) + std::string(" -DC=")
-                + std::to_string(params.n_inputs) + std::string(" -DK=")
-                + std::to_string(params.n_outputs) + std::string(" -DSTRIDE=")
-                + std::to_string(params.kernel_stride0) + std::string(" -DGLOBAL_SPLITU=")
-                + std::to_string(conv11_param.params.global_split)
-                + std::string(" -DPER_ITER_STRIDE=")
-                + std::to_string(conv11_param.params.stride_per_iter)
-                + std::string(" -DTILE_COL=") + std::to_string(conv11_param.params.tile_col)
-                + std::string(" -DTILE_ROW=") + std::to_string(conv11_param.params.tile_row)
-                + std::string(" -DPER_WI_TILE_ROW=")
-                + std::to_string(conv11_param.params.wi_per_tile_row)
-                + std::string(" -DPER_WI_TILE_COL=")
-                + std::to_string(conv11_param.params.wi_per_tile_col)
-                + std::string(" -DBRANCH=") + std::to_string(conv11_param.params.code_branch)
-                + std::string(" -DMETHOD=") + std::to_string(conv11_param.params.code_method);
 
-            int wg_in = (params.out_height * params.out_width + conv11_param.params.tile_col - 1)
-                        / conv11_param.params.tile_col;
-            int wg_wei = (params.n_outputs + conv11_param.params.tile_row - 1)
-                         / conv11_param.params.tile_row;
+            if (conv11_param.kernel_method == 1) {
+                kernelInfo.kernel_name = "conv1x1_act";
 
-            kernelInfo.l_wk = {256, 1, 1};
-            kernelInfo.g_wk = {256 * wg_in* wg_wei * conv11_param.params.global_split, 1, 1};
-        } else if (conv11_param.kernel_name == "Conv1x1FC7.cl") {
+                if (cc._usemacro) {
+                    kernelInfo.comp_options =
+                        std::string(" -DMACRO")
+                        + std::string(" -DBIAS=") + std::to_string(params.bias) + std::string(" -DN=")
+                        + std::to_string(params.batch_sz) + std::string(" -DH=")
+                        + std::to_string(params.in_height) + std::string(" -DW=")
+                        + std::to_string(params.in_width) + std::string(" -DC=")
+                        + std::to_string(params.n_inputs) + std::string(" -DK=")
+                        + std::to_string(params.n_outputs) + std::string(" -DSTRIDE=")
+                        + std::to_string(params.kernel_stride0) + std::string(" -DGLOBAL_SPLITU=")
+                        + std::to_string(conv11_param.params.global_split)
+                        + std::string(" -DPER_ITER_STRIDE=")
+                        + std::to_string(conv11_param.params.stride_per_iter)
+                        + std::string(" -DKERNEL_METHOD=") + std::to_string(conv11_param.kernel_method)
+                        + std::string(" -DTILE_COL=") + std::to_string(conv11_param.params.tile_col)
+                        + std::string(" -DTILE_ROW=") + std::to_string(conv11_param.params.tile_row)
+                        + std::string(" -DPER_WI_TILE_ROW=")
+                        + std::to_string(conv11_param.params.wi_per_tile_row)
+                        + std::string(" -DPER_WI_TILE_COL=")
+                        + std::to_string(conv11_param.params.wi_per_tile_col)
+                        + std::string(" -DBRANCH=") + std::to_string(conv11_param.params.code_branch)
+                        + std::string(" -DMETHOD=") + std::to_string(conv11_param.params.code_method);
+                } else {
+                    kernelInfo.comp_options =
+                        std::string(" -DBIAS=") + std::to_string(params.bias)
+                        + std::string(" -DN=") + std::to_string(params.batch_sz)
+                        + std::string(" -DSTRIDE=")
+                        + std::to_string(params.kernel_stride0) + std::string(" -DGLOBAL_SPLITU=")
+                        + std::to_string(conv11_param.params.global_split)
+                        + std::string(" -DPER_ITER_STRIDE=")
+                        + std::to_string(conv11_param.params.stride_per_iter)
+                        + std::string(" -DKERNEL_METHOD=") + std::to_string(conv11_param.kernel_method)
+                        + std::string(" -DTILE_COL=") + std::to_string(conv11_param.params.tile_col)
+                        + std::string(" -DTILE_ROW=") + std::to_string(conv11_param.params.tile_row)
+                        + std::string(" -DPER_WI_TILE_ROW=")
+                        + std::to_string(conv11_param.params.wi_per_tile_row)
+                        + std::string(" -DPER_WI_TILE_COL=")
+                        + std::to_string(conv11_param.params.wi_per_tile_col)
+                        + std::string(" -DBRANCH=") + std::to_string(conv11_param.params.code_branch)
+                        + std::string(" -DMETHOD=") + std::to_string(conv11_param.params.code_method);
+                }
+
+                int wg_in = (params.out_height * params.out_width + conv11_param.params.tile_col - 1)
+                            / conv11_param.params.tile_col;
+                int wg_wei = (params.n_outputs + conv11_param.params.tile_row - 1)
+                             / conv11_param.params.tile_row;
+
+                kernelInfo.l_wk = {256, 1, 1};
+                kernelInfo.g_wk = {256 * wg_in* wg_wei * conv11_param.params.global_split, 1, 1};
+            } else if (conv11_param.kernel_method <= 3) {
+                kernelInfo.kernel_name = "conv1x1_act_pool";
+
+                if (params.bias) {
+                    kernelInfo.comp_options = std::string(" -DBIAS ") + std::string(" -DN=")
+                                              + std::to_string(params.batch_sz) + std::string(" -DH=")
+                                              + std::to_string(params.in_height) + std::string(" -DW=")
+                                              + std::to_string(params.in_width) + std::string(" -DC=")
+                                              + std::to_string(params.n_inputs) + std::string(" -DK=")
+                                              + std::to_string(params.n_outputs)
+                                              + std::string(" -DKERNEL_METHOD=") + std::to_string(conv11_param.kernel_method);
+                } else {
+                    kernelInfo.comp_options = std::string(" -DN=") + std::to_string(params.batch_sz)
+                                              + std::string(" -DH=") + std::to_string(params.in_height)
+                                              + std::string(" -DW=") + std::to_string(params.in_width)
+                                              + std::string(" -DC=") + std::to_string(params.n_inputs)
+                                              + std::string(" -DK=") + std::to_string(params.n_outputs)
+                                              + std::string(" -DKERNEL_METHOD=") + std::to_string(conv11_param.kernel_method);
+                }
+
+                kernelInfo.l_wk = {1024, 1, 1};
+                kernelInfo.g_wk = {1024 * 64, 1, 1};
+            }
+        } else if (conv11_param.kernel_name == "Conv1x1FC.cl") {
+            kernelInfo.isMIOpenKernel = true;
             kernelInfo.kernel_name = "InnerProduct";
 
             if (params.bias) {
-                kernelInfo.comp_options = std::string(" -DBIAS ") + std::string(" -DSTRIDE=")
+                kernelInfo.comp_options = std::string(" -DBIAS ") + std::string(" -DWIDTH=")
                                           + std::to_string(params.n_inputs)
+                                          + std::string(" -DMACRO -DNO_SLOPE")
+                                          + std::string(" -DOUTPUT=") + std::to_string(params.n_outputs)
+                                          + std::string(" -DKERNEL_METHOD=") + std::to_string(conv11_param.kernel_method)
                                           + std::string(" -DN=") + std::to_string(params.batch_sz);
             } else {
                 kernelInfo.comp_options =
-                    std::string(" -DSTRIDE=") + std::to_string(params.n_inputs)
+                    std::string(" -DWIDTH=") + std::to_string(params.n_inputs)
+                    + std::string(" -DOUTPUT=") + std::to_string(params.n_outputs)
+                    + std::string(" -DMACRO -DNO_SLOPE")
+                    + std::string(" -DKERNEL_METHOD=") + std::to_string(conv11_param.kernel_method)
                     + std::string(" -DN=") + std::to_string(params.batch_sz);
-            }
-
-            if (params.has_active) {
-                kernelInfo.comp_options += std::string(" -DRELU");
             }
 
             kernelInfo.l_wk = {64, 1, 1};
             kernelInfo.g_wk = {64 * 64 * 16, 1, 1};
-        } else if (conv11_param.kernel_name == "Conv1x1C320H7W7K1280Pool.cl" ||
-                   conv11_param.kernel_name == "Conv1x1C1024H7W7K1024Pool.cl") {
-            kernelInfo.kernel_name = "conv1x1_act_pool";
 
-            if (params.bias) {
-                kernelInfo.comp_options = std::string(" -DBIAS ") + std::string(" -DN=")
-                                          + std::to_string(params.batch_sz) + std::string(" -DH=")
-                                          + std::to_string(params.in_height) + std::string(" -DW=")
-                                          + std::to_string(params.in_width) + std::string(" -DC=")
-                                          + std::to_string(params.n_inputs) + std::string(" -DK=")
-                                          + std::to_string(params.n_outputs);
-            } else {
-                kernelInfo.comp_options = std::string(" -DN=") + std::to_string(params.batch_sz)
-                                          + std::string(" -DH=") + std::to_string(params.in_height)
-                                          + std::string(" -DW=") + std::to_string(params.in_width)
-                                          + std::string(" -DC=") + std::to_string(params.n_inputs)
-                                          + std::string(" -DK=") + std::to_string(params.n_outputs);
-            }
-
-            kernelInfo.l_wk = {1024, 1, 1};
-            kernelInfo.g_wk = {1024 * 64, 1, 1};
         } else if (conv11_param.kernel_name == "xGemm") {
             kernelInfo.kernel_name = "xGemm";
         } else if (conv11_param.kernel_name == "ConvFwd1x1_7x7x512x2048x1.s") {
@@ -300,7 +332,7 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
             kernelInfo.g_wk = {100352, 1, 1};
         }
 
-        kernelInfo.isMIOpenKernel = false;
+        //kernelInfo.isMIOpenKernel = false;
         result.construction_params.push_back(kernelInfo);
     } else {
         result.status = miopenStatusInternalError;
