@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -51,13 +51,13 @@
 
 __attribute__((reqd_work_group_size(256, 1, 1))) __kernel void
 mloPooling(const __global _FLOAT* bot,
+           __global _FLOAT* top,
 #if MLO_CONV_BIAS
            const __global _FLOAT* bias,
 #endif
 #if MLO_CONV_PRELU
            _FLOAT negSlope,
 #endif
-           __global _FLOAT* top,
            UNUSED __global _FLOAT* mask)
 {
     int gid     = get_global_id(0);

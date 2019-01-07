@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -390,45 +390,36 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
         int _out_pix_tile0 = std::max(1, 8 / pooling_s_w);
         int _out_pix_tile1 = std::max(1, 8 / pooling_s_h);
 
-        if (pooling_w_h == 2 && pooling_w_w == 2) {
-            kernelInfo.l_wk = {256, 1, 1};
-            kernelInfo.g_wk = {64 * 64 * 40, 1, 1};
-            kernelInfo.kernel_file = "BiasReLuPooling.cl";
-            kernelInfo.kernel_name = "mloPooling";
-            kernelInfo.kernel_type = SABER;
-        } else {
-            // Bias relu kernel
-            while (_out_pix_tile0 * _grp_tile0 > out_w * 2 && _out_pix_tile0 > 1) {
-                _out_pix_tile0 >>= 1;
-            }
-
-            while (_out_pix_tile1 * _grp_tile1 > out_h * 2 && _out_pix_tile1 > 1) {
-                _out_pix_tile1 >>= 1;
-            }
-
-            int g_wk_width = ((out_w + _grp_tile0 * _out_pix_tile0 - 1) /
-                              (_grp_tile0 * _out_pix_tile0));
-            int g_wk_height = ((out_h + _grp_tile1 * _out_pix_tile1 - 1) /
-                               (_grp_tile1 * _out_pix_tile1));
-
-            kernelInfo.l_wk = {_grp_tile0, _grp_tile1, 1};
-            kernelInfo.g_wk = {g_wk_width * _grp_tile0,
-                               g_wk_height * _grp_tile1,
-                               out_c* bt_size
-                              };
-            kernelInfo.kernel_file = "MIOpenPooling.cl";
-            kernelInfo.kernel_name = "mloPoolingG";
-            kernelInfo.kernel_type = MIOPEN;
-            kernelInfo.wk_dim = 3;
-        }
+        kernelInfo.l_wk        = {256, 1, 1};
+        kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
+        kernelInfo.kernel_file = "PoolingGen.cl";
+        kernelInfo.kernel_name = "mloPooling";
+        kernelInfo.kernel_type = SABER;
 
         int ptype = MLO_POOLING_OP_MAX;
+        int average_include = 0;
 
-        if (pooling_type == Pooling_max) {
-            ptype = MLO_POOLING_OP_MAX;
-        } else if (pooling_type == Pooling_average_exclude_padding ||
-                   pooling_type == Pooling_average_include_padding) {
-            ptype = MLO_POOLING_OP_AVE;
+        switch (pooling_type) {
+            case Pooling_max: {
+                ptype = MLO_POOLING_OP_MAX;
+            }
+            break;
+
+            case Pooling_average_include_padding: {
+                ptype = MLO_POOLING_OP_AVE;
+                average_include = 1;
+            }
+            break;
+
+            case Pooling_average_exclude_padding: {
+                ptype = MLO_POOLING_OP_AVE;
+            }
+            break;
+
+            default: {
+                LOG(ERROR) << "Unknown polling type: " << pooling_type;
+            }
+            break;
         }
 
         kernelInfo.comp_options =
@@ -456,6 +447,7 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
             std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(out_w * out_h) +
             std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") + std::to_string(out_w * out_h * out_c) +
             std::string(" -DBATCH_NUM=") + std::to_string(bt_size) +
+            std::string(" -DAVERAGE_INCLUDE=") + std::to_string(average_include) +
             std::string(" -DCU_NUM=64") +
             std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias) +
             std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive) +

@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -76,34 +76,12 @@ SaberStatus SaberPooling<AMD, OpDtype>::create(
     }
 
     kernelInfo.wk_dim = 3;
+    kernelInfo.l_wk        = {256, 1, 1};
+    kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
+    kernelInfo.kernel_file = "PoolingGen.cl";
+    kernelInfo.kernel_name = "mloPooling";
 
-    if (param.window_h == 2
-            && param.window_w == 2
-            && param.pad_w == 0
-            && param.pad_h == 0) {
-        kernelInfo.l_wk        = {256, 1, 1};
-        kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
-        kernelInfo.kernel_file = "Pooling.cl";
-        kernelInfo.kernel_name = "mloPooling";
-    } else if (param.window_h == inputs[0]->height()
-               && param.window_w == inputs[0]->width()
-               && param.pad_w == 0
-               && param.pad_h == 0
-               && (inputs[0]->channel()*inputs[0]->num() % 256) == 0) {
-        int g_wk_width  = 1;
-        int g_wk_height = 1;
-        kernelInfo.l_wk = {256, 1, 1};
-        kernelInfo.g_wk = {inputs[0]->channel() * inputs[0]->num(), 1, 1};
-        kernelInfo.kernel_file = "Pooling7x7_7_7_2048.cl";
-        kernelInfo.kernel_name = "mloPoolingG";
-    } else {
-        kernelInfo.l_wk        = {256, 1, 1};
-        kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
-        kernelInfo.kernel_file = "PoolingGen.cl";
-        kernelInfo.kernel_name = "mloPooling";
-    }
-
-    int bot_batch_stride   = inputs[0]->width() * inputs[0]->height() * outputs[0]->channel();
+    int bot_batch_stride   = inputs[0]->width() * inputs[0]->height() * inputs[0]->channel();
     int bot_channel_stride = inputs[0]->width() * inputs[0]->height();
 
     int top_batch_stride   = outputs[0]->width() * outputs[0]->height() * outputs[0]->channel();
@@ -118,8 +96,8 @@ SaberStatus SaberPooling<AMD, OpDtype>::create(
         + std::string(" -DMLO_POOLING_PAD1=") + std::to_string(param.pad_h)
         + std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(param.stride_w)
         + std::string(" -DMLO_POOLING_STRIDE1=") + std::to_string(param.stride_h)
-        + std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(inputs[0]->channel())
-        + std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(outputs[0]->channel())
+        + std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(outputs[0]->channel())
+        + std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(inputs[0]->channel())
         + std::string(" -DMLO_POOLING_GROUP_SZ0=8")
         + std::string(" -DMLO_POOLING_GROUP_SZ1=8")
         + std::string(" -DMLO_POOLING_BOT_BATCH_STRIDE=") + std::to_string(bot_batch_stride)

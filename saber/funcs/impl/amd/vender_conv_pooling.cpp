@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -404,22 +404,39 @@ SaberStatus VenderConv2DPooling<AMD, OpDtype>::dispatch(
         } else if (_kernels_ptr[i].get()->GetName() == "mloPooling") {
             if (needBias) {
                 if (isBias) {
-                    err = _kernels_ptr[i].get()->SetKernelArgs(
+                    if (isActive) {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
                               (PtrDtype)_outConvRelu->data(),
                               (PtrDtype)outputs[0]->mutable_data(),
                               (PtrDtype)param.conv_param.bias()->data(),
-                              negative_slope);
-                } else {
-                    err = _kernels_ptr[i].get()->SetKernelArgs(
+                              negative_slope,
+                              (PtrDtype)0);
+                    } else {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
                               (PtrDtype)_outConvRelu->data(),
                               (PtrDtype)outputs[0]->mutable_data(),
-                              negative_slope);
+                              (PtrDtype)param.conv_param.bias()->data(),
+                              (PtrDtype)0);
+                    }
+                } else {
+                    if (isActive) {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                              (PtrDtype)_outConvRelu->data(),
+                              (PtrDtype)outputs[0]->mutable_data(),
+                              negative_slope,
+                              (PtrDtype)0);
+                    } else {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                              (PtrDtype)_outConvRelu->data(),
+                              (PtrDtype)outputs[0]->mutable_data(),
+                              (PtrDtype)0);
+                    }
                 }
             } else {
                 err = _kernels_ptr[i].get()->SetKernelArgs(
                           (PtrDtype)_outConvRelu->data(),
                           (PtrDtype)outputs[0]->mutable_data(),
-                          1.0f);
+                          (PtrDtype)0);
             }
 
             if (!err) {
