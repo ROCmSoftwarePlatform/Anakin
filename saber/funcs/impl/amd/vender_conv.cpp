@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -536,7 +536,7 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
 
                 if (_kernels_ptr[i].get()->GetName() != "miog_betac_alphaab") {
                     err = _kernels_ptr[i].get()->SetKernelArgs(
-                              outputs[0]->mutable_data(), out_offset, floatObjects[0]);
+                              outputs[0]->mutable_data(), out_offset, floatObjects[1]);
 
                     if (!err) {
                         LOG(ERROR) << "Fail to set kernel args :" << err;
@@ -631,7 +631,7 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
 
                 if (_kernels_ptr[i].get()->GetName() != "miog_betac_alphaab") {
                     err = _kernels_ptr[i].get()->SetKernelArgs(
-                              (PtrDtype)outputs[0]->mutable_data(), out_offset, floatObjects[0]);
+                              (PtrDtype)outputs[0]->mutable_data(), out_offset, floatObjects[1]);
 
                     if (!err) {
                         LOG(ERROR) << "Fail to set kernel args :" << err;
