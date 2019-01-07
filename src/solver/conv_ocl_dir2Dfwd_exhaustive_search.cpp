@@ -73,7 +73,7 @@ ConvOclDirectFwdLegacyExhaustiveSearch::GetPerformanceConfig(const ConvolutionCo
 
     result.n_stacks = 1; // # of diff stacks (part of batch).
 
-    if(params.kernel_size0 == 1 && params.kernel_size1 == 1)
+    if(params.kernel_size0 == 1 && params.kernel_size1 == 1 && params.group_counts < 2)
     {
 
         // version
@@ -114,6 +114,19 @@ ConvOclDirectFwdLegacyExhaustiveSearch::GetPerformanceConfig(const ConvolutionCo
             // int version =
             result.out_pix_tile1 = 0;
         }
+
+    }
+    if(params.group_counts >= 2)
+    {
+        result.grp_tile0       = 32;
+        result.grp_tile1       = 8;
+        result.in_tile0        = 32;
+        result.in_tile1        = 16;
+        result.out_pix_tile0   = 1;
+        result.out_pix_tile1   = 2;
+        result.n_out_pix_tiles = 1;
+        result.n_in_data_tiles = 1;
+        result.n_stacks        = 1;
     }
     if(!params.do_search) // Prevent spamming durign search.
         MIOPEN_LOG_I2("Returns: " << result);
@@ -394,7 +407,7 @@ ConvOclDirectFwdLegacyExhaustiveSearch::Search(const ConvolutionContext& params)
 
     long long runs_left = 0;
 
-    if(params.kernel_size0 == 1 && params.kernel_size1 == 1)
+    if(params.kernel_size0 == 1 && params.kernel_size1 == 1 && params.group_counts < 2)
     {
         int n_grp_tiles0 = 3;
         std::cout << "Searching the best solution in the 4 dim space. Please, be patient it may "
