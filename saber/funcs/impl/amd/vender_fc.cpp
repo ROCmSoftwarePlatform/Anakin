@@ -271,6 +271,31 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
             _branch = 1;
             break;
         }
+    } else if (inputs[0]->num() == 32) {
+        switch (param.weights->width() * param.weights->height()) {
+        case 25088 * 4096:
+        case 4096 * 4096:
+        case 50176 * 4096:
+            fc_index = FC6;
+            _branch = 7;
+            break;
+
+        case 4096 * 1000:
+        case 2048 * 1000:
+            fc_index = FC7;
+            _branch = 8;
+            break;
+
+        case 4096 * 1470:
+            fc_index = FC;
+            _branch = 9;
+            break;
+
+        case 1024 * 21841:
+        default:
+            _branch = 0;
+            break;
+        }
     } else {
         _branch = 0;
     }
