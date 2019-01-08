@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -37,39 +37,42 @@ __kernel void Depthwiseconv(
     int size_channel_in  = hin * win;
     int size_channel_out = hout * wout;
     int size_kernel      = kernel_h * kernel_w;
+    const int count      = num * channels * hout * wout;
 
-    const int pw = local_idx % wout;
-    const int ph = (local_idx / wout) % hout;
-    const int c  = (local_idx / size_channel_out) % channels;
-    const int n  = local_idx / size_channel_out / channels;
-    int hstart   = ph * stride_h - pad_h;
-    int wstart   = pw * stride_w - pad_w;
-    int hend     = min(hstart + kernel_h, hin + pad_h);
-    int wend     = min(wstart + kernel_w, win + pad_w);
+    if (local_idx < count) {
+        const int pw = local_idx % wout;
+        const int ph = (local_idx / wout) % hout;
+        const int c  = (local_idx / size_channel_out) % channels;
+        const int n  = local_idx / size_channel_out / channels;
+        int hstart   = ph * stride_h - pad_h;
+        int wstart   = pw * stride_w - pad_w;
+        int hend     = min(hstart + kernel_h, hin + pad_h);
+        int wend     = min(wstart + kernel_w, win + pad_w);
 
-    hstart                     = max(hstart, 0);
-    wstart                     = max(wstart, 0);
-    hend                       = min(hend, hin);
-    wend                       = min(wend, win);
-    float aveval               = 0;
-    global float* bottom_slice = din + (n * channels + c) * size_channel_in;
-    global float* weight_slice = weight + c * size_kernel;
+        hstart                     = max(hstart, 0);
+        wstart                     = max(wstart, 0);
+        hend                       = min(hend, hin);
+        wend                       = min(wend, win);
+        float aveval               = 0;
+        global float* bottom_slice = din + (n * channels + c) * size_channel_in;
+        global float* weight_slice = weight + c * size_kernel;
 
-    int khstart = hend < kernel_h ? kernel_h - hend : 0;
-    int kwstart = wend < kernel_w ? kernel_w - wend : 0;
+        int khstart = hend < kernel_h ? kernel_h - hend : 0;
+        int kwstart = wend < kernel_w ? kernel_w - wend : 0;
 
-    for (int h = hstart; h < hend; ++h) {
-        for (int w = wstart; w < wend; ++w) {
-            aveval += bottom_slice[h * win + w]
-                      * weight_slice[(khstart + h - hstart) * kernel_w + (kwstart + w - wstart)];
+        for (int h = hstart; h < hend; ++h) {
+            for (int w = wstart; w < wend; ++w) {
+                aveval += bottom_slice[h * win + w]
+                          * weight_slice[(khstart + h - hstart) * kernel_w + (kwstart + w - wstart)];
+            }
         }
-    }
 
 #if MLO_CONV_BIAS
-    aveval += bias[c];
+        aveval += bias[c];
 #endif
 #if MLO_CONV_ACTIVE_RELU
-    aveval = max(aveval, (float)0);
+        aveval = max(aveval, (float)0);
 #endif
-    dout[local_idx] = aveval;
+        dout[local_idx] = aveval;
+    }
 }
