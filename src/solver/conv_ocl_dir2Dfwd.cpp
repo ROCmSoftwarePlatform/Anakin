@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2018 Advanced Micro Devices, Inc.
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -63,7 +63,6 @@ bool ConvOclDirectFwd::IsApplicable(const ConvolutionContext& params) const
     {
         return params.kernel_stride0 == params.kernel_stride1
             && params.pad0 == params.pad1
-            && (params.group_counts > 16)
             && !(params.kernel_size0 == 1 && params.kernel_size1 == 1)
             /// \todo need to make sure support stride > 2, should support but not tested
             && !(params.kernel_stride0 > 2 || params.kernel_stride1 > 2)
