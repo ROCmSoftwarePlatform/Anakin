@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -59,10 +59,13 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::create(
         bool _use_vender = false;
 
         for (auto s : solution) {
-            if (s.kernel_name == "conv1x1_act_pool") {
+            if (s.kernel_name == "conv1x1_act_pool"
+                    || s.kernel_name == "conv1x1_act"
+                    || s.kernel_name == "mloPooling") {
                 CreateKernelList(inputs[0]->device_id(), s);
             } else {
                 _use_vender = true;
+                break;
             }
         }
 
@@ -71,16 +74,26 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::create(
             vcp->set_solution(solution);
             this->_impl = vcp;
             this->_impl->create(inputs, outputs, param, ctx);
+
+            if (_outConvRelu) {
+                delete _outConvRelu;
+                _outConvRelu = nullptr;
+            }
+        } else if (solution[0].kernel_name  == "conv1x1_act_pool") {
+            if (_outConvRelu) {
+                delete _outConvRelu;
+                _outConvRelu = nullptr;
+            }
         }
     } else {
         VenderConv2DPooling<AMD, AK_FLOAT>* vcp = new VenderConv2DPooling<AMD, AK_FLOAT>;
         this->_impl = vcp;
         this->_impl->create(inputs, outputs, param, ctx);
-    }
 
-    if (_outConvRelu) {
-        delete _outConvRelu;
-        _outConvRelu = nullptr;
+        if (_outConvRelu) {
+            delete _outConvRelu;
+            _outConvRelu = nullptr;
+        }
     }
 
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE CREATE KERNEL";
@@ -198,6 +211,81 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
                           (PtrDtype)inputs[0]->data(),
                           (PtrDtype)outputs[0]->mutable_data(),
                           negative_slope);
+            }
+
+            if (!err) {
+                LOG(ERROR) << "Fail to set kernel args :" << err;
+                return SaberInvalidValue;
+            }
+
+            list.push_back(_kernels_ptr[i]);
+        } else if (_kernels_ptr[i].get()->GetName() == "conv1x1_act") {
+            if (isBias) {
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                          (PtrDtype)param.conv_param.weight()->data(),
+                          (PtrDtype)inputs[0]->data(),
+                          (PtrDtype)param.conv_param.bias()->data(),
+                          (PtrDtype)_outConvRelu->mutable_data(),
+                          negative_slope,
+                          (unsigned int)inputs[0]->channel(),
+                          (unsigned int)inputs[0]->height(),
+                          (unsigned int)inputs[0]->width(),
+                          (unsigned int)param.conv_param.weight()->num());
+            } else {
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                          (PtrDtype)param.conv_param.weight()->data(),
+                          (PtrDtype)inputs[0]->data(),
+                          (PtrDtype)_outConvRelu->mutable_data(),
+                          negative_slope,
+                          (unsigned int)inputs[0]->channel(),
+                          (unsigned int)inputs[0]->height(),
+                          (unsigned int)inputs[0]->width(),
+                          (unsigned int)param.conv_param.weight()->num());
+            }
+
+
+            if (!err) {
+                LOG(ERROR) << "Fail to set kernel args :" << err;
+                return SaberInvalidValue;
+            }
+
+            list.push_back(_kernels_ptr[i]);
+        } else if (_kernels_ptr[i].get()->GetName() == "mloPooling") {
+            if (needBias) {
+                if (isBias) {
+                    if (isActive) {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                                  (PtrDtype)_outConvRelu->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  (PtrDtype)param.conv_param.bias()->data(),
+                                  negative_slope,
+                                  (PtrDtype)0);
+                    } else {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                                  (PtrDtype)_outConvRelu->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  (PtrDtype)param.conv_param.bias()->data(),
+                                  (PtrDtype)0);
+                    }
+                } else {
+                    if (isActive) {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                                  (PtrDtype)_outConvRelu->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  negative_slope,
+                                  (PtrDtype)0);
+                    } else {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                                  (PtrDtype)_outConvRelu->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  (PtrDtype)0);
+                    }
+                }
+            } else {
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                          (PtrDtype)_outConvRelu->data(),
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (PtrDtype)0);
             }
 
             if (!err) {
