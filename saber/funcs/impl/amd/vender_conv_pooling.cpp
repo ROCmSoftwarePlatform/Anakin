@@ -22,6 +22,21 @@ namespace saber {
 typedef TargetWrapper<AMD> AMD_API;
 typedef Env<AMD> AMD_ENV;
 
+static bool isPoolAlign(int couv_out_w, int couv_out_h, const ConvPoolingParam<AMD>& params)
+{
+    int out_width  = couv_out_w;
+    int out_height = couv_out_h;
+    int kernel_size0 = params.pooling_param.window_w;
+    int kernel_size1 = params.pooling_param.window_h;
+    int kernel_stride0 = params.pooling_param.stride_w;
+    int kernel_stride1 = params.pooling_param.stride_h;
+    int pad0 = params.pooling_param.stride_w;
+    int pad1 = params.pooling_param.stride_h;
+
+    return ((out_width + 2 * pad0 - kernel_size0) % kernel_stride0 == 0)
+           && ((out_height + 2 * pad1 - kernel_size1) % kernel_stride1 == 0);
+}
+
 template <DataType OpDtype>
 SaberStatus VenderConv2DPooling<AMD, OpDtype>::init(
     const std::vector<Tensor<AMD>*>& inputs,
@@ -365,7 +380,8 @@ SaberStatus VenderConv2DPooling<AMD, OpDtype>::dispatch(
                     && param.pooling_param.stride_h == 2
                     && param.pooling_param.stride_w == 2
                     && param.pooling_param.pad_h == 0
-                    && param.pooling_param.pad_w == 0) {
+                    && param.pooling_param.pad_w == 0
+                    && isPoolAlign(_outConvRelu->width(), _outConvRelu->height(), param)) {
                 err                    = _kernels_ptr[i].get()->SetKernelArgs(
                                              (unsigned int)inputs[0]->num(),
                                              (unsigned int)inputs[0]->channel(),
