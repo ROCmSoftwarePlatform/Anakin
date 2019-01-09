@@ -83,7 +83,7 @@ SaberStatus SaberScale<AMD, OpDtype>::create(
         kernelInfo.wk_dim      = 1;
         kernelInfo.kernel_type = SABER;
         kernelInfo.l_wk        = {AMD_NUM_THREADS};
-        kernelInfo.g_wk = {(count / 4  + kernelInfo.l_wk[0] - 1) / kernelInfo.l_wk[0]* kernelInfo.l_wk[0]};
+        kernelInfo.g_wk        = {(count / 4  + kernelInfo.l_wk[0] - 1) / kernelInfo.l_wk[0]* kernelInfo.l_wk[0]};
 
         kernelInfo.kernel_name   = "Scale_singleBias_float4";
         _kernel_Scale_singleBias = CreateKernel(inputs[0]->device_id(), &kernelInfo);
@@ -94,12 +94,11 @@ SaberStatus SaberScale<AMD, OpDtype>::create(
         }
     } else {
         KernelInfo kernelInfo;
-        kernelInfo.kernel_file = "Scale.cl";
-        kernelInfo.wk_dim      = 1;
-        kernelInfo.kernel_type = SABER;
-        kernelInfo.l_wk        = {AMD_NUM_THREADS};
-        kernelInfo.g_wk = {(count  + kernelInfo.l_wk[0] - 1) / kernelInfo.l_wk[0]* kernelInfo.l_wk[0]};
-
+        kernelInfo.kernel_file   = "Scale.cl";
+        kernelInfo.wk_dim        = 1;
+        kernelInfo.kernel_type   = SABER;
+        kernelInfo.l_wk          = {AMD_NUM_THREADS};
+        kernelInfo.g_wk          = {(count  + kernelInfo.l_wk[0] - 1) / kernelInfo.l_wk[0] * kernelInfo.l_wk[0]};
         kernelInfo.kernel_name   = "Scale_singleBias";
         _kernel_Scale_singleBias = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
@@ -110,13 +109,13 @@ SaberStatus SaberScale<AMD, OpDtype>::create(
     }
 
     KernelInfo kernelInfo;
-    kernelInfo.kernel_file = "Scale.cl";
-    kernelInfo.wk_dim      = 1;
-    kernelInfo.kernel_type = SABER;
-    kernelInfo.l_wk        = {AMD_NUM_THREADS};
-    kernelInfo.g_wk = {(count / 4  + kernelInfo.l_wk[0] - 1) / kernelInfo.l_wk[0]* kernelInfo.l_wk[0]};
+    kernelInfo.kernel_file  = "Scale.cl";
+    kernelInfo.wk_dim       = 1;
+    kernelInfo.kernel_type  = SABER;
+    kernelInfo.l_wk         = {AMD_NUM_THREADS};
+    kernelInfo.g_wk         = {(count + kernelInfo.l_wk[0] - 1) / kernelInfo.l_wk[0] * kernelInfo.l_wk[0]};
     kernelInfo.kernel_name  = "Scale_multiBias";
-    kernelInfo.kernel_type = SABER;
+    kernelInfo.kernel_type  = SABER;
     _kernel_Scale_multiBias = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
     if (!_kernel_Scale_multiBias.get()->isInit()) {
@@ -147,8 +146,7 @@ SaberStatus SaberScale<AMD, OpDtype>::dispatch(
     }
 
     if (_scale_dim > 1 || inputs.size() > 1) { //_kernel_Scale_multiBias
-        OpDataType* scale_data =
-            inputs.size() > 1 ? (OpDataType*)inputs[1]->data() : (OpDataType*)_weight.data();
+        OpDataType* scale_data = inputs.size() > 1 ? (OpDataType*)inputs[1]->data() : (OpDataType*)_weight.data();
         OpDataType* bias_data = param.bias_term ? (OpDataType*)_bias.data() : (OpDataType*)NULL;
 
         if (bias_data == NULL) {

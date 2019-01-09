@@ -54,7 +54,8 @@ __kernel void Scale_multiBias(
     if (tid < count) {
         int scale_id = (tid / inner_dim) % scale_dim;
         float scale  = scale_data[scale_id];
-        out_data[tid] = (bias_flag == 1) ? scale * in_data[tid] + bias_data[scale_id] :  scale *
-                        in_data[tid];
+        out_data[tid] = (bias_flag == 1)
+                        ? scale * in_data[tid] + bias_data[scale_id]
+                          : scale * in_data[tid];
     }
 }
