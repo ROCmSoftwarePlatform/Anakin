@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2018 Advanced Micro Devices, Inc.
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
  *
  *******************************************************************************/
 
-#include "miopen/solver.hpp"
+//#include "miopen/solver.hpp"
 #include "miopen/solver_conv_common.hpp"
 
 namespace miopen {
@@ -90,29 +90,13 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
     const ConvolutionContext& params,
     const LegacyPerformanceConfig& searched_params) const {
     ConvSolution result;
-    int dev;
     // searched_params.CopyTo(result);
-
-    const auto dev_name = params.GetStream().GetDeviceName();
-
-    if (dev_name == "gfx803") {
-        dev = GFX803;
-    } else if (dev_name == "gfx900") {
-        dev = GFX900;
-    }
 
     ConvCommon cc;
     Conv1x1Type conv11_param;
     bool ret = cc.getKernelInfo(
-                   dev,
-                   params.batch_sz,
-                   params.kernel_stride0,
-                   params.n_inputs,
-                   params.in_width,
-                   params.n_outputs,
-                   conv11_param,
-                   params.has_pooling);
-
+                   params,
+                   conv11_param);
     KernelInfo kernelInfo;
 
     if (ret) {
@@ -337,6 +321,13 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
     } else {
         result.status = miopenStatusInternalError;
         ALOGE("can NOT get solution");
+    }
+
+    // Start to do pooling...
+    if (params.has_pooling
+            && (kernelInfo.kernel_name != "conv1x1_act_pool")
+            && (kernelInfo.kernel_name != "xGemm")) {
+        addPoolingKernel(params, result);
     }
 
     return result;

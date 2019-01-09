@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2018 Advanced Micro Devices, Inc.
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,41 +27,59 @@
 
 namespace miopen {
 
-bool ConvCommon::getKernelInfo(int dev, int batch, int stride, int channel, int width,
-                               int output_num, Conv1x1Type& mType, bool hasPooling) {
+bool ConvCommon::getKernelInfo(const ConvolutionContext& params, Conv1x1Type& mType) {
+    int dev;
+    const auto dev_name = params.GetStream().GetDeviceName();
+
+    if (dev_name == "gfx803") {
+        dev = GFX803;
+    } else if (dev_name == "gfx900") {
+        dev = GFX900;
+    }
 
     for (int i = 0; i < conv1x1type.size(); i++) {
-        if (conv1x1type[i].dev == dev && conv1x1type[i].batch == batch
-                && conv1x1type[i].stride == stride && (conv1x1type[i].channel == channel
-                        || conv1x1type[i].channel == 0)
-                && conv1x1type[i].width == width && conv1x1type[i].output_num == output_num && channel % 16 == 0) {
+        if (params.has_pooling && conv1x1type[i].fusion_pooling
+                && params.poolingContext.pooling_type == MLO_POOLING_OP_MAX
+                && params.poolingContext.kernel_size1 == 2
+                && params.poolingContext.kernel_size0 == 2
+                && params.poolingContext.pad1 == 0
+                && params.poolingContext.pad0 == 0
+                && params.poolingContext.kernel_stride1 == 2
+                && params.poolingContext.kernel_stride0 == 2
+                && conv1x1type[i].dev == dev && conv1x1type[i].batch == params.batch_sz
+                && conv1x1type[i].stride == params.kernel_stride0 && conv1x1type[i].channel == params.n_inputs
+                && conv1x1type[i].width == params.in_width && conv1x1type[i].output_num == params.n_outputs) {
 
-            if (hasPooling && (conv1x1type[i].kernel_name.find("Pool") != std::string::npos)) {
-                mType = conv1x1type[i];
-                ALOGD("Got kernel:" << mType.kernel_name << "!!");
-                return true;
-            } else if (conv1x1type[i].kernel_name.find("Pool") == std::string::npos) {
-                mType = conv1x1type[i];
-                ALOGD("Got kernel:" << mType.kernel_name << "!!");
-                return true;
-            }
+            mType = conv1x1type[i];
+            ALOGD("Got kernel:" << mType.kernel_name << "!!");
+            return true;
+        } else if (conv1x1type[i].dev == dev && conv1x1type[i].batch == params.batch_sz
+                   && conv1x1type[i].stride == params.kernel_stride0 && (conv1x1type[i].channel == params.n_inputs
+                           || conv1x1type[i].channel == 0)
+                   && conv1x1type[i].width == params.in_width && conv1x1type[i].output_num == params.n_outputs
+                   && params.n_inputs % 16 == 0) {
+
+            mType = conv1x1type[i];
+            ALOGD("Got kernel:" << mType.kernel_name << "!!");
+            return true;
         }
 
         if (conv1x1type[i].dev == dev
-                && ((conv1x1type[i].channel == channel && channel == 1024)
-                    || (conv1x1type[i].channel == channel && channel == 1280))
-                && (conv1x1type[i].output_num == output_num && output_num == 1000)
-                && (conv1x1type[i].stride == stride && stride == 1)
-                && (conv1x1type[i].width == width && width == 1)
-                && conv1x1type[i].batch >= batch) {
+                && ((conv1x1type[i].channel == params.n_inputs && params.n_inputs == 1024)
+                    || (conv1x1type[i].channel == params.n_inputs && params.n_inputs == 1280))
+                && (conv1x1type[i].output_num == params.n_outputs && params.n_outputs == 1000)
+                && (conv1x1type[i].stride == params.kernel_stride0 && params.kernel_stride0 == 1)
+                && (conv1x1type[i].width == params.in_width && params.in_width == 1)
+                && conv1x1type[i].batch >= params.batch_sz) {
             mType = conv1x1type[i];
             ALOGD("Got kernel:" << mType.kernel_name << "!!");
             return true;
         }
     }
 
-    if (batch < 32 && ((batch == 1 && stride == 1) || (width <= 14 && stride == 1)
-                       || (stride == 2))) {
+    if (params.batch_sz < 32 && ((params.batch_sz == 1 && params.kernel_stride0 == 1)
+                                 || (params.in_width <= 14 && params.kernel_stride0 == 1)
+                                 || (params.kernel_stride0 == 2))) {
         mType.kernel_name = "xGemm";
         ALOGD("Got kernel:" << mType.kernel_name << "!!");
         return true;
