@@ -50,7 +50,7 @@ void addPoolingKernel(const ConvolutionContext& params, ConvSolution& result) {
     kernel2.comp_options =
         std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(params.poolingContext.pooling_type)
         + std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(params.poolingContext.kernel_size0)
-        + std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(params.poolingContext.kernel_size0)
+        + std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(params.poolingContext.kernel_size1)
         + std::string(" -DMLO_POOLING_PAD0=") + std::to_string(params.poolingContext.pad0)
         + std::string(" -DMLO_POOLING_PAD1=") + std::to_string(params.poolingContext.pad1)
         + std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(params.poolingContext.kernel_stride0)

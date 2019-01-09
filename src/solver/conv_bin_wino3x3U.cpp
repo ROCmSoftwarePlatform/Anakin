@@ -32,6 +32,21 @@ MIOPEN_DECLARE_ENV_VAR(MIOPEN_DEBUG_AMD_WINOGRAD_3X3)
 namespace miopen {
 namespace solver {
 
+static bool isPoolAlign(const ConvolutionContext& params)
+{
+    int out_width  = params.out_width;
+    int out_height = params.out_height;
+    int kernel_size0 = params.poolingContext.kernel_size0;
+    int kernel_size1 = params.poolingContext.kernel_size1;
+    int kernel_stride0 = params.poolingContext.kernel_stride0;
+    int kernel_stride1 = params.poolingContext.kernel_stride1;
+    int pad0 = params.poolingContext.pad0;
+    int pad1 = params.poolingContext.pad1;
+
+    return ((out_width + 2 * pad0 - kernel_size0) % kernel_stride0 == 0)
+           && ((out_height + 2 * pad1 - kernel_size1) % kernel_stride1 == 0);
+}
+
 bool ConvBinWinograd3x3U::IsApplicable(const ConvolutionContext& params) const {
     if (!params.use_binaries) {
         return false;
@@ -123,35 +138,9 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
         } else if (params.rmv == rocm_meta_version::AMDHSA_1_0) {
             if (params.has_active && params.bias) {
                 if (params.kernel_stride0 == 1) {
-                    if ((params.n_inputs == 128 && params.n_outputs == 128
-                         && params.in_height == 28 && params.in_width == 28 && params.batch_sz == 1)
-                       || (params.n_inputs == 1024 && params.n_outputs == 1024
-                         && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 2)
-                       || (params.n_inputs == 512 && params.n_outputs == 512
-                         && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 4)
-                       || (params.n_inputs == 512 && params.n_outputs == 512
-                         && params.in_height == 14 && params.in_width == 14 && params.batch_sz == 1)
-                       || (params.n_inputs == 256 && params.n_outputs == 256
-                         && params.in_height == 14 && params.in_width == 14 && params.batch_sz <= 2)
-                       || (params.n_outputs == 384 && params.in_height == 13
-                         && params.in_width == 13 && params.batch_sz <= 1)
-                       || (params.n_outputs == 128 && params.in_height == 6
-                         && params.in_width == 64 && params.batch_sz <= 2)
-                       || (params.n_outputs == 64 && params.in_height == 12
-                         && params.in_width == 128 && params.batch_sz <= 1)) {
-                        //todo: remove n_inputs = n_outputs
-                        kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_sw.so";
-                    } else {
-                        kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu.so";
-                    }
-                } else if (params.kernel_stride0 == 2) {
-                    kernel.kernel_file =   "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_stride2.so"
-                                           ;
-                } else {
-                    return result;
-                }
-
-                if (params.has_pooling && params.kernel_stride0 == 1
+                    if (params.has_pooling
+                        && isPoolAlign(params)
+                        && params.kernel_stride0 == 1
                         && params.poolingContext.pooling_type == 1 //Pooling_max
                         && params.poolingContext.kernel_size0 == 2
                         && params.poolingContext.kernel_size1 == 2
@@ -159,7 +148,32 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
                         && params.poolingContext.kernel_stride1 == 2
                         && params.poolingContext.pad0 == 0
                         && params.poolingContext.pad1 == 0) {
-                    kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_pooling.so";
+                        kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_pooling.so";
+                    } else if ((params.n_inputs == 128 && params.n_outputs == 128
+                                && params.in_height == 28 && params.in_width == 28 && params.batch_sz == 1)
+                               || (params.n_inputs == 1024 && params.n_outputs == 1024
+                                && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 2)
+                               || (params.n_inputs == 512 && params.n_outputs == 512
+                                && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 4)
+                               || (params.n_inputs == 512 && params.n_outputs == 512
+                                && params.in_height == 14 && params.in_width == 14 && params.batch_sz == 1)
+                               || (params.n_inputs == 256 && params.n_outputs == 256
+                                && params.in_height == 14 && params.in_width == 14 && params.batch_sz <= 2)
+                               || (params.n_outputs == 384 && params.in_height == 13
+                                && params.in_width == 13 && params.batch_sz <= 1)
+                               || (params.n_outputs == 128 && params.in_height == 6
+                                && params.in_width == 64 && params.batch_sz <= 2)
+                               || (params.n_outputs == 64 && params.in_height == 12
+                                && params.in_width == 128 && params.batch_sz <= 1)) {
+                        //todo: remove n_inputs = n_outputs
+                        kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_sw.so";
+                    } else {
+                        kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu.so";
+                    }
+                } else if (params.kernel_stride0 == 2) {
+                    kernel.kernel_file =   "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_stride2.so";
+                } else {
+                    return result;
                 }
             } else if (params.has_active && !params.bias) {
                 if (params.kernel_stride0 == 1) {
