@@ -66,8 +66,7 @@ __kernel void Col2Im(global _FLOAT* col,
                      const int height,
                      const int width,
                      global _FLOAT* im,
-                     size_t im_offset)
-{
+                     const int im_offset) {
     global _FLOAT* im_off = im + im_offset;
     int gid               = (int)get_global_id(0);
 
@@ -77,24 +76,22 @@ __kernel void Col2Im(global _FLOAT* col,
     int im_w   = (im_pix % width) + pad_w;
 
     int start_h = (im_h < dilation_h * (wei_h - 1) + 1)
-                      ? 0
-                      : (im_h - (dilation_h * (wei_h - 1) + 1)) / stride_h + 1;
+                  ? 0
+                  : (im_h - (dilation_h * (wei_h - 1) + 1)) / stride_h + 1;
     int end_h   = min(col_h, im_h / stride_h + 1);
     int start_w = (im_w < dilation_w * (wei_w - 1) + 1)
-                      ? 0
-                      : (im_w - (dilation_w * (wei_w - 1) + 1)) / stride_w + 1;
+                  ? 0
+                  : (im_w - (dilation_w * (wei_w - 1) + 1)) / stride_w + 1;
     int end_w = min(col_w, im_w / stride_w + 1);
 
     int ch_offset = im_ch * col_w * col_h * wei_w * wei_h;
     col += ch_offset;
 
     _FLOAT tmp = (_FLOAT)0.0f;
-    for(int cy = start_h; cy < end_h; cy++)
-    {
-        for(int cx = start_w; cx < end_w; cx++)
-        {
-            if((im_h - cy * stride_h) % dilation_h == 0 && (im_w - cx * stride_w) % dilation_w == 0)
-            {
+
+    for (int cy = start_h; cy < end_h; cy++) {
+        for (int cx = start_w; cx < end_w; cx++) {
+            if ((im_h - cy * stride_h) % dilation_h == 0 && (im_w - cx * stride_w) % dilation_w == 0) {
                 int col_off_y = cy + (((im_h - cy * stride_h) / dilation_h) * wei_w * col_h);
                 int col_off_x = cx + (((im_w - cx * stride_w) / dilation_w) * col_w * col_h);
 
@@ -102,6 +99,7 @@ __kernel void Col2Im(global _FLOAT* col,
             }
         }
     }
+
     im_off[gid] = tmp;
 }
 __kernel void
@@ -164,6 +162,7 @@ Col2ImBiasRelu(global float* col,
 
     if (isBias) {
         tmp = tmp + bias[(gid % (C * height * width)) / (height * width)];
+
         if (relu_flag) {
             tmp = tmp * (tmp > 0.0f ? 1.0f : slope);
         }
@@ -172,6 +171,7 @@ Col2ImBiasRelu(global float* col,
             tmp = tmp * (tmp > 0.0f ? 1.0f : slope);
         }
     }
+
     im_off[gid] = tmp;
 
 }
