@@ -37,14 +37,15 @@ SaberStatus SaberResize<AMD, OpDtype>::create(
     ResizeParam<AMD>& param,
     Context<AMD>& ctx) {
 
+    int works = (outputs[0]->size() + 255) / 256 * 256;
+
     KernelInfo kernelInfo;
-    kernelInfo.wk_dim      = 2;
-    kernelInfo.l_wk        = {8, 8};
-    kernelInfo.g_wk        = {(outputs[0]->width() + 8 - 1) / 8 * 8,
-                              (outputs[0]->height() + 8 - 1) / 8 * 8
-                             };
-    kernelInfo.kernel_file = "Resize.cl";
-    kernelInfo.kernel_name = "resize_2d_kernel";
+    kernelInfo.wk_dim       = 3;
+    kernelInfo.l_wk         = {256, 1, 1};
+    kernelInfo.g_wk         = {works, 1, 1};
+    kernelInfo.kernel_file  = "Resize.cl";
+    kernelInfo.kernel_name  = "resize_2D";
+    kernelInfo.comp_options = kernelInfo.comp_options + " -DRESIZE_TYPE=" + std::to_string(param.resize_type);
 
     AMDKernelPtr kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
@@ -108,65 +109,79 @@ SaberStatus SaberResize<AMD, OpDtype>::dispatch(
         dst_real_shape = outputs[0]->shape();
     }
 
-    int src_stride_w = src_real_shape.count(width_idx + 1); // inputs[0]->count(width_idx + 1,
-    // dims);
-    int src_stride_h =
-        src_real_shape.count(height_idx + 1); // inputs[0]->count(height_idx + 1, dims);
-    int src_stride_channel =
-        src_real_shape.count(channel_idx + 1); // inputs[0]->count(channel_idx + 1, dims);
-    int src_stride_batch = src_real_shape.count(num_idx + 1); // inputs[0]->count(num_idx + 1,
-    // dims);
-    int dst_stride_w =
-        dst_real_shape.count(width_idx + 1); // outputs[0]->count(width_idx + 1, dims);
-    int dst_stride_h =
-        dst_real_shape.count(height_idx + 1); // outputs[0]->count(height_idx + 1, dims);
-    int dst_stride_channel =
-        dst_real_shape.count(channel_idx + 1); // outputs[0]->count(channel_idx + 1, dims);
-    int dst_stride_batch =
-        dst_real_shape.count(num_idx + 1); // outputs[0]->count(num_idx + 1, dims);
+    int src_stride_w       = src_real_shape.count(width_idx + 1); // inputs[0]->count(width_idx + 1, // dims);
+    int src_stride_h       = src_real_shape.count(height_idx + 1); // inputs[0]->count(height_idx + 1, dims);
+    int src_stride_channel = src_real_shape.count(channel_idx + 1); // inputs[0]->count(channel_idx + 1, dims);
+    int src_stride_batch   = src_real_shape.count(num_idx + 1); // inputs[0]->count(num_idx + 1,// dims);
 
-    printf("w_out:%d, h_out:%d, c_out:%d, n_out:%d\n", w_out, h_out, c_out, n_out);
-    printf("w_in:%d, h_in:%d, c_in:%d, n_in:%d\n", w_in, h_in, c_in, n_in);
+    int dst_stride_w       = dst_real_shape.count(width_idx + 1); // outputs[0]->count(width_idx + 1, dims);
+    int dst_stride_h       = dst_real_shape.count(height_idx + 1); // outputs[0]->count(height_idx + 1, dims);
+    int dst_stride_channel = dst_real_shape.count(channel_idx + 1); // outputs[0]->count(channel_idx + 1, dims);
+    int dst_stride_batch   = dst_real_shape.count(num_idx + 1); // outputs[0]->count(num_idx + 1, dims);
 
-    bool err = false;
+    LOG(INFO) << "In N C H W" << n_in << " " << c_in << " " << h_in << " " << w_in;
+    LOG(INFO) << "Out N C H W" << n_out << " " << n_out << " " << h_out << " " << w_out;
 
-    for (int i = 0; i < n_out; ++i) {
-        err = kernel->SetKernelArgs(
-                  (int)w_out,
-                  (int)h_out,
-                  (int)n_out,
-                  (int)c_out,
-                  (int)dst_stride_w,
-                  (int)dst_stride_h,
-                  (int)dst_stride_channel,
-                  (int)dst_stride_batch,
-                  (int)w_in,
-                  (int)h_in,
-                  (int)src_stride_w,
-                  (int)src_stride_h,
-                  (int)src_stride_channel,
-                  (int)src_stride_batch,
-                  (float)(1 / param.width_scale),
-                  (float)(1 / param.height_scale),
-                  (PtrDtype)inputs[0]->data(),
-                  (PtrDtype)outputs[0]->mutable_data());
+    bool err {false};
+    float h_scale {1.0f};
+    float w_scale {1.0f};
 
-        if (!err) {
-            LOG(ERROR) << "Failed to set kernel args";
-            return SaberInvalidValue;
-        }
-
-        amd_kernel_list list;
-        list.push_back(_kernel_ptr);
-        err = LaunchKernel(cm, list);
-
-        if (!err) {
-            LOG(ERROR) << "Failed to set execution";
-            return SaberInvalidValue;
-        }
-
-        LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE EXECUTION";
+    switch (param.resize_type)
+    {
+        case BILINEAR_ALIGN:
+        {
+            h_scale = ((float)(h_in - 1)) / (h_out - 1);
+            w_scale = ((float)(w_in - 1)) / (w_out - 1);
+        } break;
+        case BILINEAR_NO_ALIGN:
+        {
+            h_scale = ((float)h_in) / h_out;
+            w_scale = ((float)w_in) / w_out;
+        } break;
+        case RESIZE_CUSTOM:
+        {
+            h_scale = 1.0f / param.height_scale;
+            w_scale = 1.0f / param.width_scale;
+        } break;
+        default:
+            LOG(INFO) << "errorr: invalid Resize Type";
     }
+
+    err = kernel->SetKernelArgs(
+        (PtrDtype)inputs[0]->data(),
+        (PtrDtype)outputs[0]->mutable_data(),
+        n_in,
+        c_in,
+        h_in,
+        w_in,
+        h_out,
+        w_out,
+        src_stride_batch,
+        src_stride_channel,
+        src_stride_h,
+        src_stride_w,
+        dst_stride_batch,
+        dst_stride_channel,
+        dst_stride_h,
+        dst_stride_w,
+        h_scale,
+        w_scale);
+
+    if (!err) {
+        LOG(ERROR) << "Failed to set kernel args";
+        return SaberInvalidValue;
+    }
+
+    amd_kernel_list list;
+    list.push_back(_kernel_ptr);
+    err = LaunchKernel(cm, list);
+
+    if (!err) {
+        LOG(ERROR) << "Failed to set execution";
+        return SaberInvalidValue;
+    }
+
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE EXECUTION";
 
     return SaberSuccess;
 }

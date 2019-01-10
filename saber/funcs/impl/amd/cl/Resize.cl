@@ -12,107 +12,95 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-__kernel void resize_2d_kernel(
-    const int wout,
-    const int hout,
-    const int num,
-    const int channels,
-    const int dst_stride_w,
-    const int dst_stride_h,
-    const int dst_stride_c,
-    const int dst_stride_batch,
-    const int win,
-    const int hin,
-    const int src_stride_w,
-    const int src_stride_h,
-    const int src_stride_c,
-    const int src_stride_batch,
-    const float scale_w,
-    const float scale_h,
-    global const float* src,
-    global float* dst) {
-    int local_idx   = get_local_id(0);
-    int local_idy   = get_local_id(1);
-    int group_idx   = get_group_id(0);
-    int group_idy   = get_group_id(1);
-    int local_sizex = get_local_size(0);
-    int local_sizey = get_local_size(1);
-    int dst_w       = group_idx * local_sizex + local_idx;
-    int dst_h       = group_idy * local_sizey + local_idy;
 
-    if (dst_w < wout && dst_h < hout) {
-#if 0 //! more precise method
-        float fw = scale_w * (dst_w + 0.5f) - 0.5f;
-        float fh = scale_h * (dst_h + 0.5f) - 0.5f;
-        int src_w = int(floor(fw));
-        int w = src_w + 1;
-        int src_h = int(floor(fh));
-        int h = src_h + 1;
-#else
-        float fh        = scale_h * dst_h;
-        float fw        = scale_w * dst_w;
-        const int src_h = (int)fh;
-        const int src_w = (int)fw;
-        int w           = src_w + 1;
-        int h           = src_h + 1;
+#ifndef RESIZE_TYPE
+#define RESIZE_TYPE RESIZE_CUSTOM
 #endif
-        fh -= src_h;
-        fw -= src_w;
-        const float w_h0 = 1.0f - fh;
-        const float w_w0 = 1.0f - fw;
-        const float w_h1 = fh;
-        const float w_w1 = fw;
 
-        float w_00 = w_h0 * w_w0;
-        float w_01 = w_h0 * w_w1;
-        float w_10 = w_h1 * w_w0;
-        float w_11 = w_h1 * w_w1;
+#define BILINEAR_ALIGN 0
+#define BILINEAR_NO_ALIGN 1
+#define RESIZE_CUSTOM 2
 
-        int hl = src_h * src_stride_h;
-        int hh = h * src_stride_h;
-        int wl = src_w * src_stride_w;
-        int wh = w * src_stride_w;
+__kernel void resize_2D(
+            global const float* src,
+            global float* dst,
+            const int num,
+            const int channel,
+            const int height_in,
+            const int width_in,
+            const int height_out,
+            const int width_out,
+            const int src_stride_batch,
+            const int src_stride_c,
+            const int src_stride_h,
+            const int src_stride_w,
+            const int dst_stride_batch,
+            const int dst_stride_c,
+            const int dst_stride_h,
+            const int dst_stride_w,
+            const float scale_h,
+            const float scale_w)
+{
+    int index = get_global_id(0);
 
-        int src_indexTL = hl + wl;
-        int src_indexTR = hl + wh;
-        int src_indexBL = hh + wl;
-        int src_indexBR = hh + wh;
+    if (index >= num * channel * height_out * width_out)
+        return;
 
-        int dst_index = dst_w * dst_stride_w + dst_h * dst_stride_h;
-#if 1
+    int n = index / width_out / height_out / channel;
+    int c = (index / width_out / height_out) % channel;
+    int h = (index / width_out) % height_out;
+    int w = index % width_out;
 
-        // for (int i = 0; i < num; ++i) {
-        for (int j = 0; j < channels; ++j) {
-#if 0
-            float tl = src[src_indexTL];
-            float tr = w > win ? 0 : src[1];
-            float bl = h > hin ? 0 : src[2];
-            float br = (w > win || h > hin) ? 0 : src[3];
-#else
-#if 0
-            float tl = (src_w < 0 || src_h < 0) ? 0 : src[src_indexTL];
-            float tr = (w > win || src_h < 0) ? 0 : src[src_indexTR];
-            float bl = (src_w < 0 || h > hin) ? 0 : src[src_indexBL];
-            float br = (w > win || h > hin) ? 0 : src[src_indexBR];
-#else
-            float tl = src[src_indexTL];
-            float tr = w >= win ? 0 : src[src_indexTR];               // w > win? 0 :
-            float bl = h >= hin ? 0 : src[src_indexBL];               // h > hin? 0 :
-            float br = (w >= win || h >= hin) ? 0 : src[src_indexBR]; //(w > win || h > hin)? 0 :
+#if RESIZE_TYPE == BILINEAR_ALIGN
+    float fh = h * scale_h;
+    float fw = w * scale_w;
+
+    int h_start = (int) fh;
+    int h_id    = (h_start < height_in - 1) ? 1 : 0;
+    int h_end   = h_start + h_id;
+
+    int w_start = (int) fw;
+    int w_in    = (w_start < width_in - 1) ? 1 : 0;
+    int w_end   = w_start + w_in;
+#elif RESIZE_TYPE == BILINEAR_NO_ALIGN
+    float fh = scale_h * (h + 0.5f) - 0.5f;
+    fh = (fh < 0.0f) ? 0.0f : fh;
+    float fw = scale_w * (w + 0.5f) - 0.5f;
+    fw = (fw < 0.0f) ? 0.0f : fw;
+
+    int h_start = (int) fh;
+    int h_id    = (h_start < height_in - 1) ? 1 : 0;
+    int h_end   = h_start + h_id;
+
+    int w_start = (int) fw;
+    int w_in    = (w_start < width_in - 1) ? 1 : 0;
+    int w_end   = w_start + w_in;
+#elif RESIZE_TYPE == RESIZE_CUSTOM
+    float fh = h * scale_h;
+    float fw = w * scale_w;
+
+    int h_start = (int) fh;
+    int h_end   = h_start + 1;
+
+    int w_start = (int) fw;
+    int w_end   = w_start + 1;
 #endif
-#endif
-            dst[dst_index] = (float)(w_00 * tl + w_01 * tr + w_10 * bl + w_11 * br);
-            src_indexBR += src_stride_c;
-            src_indexBL += src_stride_c;
-            src_indexTR += src_stride_c;
-            src_indexTL += src_stride_c;
-            dst_index += dst_stride_c;
-        }
 
-        //}
-#endif
-    }
+    int nc_offset = n * src_stride_batch + c * src_stride_c;
+    float tl = src[nc_offset + h_start * src_stride_h + w_start * src_stride_w];
+    float tr = (w_end >= width_in ) ? 0 : src[nc_offset + h_start * src_stride_h + w_end * src_stride_w];
+    float bl = (h_end >= height_in) ? 0 : src[nc_offset + h_end   * src_stride_h + w_start * src_stride_w];
+    float br = ((w_end >= width_in ) || (h_end >= height_in)) ? 0 : src[nc_offset + h_end * src_stride_h + w_end * src_stride_w];
+
+    fh = fh - h_start;
+    fw = fw - w_start;
+
+    const float w00 = (1.0f - fh) * (1.0f - fw);
+    const float w01 = fw * (1.0f - fh);
+    const float w10 = fh * (1.0f - fw);
+    const float w11 = fw * fh;
+
+    int dst_index = n * dst_stride_batch + c * dst_stride_c + h * dst_stride_h + w * dst_stride_w;
+    dst[dst_index] = w00 * tl + w01 * tr + w10 * bl + w11 * br;
 }
 
-// local = 8, 8, 1
-// global = (w_out + 8 - 1), (h_out + 8 - 1), 1
