@@ -1,3 +1,18 @@
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 #include "framework/operators/fusion_ops/deconv_batchnorm_scale_relu.h"
 
 namespace anakin {
@@ -37,8 +52,8 @@ Status DeconvBatchnormScaleReluHelper<Ttype, Ptype>::InitParam() {
     auto filter_num = GET_PARAMETER(int, filter_num);
     auto kernel_size = GET_PARAMETER(PTuple<int>, kernel_size);
     auto axis = GET_PARAMETER(int, axis);
-	
-	using pblock_type = PBlock<Ttype>;
+
+    using pblock_type = PBlock<Ttype>;
     auto weights = GET_PARAMETER(pblock_type, weight_1);
     auto weights_shape = weights.shape();
     auto weights_dtype = weights.h_tensor().get_dtype();
@@ -67,23 +82,25 @@ Status DeconvBatchnormScaleReluHelper<Ttype, Ptype>::InitParam() {
     auto alpha = GET_PARAMETER(float, relu_0_alpha);
     ActivationParam<Ttype> active_param(Active_relu);//, alpha); // TEMP
 
-    if(bias_term) {
+    if (bias_term) {
         auto bias = GET_PARAMETER(pblock_type, weight_2);
+
         if (weights_dtype == AK_FLOAT) {
             graph::GraphGlobalMem<Ttype>::Global().template apply<Level_0>(
-                    WeightsFusion<float, Ttype>::update_deconv_weights,
-                    weights, bias,
-                    weights_shape[0], weights_shape[1], weights_shape[2], weights_shape[3],
-                    true,
-                    batch_norm_weight_3_vector[0], epsilon,
-                    batch_norm_weight_1_vector,
-                    batch_norm_weight_2_vector,
-                    scale_weight_1_vector,
-                    scale_weight_2_vector,
-                    scale_bias_term);
-        }else {
+                WeightsFusion<float, Ttype>::update_deconv_weights,
+                weights, bias,
+                weights_shape[0], weights_shape[1], weights_shape[2], weights_shape[3],
+                true,
+                batch_norm_weight_3_vector[0], epsilon,
+                batch_norm_weight_1_vector,
+                batch_norm_weight_2_vector,
+                scale_weight_1_vector,
+                scale_weight_2_vector,
+                scale_bias_term);
+        } else {
             // fixme
         }
+
         saber::ConvParam<Ttype> conv_param(group, padding[0], padding[1],
                                            strides[0], strides[1],
                                            dilation_rate[0], dilation_rate[1],
@@ -92,21 +109,23 @@ Status DeconvBatchnormScaleReluHelper<Ttype, Ptype>::InitParam() {
         _param_deconv_batchnorm_scale_relu = conv_param;
     } else {
         pblock_type* bias = new pblock_type();
+
         if (weights_dtype == AK_FLOAT) {
             graph::GraphGlobalMem<Ttype>::Global().template apply<Level_0>(
-                    WeightsFusion<float, Ttype>::update_deconv_weights,
-                    weights, *bias,
-                    weights_shape[0], weights_shape[1], weights_shape[2], weights_shape[3],
-                    false,
-                    batch_norm_weight_3_vector[0], epsilon,
-                    batch_norm_weight_1_vector,
-                    batch_norm_weight_2_vector,
-                    scale_weight_1_vector,
-                    scale_weight_2_vector,
-                    scale_bias_term);
-        } else{
+                WeightsFusion<float, Ttype>::update_deconv_weights,
+                weights, *bias,
+                weights_shape[0], weights_shape[1], weights_shape[2], weights_shape[3],
+                false,
+                batch_norm_weight_3_vector[0], epsilon,
+                batch_norm_weight_1_vector,
+                batch_norm_weight_2_vector,
+                scale_weight_1_vector,
+                scale_weight_2_vector,
+                scale_bias_term);
+        } else {
             // fixme
         }
+
         saber::ConvParam<Ttype> conv_param(group, padding[0], padding[1],
                                            strides[0], strides[1],
                                            dilation_rate[0], dilation_rate[1],
@@ -114,7 +133,7 @@ Status DeconvBatchnormScaleReluHelper<Ttype, Ptype>::InitParam() {
                                            active_param);
         _param_deconv_batchnorm_scale_relu = conv_param;
     }
-  
+
     return Status::OK();
 }
 
@@ -125,10 +144,10 @@ Status DeconvBatchnormScaleReluHelper<Ttype, Ptype>::Init(OpContext<Ttype>& ctx,
     if (_param_deconv_batchnorm_scale_relu.group == ins[0]->channel() && \
             _param_deconv_batchnorm_scale_relu.group == outs[0]->channel()) {
         _funcs_deconv_batchnorm_scale_relu.init(ins, outs, _param_deconv_batchnorm_scale_relu, SPECIFY,
-                                              SABER_IMPL, ctx);
+                                                SABER_IMPL, ctx);
     } else {
         _funcs_deconv_batchnorm_scale_relu.init(ins, outs, _param_deconv_batchnorm_scale_relu, SPECIFY,
-                                              SABER_IMPL, ctx);
+                                                SABER_IMPL, ctx);
     }
 
     //_funcs_deconv_batchnorm_scale_relu.init(ins, outs, _param_deconv_batchnorm_scale_relu, SPECIFY, VENDER_IMPL, ctx);
@@ -139,7 +158,8 @@ template<typename Ttype, Precision Ptype>
 Status DeconvBatchnormScaleReluHelper<Ttype, Ptype>::InferShape(const
         std::vector<Tensor4dPtr<Ttype> >& ins,
         std::vector<Tensor4dPtr<Ttype> >& outs) {
-    _funcs_deconv_batchnorm_scale_relu.compute_output_shape(ins, outs, _param_deconv_batchnorm_scale_relu);
+    _funcs_deconv_batchnorm_scale_relu.compute_output_shape(ins, outs,
+            _param_deconv_batchnorm_scale_relu);
     return Status::OK();
 }
 
@@ -156,17 +176,26 @@ template class DeconvBatchnormScaleReluHelper<ARM, Precision::INT8>;
 #endif
 #ifdef USE_X86_PLACE
 INSTANCE_DECONVBATCHNORMSCALERELU(X86, Precision::FP32);
-ANAKIN_REGISTER_OP_HELPER(DeconvBatchnormScaleRelu, DeconvBatchnormScaleReluHelper, X86, Precision::FP32);
+ANAKIN_REGISTER_OP_HELPER(DeconvBatchnormScaleRelu, DeconvBatchnormScaleReluHelper, X86,
+                          Precision::FP32);
 #endif
 
 // register helper
 #ifdef USE_CUDA
 INSTANCE_DECONVBATCHNORMSCALERELU(NV, Precision::FP32);
-ANAKIN_REGISTER_OP_HELPER(DeconvBatchnormScaleRelu, DeconvBatchnormScaleReluHelper, NV, Precision::FP32);
+ANAKIN_REGISTER_OP_HELPER(DeconvBatchnormScaleRelu, DeconvBatchnormScaleReluHelper, NV,
+                          Precision::FP32);
 #endif
 
 #ifdef USE_ARM_PLACE
-ANAKIN_REGISTER_OP_HELPER(DeconvBatchnormScaleRelu, DeconvBatchnormScaleReluHelper, ARM, Precision::FP32);
+ANAKIN_REGISTER_OP_HELPER(DeconvBatchnormScaleRelu, DeconvBatchnormScaleReluHelper, ARM,
+                          Precision::FP32);
+#endif
+
+#ifdef AMD_GPU
+INSTANCE_DECONVBATCHNORMSCALERELU(AMD, Precision::FP32);
+ANAKIN_REGISTER_OP_HELPER(DeconvBatchnormScaleRelu, DeconvBatchnormScaleReluHelper, AMD,
+                          Precision::FP32);
 #endif
 
 //! register op
@@ -179,24 +208,24 @@ ANAKIN_REGISTER_OP(DeconvBatchnormScaleRelu)
 .__alias__<ARM, Precision::FP32>("convolution_batchnorm_scale_relu")
 #endif
 #ifdef AMD_GPU
-//.__alias__<AMD, Precision::FP32>("convolution_batchnorm_scale_relu")
+.__alias__<AMD, Precision::FP32>("convolution_batchnorm_scale_relu")
 #endif
 .num_in(1)
 .num_out(1)
 .Args<int>("group", " group of conv ")
 .Args<bool>("bias_term", " whether conv weights have bias")
 .Args<PTuple<int>>("padding", "padding of conv (x, y)")
-.Args<PTuple<int>>("strides", "strides of conv (x)")
-.Args<PTuple<int>>("dilation_rate", "dilation rate of conv (x)")
-.Args<int>("filter_num", "filter(kernel) number of weights")
-.Args<PTuple<int>>("kernel_size", "kernel size of kernel (x, y)")
-.Args<int>("axis", "axis of conv")
-.Args<float>("relu_0_alpha", " alpha for relu")
-.Args<int>("scale_0_num_axes", " num axes for scale")
-.Args<bool>("scale_0_bias_term", "whether scale has bias")
-.Args<int>("scale_0_axis", "axis for scale")
-.Args<float>("batchnorm_0_epsilon", "epsilon for batchnorm")
-.Args<float>("batchnorm_0_momentum", "momentum for batchnorm");
+                .Args<PTuple<int>>("strides", "strides of conv (x)")
+                .Args<PTuple<int>>("dilation_rate", "dilation rate of conv (x)")
+                .Args<int>("filter_num", "filter(kernel) number of weights")
+                .Args<PTuple<int>>("kernel_size", "kernel size of kernel (x, y)")
+                .Args<int>("axis", "axis of conv")
+                .Args<float>("relu_0_alpha", " alpha for relu")
+                .Args<int>("scale_0_num_axes", " num axes for scale")
+                .Args<bool>("scale_0_bias_term", "whether scale has bias")
+                .Args<int>("scale_0_axis", "axis for scale")
+                .Args<float>("batchnorm_0_epsilon", "epsilon for batchnorm")
+                .Args<float>("batchnorm_0_momentum", "momentum for batchnorm");
 
 } /* namespace ops */
 

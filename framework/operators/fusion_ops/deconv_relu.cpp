@@ -1,3 +1,18 @@
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 #include "framework/operators/fusion_ops/deconv_relu.h"
 
 namespace anakin {
@@ -38,11 +53,11 @@ Status DeconvReluHelper<Ttype, Ptype>::InitParam() {
     auto filter_num = GET_PARAMETER(int, filter_num);
     auto kernel_size = GET_PARAMETER(PTuple<int>, kernel_size);
     auto axis = GET_PARAMETER(int, axis);
-    
-	using pblock_type = PBlock<Ttype>;
+
+    using pblock_type = PBlock<Ttype>;
     auto weights = GET_PARAMETER(pblock_type, weight_1);
     // fixme, resize deconv weights scale
-    
+
     // get relu param
     auto alpha = GET_PARAMETER(float, relu_0_alpha);
     ActivationParam<Ttype> active_param(Active_relu);//, alpha); // TEMP
@@ -50,18 +65,18 @@ Status DeconvReluHelper<Ttype, Ptype>::InitParam() {
     if (bias_term) {
         auto bias = GET_PARAMETER(pblock_type, weight_2);
         saber::ConvParam<Ttype> conv_param(group, padding[0], padding[1],
-                                              strides[0], strides[1],
-                                              dilation_rate[0], dilation_rate[1],
-                                              &(weights.d_tensor()), &(bias.d_tensor()),
-                                              active_param);
+                                           strides[0], strides[1],
+                                           dilation_rate[0], dilation_rate[1],
+                                           &(weights.d_tensor()), &(bias.d_tensor()),
+                                           active_param);
         _param_deconv_relu = conv_param;
     } else {
         Tensor4d<Ttype>* bias = new Tensor4d<Ttype>();;
         saber::ConvParam<Ttype> conv_param(group, padding[0], padding[1],
-                                              strides[0], strides[1],
-                                              dilation_rate[0], dilation_rate[1],
-                                              &(weights.d_tensor()), bias,
-                                              active_param);
+                                           strides[0], strides[1],
+                                           dilation_rate[0], dilation_rate[1],
+                                           &(weights.d_tensor()), bias,
+                                           active_param);
         _param_deconv_relu = conv_param;
     }
 
@@ -125,6 +140,13 @@ template class DeconvReluHelper<ARM, Precision::FP16>;
 template class DeconvReluHelper<ARM, Precision::INT8>;
 #endif
 
+#ifdef AMD_GPU
+INSTANCE_DECONVRELU(AMD, Precision::FP32)
+template class DeconvReluHelper<AMD, Precision::FP32>;
+template class DeconvReluHelper<AMD, Precision::FP16>;
+template class DeconvReluHelper<AMD, Precision::INT8>;
+#endif
+
 // register helper
 #ifdef USE_CUDA
 ANAKIN_REGISTER_OP_HELPER(DeconvRelu, DeconvReluHelper, NV, Precision::FP32);
@@ -137,6 +159,11 @@ INSTANCE_DECONVRELU(X86, Precision::FP32)
 template class DeconvReluHelper<X86, Precision::FP32>;
 ANAKIN_REGISTER_OP_HELPER(DeconvRelu, DeconvReluHelper, X86, Precision::FP32);
 #endif
+
+#ifdef AMD_GPU
+ANAKIN_REGISTER_OP_HELPER(DeconvRelu, DeconvReluHelper, AMD, Precision::FP32);
+#endif
+
 //! register op
 ANAKIN_REGISTER_OP(DeconvRelu)
 .Doc("DeconvRelu operator")
@@ -147,7 +174,7 @@ ANAKIN_REGISTER_OP(DeconvRelu)
 .__alias__<ARM, Precision::FP32>("deconv_relu")
 #endif
 #ifdef AMD_GPU
-//.__alias__<AMD, Precision::FP32>("deconv_relu")
+.__alias__<AMD, Precision::FP32>("deconv_relu")
 #endif
 .num_in(1)
 .num_out(1)
