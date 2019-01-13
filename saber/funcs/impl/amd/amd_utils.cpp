@@ -270,8 +270,7 @@ void transpose_NCHW2CNHW(AMDKernelPtr& kptr,
         kernelInfo.comp_options += " -DN=" + std::to_string(n);
         kernelInfo.comp_options += " -DC=" + std::to_string(c);
         kernelInfo.comp_options += " -DHW_IN=" + std::to_string(h_in * w_in);
-        //kernelInfo.comp_options += " -DHW_OUT=" + std::to_string(h_out * w_out);
-        kernelInfo.comp_options += " -DHW_OUT=" + std::to_string((h_in / h_stride) * (w_in / w_stride));
+        kernelInfo.comp_options += " -DHW_OUT=" + std::to_string(h_out * w_out);
         kernelInfo.comp_options += " -DW_IN=" + std::to_string(w_in);
         kernelInfo.comp_options += " -DW_OUT=" + std::to_string((w_in / w_stride));
         kernelInfo.comp_options += " -DH_STRIDE=" + std::to_string(h_stride);
@@ -280,7 +279,7 @@ void transpose_NCHW2CNHW(AMDKernelPtr& kptr,
         kernelInfo.comp_options += " -DOUT_OFF=" + std::to_string(out_offset);
 
         size_t ld0 = WG_SIZE;
-        size_t gd0 = c * (h_in / h_stride) * (w_in / w_stride);
+        size_t gd0 = c * h_out * w_out;
         kernelInfo.l_wk = {ld0, 1, 1};
         kernelInfo.g_wk = {gd0, 1, 1};
 
@@ -400,26 +399,26 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
         int average_include = 0;
 
         switch (pooling_type) {
-            case Pooling_max: {
-                ptype = MLO_POOLING_OP_MAX;
-            }
-            break;
+        case Pooling_max: {
+            ptype = MLO_POOLING_OP_MAX;
+        }
+        break;
 
-            case Pooling_average_include_padding: {
-                ptype = MLO_POOLING_OP_AVE;
-                average_include = 1;
-            }
-            break;
+        case Pooling_average_include_padding: {
+            ptype = MLO_POOLING_OP_AVE;
+            average_include = 1;
+        }
+        break;
 
-            case Pooling_average_exclude_padding: {
-                ptype = MLO_POOLING_OP_AVE;
-            }
-            break;
+        case Pooling_average_exclude_padding: {
+            ptype = MLO_POOLING_OP_AVE;
+        }
+        break;
 
-            default: {
-                LOG(ERROR) << "Unknown polling type: " << pooling_type;
-            }
-            break;
+        default: {
+            LOG(ERROR) << "Unknown polling type: " << pooling_type;
+        }
+        break;
         }
 
         kernelInfo.comp_options =
