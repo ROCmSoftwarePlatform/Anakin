@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -567,7 +567,7 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
     } else {
         if (param.bias != nullptr && param.bias->valid_size() > 0) {
             kernelInfo.kernel_file = "BiasReLuUni.cl";
-            kernelInfo.kernel_name = "ReluOnly";
+            kernelInfo.kernel_name = "BiasOnly";
 
             kernelInfo.l_wk = {256, 1, 1};
             kernelInfo.g_wk = {(inputs[0]->num())* (outputs[0]->channel())* (outputs[0]->height())
