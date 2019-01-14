@@ -619,6 +619,7 @@ std::vector<KernelInfo> FindSolutionWithPooling(
     convContext.batch_sz         = inputs[0]->num();
     convContext.pad0             = param.conv_param.pad_w;
     convContext.pad1             = param.conv_param.pad_h;
+    convContext.group_counts     = param.conv_param.group;
     convContext.kernel_stride0   = param.conv_param.stride_h;
     convContext.kernel_stride1   = param.conv_param.stride_w;
     convContext.kernel_dilation0 = param.conv_param.dilation_w;
@@ -690,17 +691,24 @@ std::vector<KernelInfo> FindSolutionWithPooling(
     miopen::Handle::setClEnv(context, device);
     miopen::Handle handle /*(context, device)*/;
     convContext.SetStream(&handle);
+    miopen::solver::ConvSolution solution;
 
-    miopen::solver::ConvSolution solution = miopen::solver::SearchForSolution <
-                                            miopen::solver::ConvBinWinograd3x3U,
-                                            miopen::solver::ConvOclDirectFwd1x1AMD,
-                                            // miopen::solver::ConvAsm3x3U,
-                                            // miopen::solver::ConvAsm1x1U,
-                                            miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
-                                            miopen::solver::ConvOclDirectFwdGen,
-                                            miopen::solver::ConvOclDirectFwd3x3,
-                                            miopen::solver::ConvOclDirectFwd1x1,
-                                            miopen::solver::ConvOclDirectFwd > (convContext, db);
+    if (convContext.group_counts > 1) {
+        solution = miopen::solver::SearchForSolution <miopen::solver::ConvOclDirectFwd > (convContext, db);
+    } else {
+
+        solution = miopen::solver::SearchForSolution <
+                   miopen::solver::ConvBinWinograd3x3U,
+                   miopen::solver::ConvOclDirectFwd1x1AMD,
+                   // miopen::solver::ConvAsm3x3U,
+                   // miopen::solver::ConvAsm1x1U,
+                   miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
+                   miopen::solver::ConvOclDirectFwdGen,
+                   miopen::solver::ConvOclDirectFwd3x3,
+                   miopen::solver::ConvOclDirectFwd1x1,
+                   miopen::solver::ConvOclDirectFwd > (convContext, db);
+    }
+
     miopen::Handle::clearClEnv();
 
     for (auto s : solution.construction_params) {

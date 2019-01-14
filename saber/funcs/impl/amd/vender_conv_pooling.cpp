@@ -22,8 +22,7 @@ namespace saber {
 typedef TargetWrapper<AMD> AMD_API;
 typedef Env<AMD> AMD_ENV;
 
-static bool isPoolAlign(int couv_out_w, int couv_out_h, const ConvPoolingParam<AMD>& params)
-{
+static bool isPoolAlign(int couv_out_w, int couv_out_h, const ConvPoolingParam<AMD>& params) {
     int out_width  = couv_out_w;
     int out_height = couv_out_h;
     int kernel_size0 = params.pooling_param.window_w;
@@ -186,6 +185,8 @@ SaberStatus VenderConv2DPooling<AMD, OpDtype>::create(
                         || kernelInfo.kernel_name == "conv7x7c3h224w224k64u2v2p3q3f1b1prelu"
                         || kernelInfo.kernel_name == "conv7x7c3h224w224k64u2v2p3q3f1b0prelu") {
                     kernelInfo.wk_dim      = 3;
+                } else if (kernelInfo.kernel_name == "MIOpenGroupConvUni") {
+                    kernelInfo.wk_dim      = 3;
                 }
 
                 CreateKernelList(inputs[0]->device_id(), kernelInfo);
@@ -327,7 +328,8 @@ SaberStatus VenderConv2DPooling<AMD, OpDtype>::dispatch(
                 || (_kernels_ptr[i].get()->GetName() == "MIOpenConv1x1pquv")
                 || (_kernels_ptr[i].get()->GetName() == "MIOpenCvD3x3_WSR0")
                 || (_kernels_ptr[i].get()->GetName() == "MIOpenCDFGen")
-                || (_kernels_ptr[i].get()->GetName() == "MIOpenCDFGen4")) {
+                || (_kernels_ptr[i].get()->GetName() == "MIOpenCDFGen4")
+                || (_kernels_ptr[i].get()->GetName() == "MIOpenGroupConvUni")) {
 
             if (isBias) {
                 if (isActive) {
@@ -422,30 +424,30 @@ SaberStatus VenderConv2DPooling<AMD, OpDtype>::dispatch(
                 if (isBias) {
                     if (isActive) {
                         err = _kernels_ptr[i].get()->SetKernelArgs(
-                              (PtrDtype)_outConvRelu->data(),
-                              (PtrDtype)outputs[0]->mutable_data(),
-                              (PtrDtype)param.conv_param.bias()->data(),
-                              negative_slope,
-                              (PtrDtype)0);
+                                  (PtrDtype)_outConvRelu->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  (PtrDtype)param.conv_param.bias()->data(),
+                                  negative_slope,
+                                  (PtrDtype)0);
                     } else {
                         err = _kernels_ptr[i].get()->SetKernelArgs(
-                              (PtrDtype)_outConvRelu->data(),
-                              (PtrDtype)outputs[0]->mutable_data(),
-                              (PtrDtype)param.conv_param.bias()->data(),
-                              (PtrDtype)0);
+                                  (PtrDtype)_outConvRelu->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  (PtrDtype)param.conv_param.bias()->data(),
+                                  (PtrDtype)0);
                     }
                 } else {
                     if (isActive) {
                         err = _kernels_ptr[i].get()->SetKernelArgs(
-                              (PtrDtype)_outConvRelu->data(),
-                              (PtrDtype)outputs[0]->mutable_data(),
-                              negative_slope,
-                              (PtrDtype)0);
+                                  (PtrDtype)_outConvRelu->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  negative_slope,
+                                  (PtrDtype)0);
                     } else {
                         err = _kernels_ptr[i].get()->SetKernelArgs(
-                              (PtrDtype)_outConvRelu->data(),
-                              (PtrDtype)outputs[0]->mutable_data(),
-                              (PtrDtype)0);
+                                  (PtrDtype)_outConvRelu->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  (PtrDtype)0);
                     }
                 }
             } else {
