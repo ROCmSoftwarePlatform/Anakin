@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -176,8 +176,8 @@ SaberStatus SaberNormalize<AMD, OpDtype>::create(
 
         _kernel_map[NORM_NO_ACROSS_SPATIAL] = kptr;
     } else {
-        globalSize             = _size;
-        kernelInfo.g_wk        = {(globalSize + localSize - 1) / localSize * localSize};
+        globalSize             = (_compute_size + localSize - 1) / localSize * localSize * _norm_size;
+        kernelInfo.g_wk        = { globalSize };
         kernelInfo.kernel_name = "ReduceAddAtomic";
         kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
@@ -188,12 +188,17 @@ SaberStatus SaberNormalize<AMD, OpDtype>::create(
 
         _kernel_map[REDUCE_ADD_ATOMIC] = kptr;
 
+        int powReverseLocalSize = 256;
+        int powReverseGlobalSize = (_norm_size + powReverseLocalSize - 1) / powReverseLocalSize *
+                                   powReverseLocalSize;
         KernelInfo kernelInfoGpuPowReverse;
         kernelInfoGpuPowReverse.kernel_file = "Normalize.cl";
         kernelInfoGpuPowReverse.kernel_name = "GpuPowReverse";
         kernelInfoGpuPowReverse.wk_dim      = 1;
-        kernelInfoGpuPowReverse.l_wk        = {1};
-        kernelInfoGpuPowReverse.g_wk        = {_norm_size};
+        kernelInfoGpuPowReverse.l_wk        = {powReverseLocalSize};
+        kernelInfoGpuPowReverse.g_wk        = {powReverseGlobalSize};
+        kernelInfoGpuPowReverse.comp_options = std::string("-DSHARE_MEMORY_DIM=") + std::to_string(
+                powReverseLocalSize);
         kptr = CreateKernel(inputs[0]->device_id(), &kernelInfoGpuPowReverse);
 
         if (!kptr.get()->isInit()) {
@@ -202,6 +207,9 @@ SaberStatus SaberNormalize<AMD, OpDtype>::create(
         }
 
         _kernel_map[GPU_POW_REVERSE] = kptr;
+
+        globalSize = (_size + localSize - 1) / localSize * localSize;
+        kernelInfo.g_wk = { globalSize };
 
         if (param.has_scale) {
             kernelInfo.kernel_name = "NormalizeWithScale";
@@ -245,7 +253,9 @@ SaberStatus SaberNormalize<AMD, OpDtype>::dispatch(
     AMDKernelPtr kptr = NULL;
     AMDKernel* kernel = NULL;
 
+
     if (!param.across_spatial) {
+
         int size_in_channel = inputs[0]->width() * inputs[0]->height();
         int channel         = inputs[0]->channel();
         int num             = inputs[0]->num();
@@ -303,6 +313,8 @@ SaberStatus SaberNormalize<AMD, OpDtype>::dispatch(
             return SaberInvalidValue;
         }
 
+        LOG(INFO) << "Dispatch _size = " << _size << " param.p = " << param.p << " _compute_size = " <<
+                  _compute_size;
         kernel = kptr.get();
         err    = kernel->SetKernelArgs(
                      (int)_size,
@@ -310,6 +322,7 @@ SaberStatus SaberNormalize<AMD, OpDtype>::dispatch(
                      (int)_compute_size,
                      (PtrDtype)inputs[0]->data(),
                      (PtrDtype)_norm_reduce.mutable_data());
+
 
         if (!err) {
             LOG(ERROR) << "Failed to set kernel Args";
@@ -345,6 +358,7 @@ SaberStatus SaberNormalize<AMD, OpDtype>::dispatch(
         }
 
         list.push_back(kptr);
+
 
         if (param.has_scale) {
             kptr = _kernel_map[NORM_WITH_SCALE];
