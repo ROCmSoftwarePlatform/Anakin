@@ -53,7 +53,8 @@ bool ConvCommon::getKernelInfo(const ConvolutionContext& params, Conv1x1Type& mT
             mType = conv1x1type[i];
             ALOGD("Got kernel:" << mType.kernel_name << "!!");
             return true;
-        } else if (conv1x1type[i].dev == dev && conv1x1type[i].batch == params.batch_sz
+        } else if (!conv1x1type[i].fusion_pooling && conv1x1type[i].dev == dev
+                   && conv1x1type[i].batch == params.batch_sz
                    && conv1x1type[i].stride == params.kernel_stride0 && (conv1x1type[i].channel == params.n_inputs
                            || conv1x1type[i].channel == 0)
                    && conv1x1type[i].width == params.in_width && conv1x1type[i].output_num == params.n_outputs
