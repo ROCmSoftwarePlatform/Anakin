@@ -598,8 +598,6 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
                             * (inputs[0]->height()) * (inputs[0]->width());
 
             for (int j = 0; j < (inputs[0]->num()); j++) {
-                out_offset = j * param.weight()->num() * outputs[0]->height()
-                             * outputs[0]->width();
                 in_offset =
                     j * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width();
                 i = 0;
@@ -628,48 +626,66 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
                 }
 
                 list.push_back(_kernels_ptr[i++]);
+                err = LaunchKernel(cm, list);
 
-                if (_kernels_ptr[i].get()->GetName() != "miog_betac_alphaab") {
-                    err = _kernels_ptr[i].get()->SetKernelArgs(
-                              (PtrDtype)outputs[0]->mutable_data(), out_offset, floatObjects[1]);
+                if (!err) {
+                    LOG(ERROR) << "Fail to set execution :" << err;
+                    return SaberInvalidValue;
+                }
+
+                for (int k = 0; k < param.group; k++) {
+                    i = 1;
+                    out_offset = j * param.weight()->num() * outputs[0]->height()
+                                 * outputs[0]->width() + (k * ((param.weight()->num() / param.group) * outputs[0]->height()
+                                                          * outputs[0]->width()));
+                    unsigned int wei_offset = k * (inputs[0]->channel() / param.group) * param.weight()->channel() *
+                                              param.weight()->height() * param.weight()->width();
+                    unsigned int wksp_offset = k * (inputs[0]->channel() / param.group) * param.weight()->height() *
+                                               param.weight()->width() * outputs[0]->height() * outputs[0]->width();
+
+                    if (_kernels_ptr[i].get()->GetName() != "miog_betac_alphaab") {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                                  (PtrDtype)outputs[0]->mutable_data(), out_offset, floatObjects[1]);
+
+                        if (!err) {
+                            LOG(ERROR) << "Fail to set kernel args :" << err;
+                            return SaberInvalidValue;
+                        }
+
+                        list.push_back(_kernels_ptr[i++]);
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                                  (PtrDtype)_outGemmWorkspace->mutable_data(),
+                                  wksp_offset,
+                                  (PtrDtype)param.weight()->data(),
+                                  wei_offset,
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  out_offset,
+                                  floatObjects[0]);
+                    } else {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                                  (PtrDtype)_outGemmWorkspace->mutable_data(),
+                                  wksp_offset,
+                                  (PtrDtype)param.weight()->data(),
+                                  wei_offset,
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  out_offset,
+                                  floatObjects[0],
+                                  floatObjects[1]);
+                    }
 
                     if (!err) {
                         LOG(ERROR) << "Fail to set kernel args :" << err;
                         return SaberInvalidValue;
                     }
 
-                    list.push_back(_kernels_ptr[i++]);
-                    err = _kernels_ptr[i].get()->SetKernelArgs(
-                              (PtrDtype)_outGemmWorkspace->mutable_data(),
-                              0,
-                              (PtrDtype)param.weight()->data(),
-                              0,
-                              (PtrDtype)outputs[0]->mutable_data(),
-                              out_offset,
-                              floatObjects[0]);
-                } else {
-                    err = _kernels_ptr[i].get()->SetKernelArgs(
-                              (PtrDtype)_outGemmWorkspace->mutable_data(),
-                              0,
-                              (PtrDtype)param.weight()->data(),
-                              0,
-                              (PtrDtype)outputs[0]->mutable_data(),
-                              out_offset,
-                              floatObjects[0],
-                              floatObjects[1]);
-                }
+                    list.push_back(_kernels_ptr[i]);
 
-                if (!err) {
-                    LOG(ERROR) << "Fail to set kernel args :" << err;
-                    return SaberInvalidValue;
-                }
+                    err = LaunchKernel(cm, list);
 
-                list.push_back(_kernels_ptr[i]);
-                err = LaunchKernel(cm, list);
-
-                if (!err) {
-                    LOG(ERROR) << "Fail to set execution :" << err;
-                    return SaberInvalidValue;
+                    if (!err) {
+                        LOG(ERROR) << "Fail to set execution :" << err;
+                        return SaberInvalidValue;
+                    }
                 }
             }
         } else if (_kernels_ptr[i].get()->GetName() == "BiasReluBoth") {

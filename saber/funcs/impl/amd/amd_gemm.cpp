@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -269,9 +269,9 @@ bool findGenericGemm(bool fromSolver, std::vector<AMDKernelPtr>& vkptr,
     } else {
         LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "Not GEMM 1x1";
         needBiasRelu = true;
-        int K = (inputs[0]->channel()) * (param.weight()->height())
+        int K = (inputs[0]->channel() / param.group) * (param.weight()->height())
                 * (param.weight()->width());
-        int M       = (param.weight()->num());
+        int M       = (param.weight()->num() / param.group);
         int N       = (output->height()) * (output->width());
         float alpha = 1.0;
         float beta  = 0.0;
