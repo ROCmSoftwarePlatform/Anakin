@@ -730,7 +730,7 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
     uint lid_x = get_local_id(0);
     uint grid_x = get_group_id(0);
 
-    __local float result[2][66];
+    __local float result[8][66];
 
     if (grid_x < OUTPUT) {
         __constant float* pA;
@@ -742,48 +742,50 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
 
         uint offset = (grid_x >> 2 << 6) % WIDTH;
 
-        float sum = { 0.0f };
+        float sum[8] = { 0.0f };
 
         for (uint i = 0; i < ITER; i++, offset = (offset + 64) % WIDTH) {
             for (uint n = 0; n < N; n++) {
-                sum += pA[offset + n * WIDTH] * pB[offset];
+                sum[n] += pA[offset + n * WIDTH] * pB[offset];
+            }
+        }
 
-                result[n % 2][lid_x] = sum;
+        for (uint n = 0; n < N; n++) {
+            result[n][lid_x] = sum[n];
 
-                if (lid_x < 32) {
-                    result[n % 2][lid_x] += result[n % 2][lid_x + 32];
-                }
+            if (lid_x < 32) {
+                result[n][lid_x] += result[n][lid_x + 32];
+            }
 
-                if (lid_x < 16) {
-                    result[n % 2][lid_x] += result[n % 2][lid_x + 16];
-                }
+            if (lid_x < 16) {
+                result[n][lid_x] += result[n][lid_x + 16];
+            }
 
-                if (lid_x < 8) {
-                    result[n % 2][lid_x] += result[n % 2][lid_x + 8];
-                }
+            if (lid_x < 8) {
+                result[n][lid_x] += result[n][lid_x + 8];
+            }
 
-                if (lid_x < 4) {
-                    result[n % 2][lid_x] += result[n % 2][lid_x + 4];
-                }
+            if (lid_x < 4) {
+                result[n][lid_x] += result[n][lid_x + 4];
+            }
 
-                if (lid_x < 2) {
-                    result[n % 2][lid_x] += result[n % 2][lid_x + 2];
-                }
+            if (lid_x < 2) {
+                result[n][lid_x] += result[n][lid_x + 2];
+            }
 
-                if (lid_x < 1) {
-                    result[n % 2][lid_x] += result[n % 2][lid_x + 1];
-                }
+            if (lid_x < 1) {
+                result[n][lid_x] += result[n][lid_x + 1];
+            }
 
-                if (lid_x == 0) {
+            if (lid_x == 0) {
 #ifdef BIAS
-                    pC[n * OUTPUT] = bias[grid_x] + result[n % 2][0];
+                pC[n * OUTPUT] = bias[grid_x] + result[n][0];
 #else
-                    pC[n * OUTPUT] = result[n % 2][0];
+                pC[n * OUTPUT] = result[n][0];
 #endif
 #ifndef NO_SLOPE
-                    pC[n * OUTPUT] *= (pC[n * OUTPUT] > 0 ? 1.0f : slope);
+                pC[n * OUTPUT] *= (pC[n * OUTPUT] > 0 ? 1.0f : slope);
 #endif
-                }
             }
         }
 
@@ -1149,22 +1151,22 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
     __local float result[65];
 
     __global const float* pA =
-        (__global const float*)(a + ((grid_x / HWG) * (STRIDE << 2)));
+        (__global const float*)(a + ((grid_x / HWG) * (WIDTH << 2)));
     __global const float* pB = (__global const float*)(b);
 
-    int offset = (((grid_x % HWG) << 6)) % STRIDE;
+    int offset = (((grid_x % HWG) << 6)) % WIDTH;
 
     float sum = 0.0f;
 
-    for (int i = 0; i < ITER; i++, offset = (offset + 64) % STRIDE) {
+    for (int i = 0; i < ITER; i++, offset = (offset + 64) % WIDTH) {
         for (int j = 0; j < 4; j++) {
-            shared_a[j][lid_x] = pA[offset + j * STRIDE + lid_x];
+            shared_a[j][lid_x] = pA[offset + j * WIDTH + lid_x];
         }
 
         for (int j = 0; j < 8; j++) {
             shared_b[j][(lid_x)] =
-                ((j + ((grid_x % HWG) << 3)) * STRIDE + (offset + lid_x) < OUTPUT * STRIDE
-                 ? pB[(j + ((grid_x % HWG) << 3)) * STRIDE + (offset + lid_x)]
+                ((j + ((grid_x % HWG) << 3)) * WIDTH + (offset + lid_x) < OUTPUT * WIDTH
+                 ? pB[(j + ((grid_x % HWG) << 3)) * WIDTH + (offset + lid_x)]
                  : 0.0f);
         }
 
@@ -1206,19 +1208,19 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
     __global const float* pA = (__global const float*)(a + ((grid_x >> 7) * (WIDTH << 2)));
     __global const float* pB = (__global const float*)(b);
 
-    int offset = (((grid_x & 127) << 6)) % STRIDE;
+    int offset = (((grid_x & 127) << 6)) % WIDTH;
 
     float sum = 0.0f;
 
-    for (int i = 0; i < ITER; i++, offset = (offset + 64) % STRIDE) {
+    for (int i = 0; i < ITER; i++, offset = (offset + 64) % WIDTH) {
         for (int j = 0; j < 4; j++) {
-            shared_a[j][lid_x] = pA[offset + j * STRIDE + lid_x];
+            shared_a[j][lid_x] = pA[offset + j * WIDTH + lid_x];
         }
 
         for (int j = 0; j < 8; j++) {
             shared_b[j][(lid_x)] =
-                ((j + ((grid_x & 127) << 3)) * STRIDE + (offset + lid_x) < OUTPUT * STRIDE
-                 ? pB[(j + ((grid_x & 127) << 3)) * STRIDE + (offset + lid_x)]
+                ((j + ((grid_x & 127) << 3)) * WIDTH + (offset + lid_x) < OUTPUT * WIDTH
+                 ? pB[(j + ((grid_x & 127) << 3)) * WIDTH + (offset + lid_x)]
                  : 0.0f);
         }
 
