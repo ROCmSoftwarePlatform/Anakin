@@ -300,8 +300,6 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
         _branch = 0;
     }
 
-    _branch = 0; //workaround
-
     if (!param.is_transpose_weights) {
         if (_branch) {
             if (batch_size_index == BATCH_SIZE_GE_INDEX) {
