@@ -272,7 +272,7 @@ void transpose_NCHW2CNHW(AMDKernelPtr& kptr,
         kernelInfo.comp_options += " -DHW_IN=" + std::to_string(h_in * w_in);
         kernelInfo.comp_options += " -DHW_OUT=" + std::to_string(h_out * w_out);
         kernelInfo.comp_options += " -DW_IN=" + std::to_string(w_in);
-        kernelInfo.comp_options += " -DW_OUT=" + std::to_string((w_in / w_stride));
+        kernelInfo.comp_options += " -DW_OUT=" + std::to_string(w_out);
         kernelInfo.comp_options += " -DH_STRIDE=" + std::to_string(h_stride);
         kernelInfo.comp_options += " -DW_STRIDE=" + std::to_string(w_stride);
         kernelInfo.comp_options += " -DIN_OFF=" + std::to_string(in_offset);
