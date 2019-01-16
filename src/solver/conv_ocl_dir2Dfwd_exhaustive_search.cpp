@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2018 Advanced Micro Devices, Inc.
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -115,18 +115,6 @@ ConvOclDirectFwdLegacyExhaustiveSearch::GetPerformanceConfig(const ConvolutionCo
             result.out_pix_tile1 = 0;
         }
 
-    }
-    if(params.group_counts >= 2)
-    {
-        result.grp_tile0       = 32;
-        result.grp_tile1       = 8;
-        result.in_tile0        = 32;
-        result.in_tile1        = 16;
-        result.out_pix_tile0   = 1;
-        result.out_pix_tile1   = 2;
-        result.n_out_pix_tiles = 1;
-        result.n_in_data_tiles = 1;
-        result.n_stacks        = 1;
     }
     if(!params.do_search) // Prevent spamming durign search.
         MIOPEN_LOG_I2("Returns: " << result);

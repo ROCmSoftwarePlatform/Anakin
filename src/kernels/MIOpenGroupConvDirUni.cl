@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -867,10 +867,11 @@ MIOpenGroupConvUni(const __global _FLOAT* __restrict in,
 #else
 
                 for (uint j = 0; j < MLO_OUT_TILE1; ++j, out_off2 += MLO_OUT_STRIDE) {
-                    if (y_out_grp + y_out_lcl + j < MLO_OUT_HEIGHT)
+
+                    if (y_out_grp + y_out_lcl + j < MLO_OUT_HEIGHT) {
                         for (uint i = 0; i < MLO_OUT_TILE0; ++i) {
                             if (x_out_grp + x_out_lcl + i < MLO_OUT_WIDTH &&
-                                    out_off2 + i < MLO_OUT_BATCH_STRIDE * MLO_BATCH_SZ)
+                                    out_off2 + i < MLO_OUT_BATCH_STRIDE * MLO_BATCH_SZ) {
 #endif
                         out[out_off2 + i] = pvt_accum[o * MLO_OUT_TILE_SZ + j * MLO_OUT_TILE0 + i]
 #if MLO_CONV_BIAS
@@ -882,9 +883,15 @@ MIOpenGroupConvUni(const __global _FLOAT* __restrict in,
                         //ReLU fusion
                         out[out_off2 + i] *= out[out_off2 + i] > 0.0f ? 1.0f : slope;
 #endif
+
+#if MLO_OUT_TILE0 != 1
                     }
                 }
+
+#endif
             }
         }
     }
+}
+}
 }
