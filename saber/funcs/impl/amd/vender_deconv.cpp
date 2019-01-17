@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -77,17 +77,18 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
     int M       = (outputs[0]->channel()) * (param.weight()->height()) * (param.weight()->width());
     float alpha = 1.0;
     float beta  = 0.0;
-    bool tA     = true;
-    bool tB     = false;
-    bool tC     = false;
-    int lda     = M;
-    int ldb     = N;
-    int ldc     = N;
+    bool transA     = true;
+    bool transB     = false;
+    bool transC     = false;
+    int leadingd_A     = M;
+    int leadingd_B     = N;
+    int leadingd_C     = N;
     int workspace_req = param.weight()->channel() * param.weight()->height()
                         * param.weight()->width() * (inputs[0]->height()) * (inputs[0]->width());
 
     MIOpenGEMM::Geometry tgg {};
-    tgg = MIOpenGEMM::Geometry(false, tA, tB, tC, lda, ldb, ldc, M, N, K, 0, 'f');
+    tgg = MIOpenGEMM::Geometry(false, transA, transB, transC, leadingd_A, leadingd_B, leadingd_C, M, N,
+                               K, 0, 'f');
 
     if (param.weight()->height() == 1 && param.weight()->width() == 1 && param.stride_h == 1
             && param.stride_w == 1 && param.pad_h == 0 && param.pad_w == 0) {
@@ -193,18 +194,9 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
         Shape sh({param.weight()->channel(),
                   param.weight()->height(),
                   param.weight()->width(),
-                  inputs[0]->width() * inputs[0]->width()
+                  inputs[0]->height() * inputs[0]->width()
                  });
         _outGemmWorkspace->re_alloc(sh);
-
-        _outCol2ImSpace = new Tensor<AMD>();
-
-        Shape sh_col2Im({param.weight()->channel(),
-                         param.weight()->height(),
-                         param.weight()->width(),
-                         inputs[0]->height() * inputs[0]->width()
-                        });
-        _outCol2ImSpace->re_alloc(sh_col2Im);
         bool miopengemm_verbose = false;
 
         bool miopengemm_warnings = false;
@@ -214,7 +206,7 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
                                         cm,
                                         (cl_mem)param.weight()->data(),
                                         (cl_mem)inputs[0]->data(),
-                                        (cl_mem)_outCol2ImSpace->mutable_data(),
+                                        (cl_mem)_outGemmWorkspace->mutable_data(),
                                         false,
                                         tgg,
                                         miopengemm_verbose,
@@ -323,7 +315,6 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
                                     (cl_mem)outputs[0]->mutable_data(),
                                     (cl_mem)param.bias()->data()
                                    };
-        cl_mem gemmWrokspace     = (cl_mem)_outGemmWorkspace->mutable_data();
         int j                    = 0;
 
         for (int i = 0; i < (inputs[0]->num()); i++) {
@@ -423,7 +414,6 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
                                     (cl_mem)outputs[0]->mutable_data(),
                                     (cl_mem)param.bias()->data()
                                    };
-        cl_mem gemmWrokspace     = (cl_mem)_outGemmWorkspace->mutable_data();
 
         int j = 0;
         AMDKernel* kernel;
@@ -438,7 +428,7 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
             if (_multikernel) {
                 AMDKernel* kernel = _kernel_atomic.get();
                 kernel->SetKernelArgs(
-                    (PtrDtype)memObjects[2], (int)uintObjects[2], (float)floatObjects[1]);
+                    (PtrDtype)_outGemmWorkspace->mutable_data(), 0, (float)floatObjects[1]);
                 list.push_back(_kernel_atomic);
             }
 
@@ -448,8 +438,8 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
                 (int)uintObjects[1],
                 (PtrDtype)memObjects[0],
                 (int)uintObjects[0],
-                (PtrDtype)_outCol2ImSpace->mutable_data(),
-                (int)uintObjects[1],
+                (PtrDtype)_outGemmWorkspace->mutable_data(),
+                (int)0,
                 (float)floatObjects[0],
                 (float)floatObjects[1]);
 
@@ -457,7 +447,7 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
 
             kernel = _kernel_col2Im_bias_relu.get();
             kernel->SetKernelArgs(
-                (PtrDtype)_outCol2ImSpace->mutable_data(),
+                (PtrDtype)_outGemmWorkspace->mutable_data(),
                 (int)inputs[0]->height(),
                 (int)inputs[0]->width(),
                 (int)param.weight()->height(),

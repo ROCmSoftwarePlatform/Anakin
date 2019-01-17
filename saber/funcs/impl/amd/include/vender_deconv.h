@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -41,7 +41,6 @@ public:
     VenderDeconv2D() {
         _multikernel = false;
         _outGemmWorkspace = nullptr;
-        _outCol2ImSpace = nullptr;
         _kernels_ptr.clear();
         _kernels.clear();
 
@@ -49,16 +48,8 @@ public:
     }
 
     ~VenderDeconv2D() {
-        if (_impl) {
-            delete _impl;
-        }
-
         if (_outGemmWorkspace) {
             delete _outGemmWorkspace;
-        }
-
-        if (_outCol2ImSpace) {
-            delete _outCol2ImSpace;
         }
 
         _kernels_ptr.clear();
@@ -86,8 +77,6 @@ public:
                               int dilation_h, int dilation_w,
                               int group);
 private:
-    bool _use_k4_s2_p1 {false};
-    Impl_t* _impl {nullptr};
 
     amd_kernel_list _kernels;
     std::vector<AMDKernelPtr> _kernels_ptr;
@@ -102,7 +91,6 @@ private:
     size_t _x_t_size;
     bool _multikernel;
     Tensor<AMD>* _outGemmWorkspace;
-    Tensor<AMD>* _outCol2ImSpace;
 
 };
 
