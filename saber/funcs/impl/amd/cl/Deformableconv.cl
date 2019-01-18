@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -52,8 +52,10 @@ static inline float deformable_im2col_bilinear(
 
 __kernel void deformable_im2col_gpu_kernel(
     const int n,
-    global const float* data_im,
+    global const float* data,
     global const float* data_offset,
+    const int im,
+    const int offset_im,
     const int height,
     const int width,
     const int kernel_h,
@@ -70,50 +72,53 @@ __kernel void deformable_im2col_gpu_kernel(
     global float* data_col) {
 
     int global_idx  = get_global_id(0);
-    const int w_col = global_idx % width_col;
-    const int h_col = (global_idx / width_col) % height_col;
-    const int c_im  = (global_idx / width_col) / height_col;
-    const int c_col = c_im * kernel_h * kernel_w;
 
-    // compute deformable group index
-    // THIS IS THE TRUE CHANNEL
-    const int deformable_group_index = c_im / channel_per_deformable_group;
+    if (global_idx < n) {
+        const int w_col = global_idx % width_col;
+        const int h_col = (global_idx / width_col) % height_col;
+        const int c_im  = (global_idx / width_col) / height_col;
+        const int c_col = c_im * kernel_h * kernel_w;
 
-    // input map coord(h_in, w_in)
-    const int h_in = h_col * stride_h - pad_h;
-    const int w_in = w_col * stride_w - pad_w;
-    // data_col (data & offset)
-    global float* data_col_ptr      = data_col + (c_col * height_col + h_col) * width_col + w_col;
-    const global float* data_im_ptr = data_im + (c_im * height + h_in) * width + w_in;
-    const global float* data_offset_ptr =
-        data_offset + deformable_group_index * 2 * kernel_h * kernel_w * height_col * width_col;
+        // compute deformable group index
+        // THIS IS THE TRUE CHANNEL
+        const int deformable_group_index = c_im / channel_per_deformable_group;
 
-    for (int i = 0; i < kernel_h; ++i) {
-        for (int j = 0; j < kernel_w; ++j) {
-            // offset_h and offset_w in the same channel
-            const int data_offset_h_ptr =
-                ((2 * (i * kernel_w + j)) * height_col + h_col) * width_col + w_col;
+        // input map coord(h_in, w_in)
+        const int h_in = h_col * stride_h - pad_h;
+        const int w_in = w_col * stride_w - pad_w;
+        // data_col (data & offset)
+        global float* data_col_ptr      = data_col + (c_col * height_col + h_col) * width_col + w_col;
+        const global float* data_im_ptr = data + im + (c_im * height + h_in) * width + w_in;
+        const global float* data_offset_ptr =
+            data_offset + offset_im + deformable_group_index * 2 * kernel_h * kernel_w * height_col * width_col;
 
-            const int data_offset_w_ptr =
-                ((2 * (i * kernel_w + j) + 1) * height_col + h_col) * width_col + w_col;
-            const float offset_h = data_offset_ptr[data_offset_h_ptr];
-            const float offset_w = data_offset_ptr[data_offset_w_ptr];
-            float val            = 0.f;
-            const float h_im     = h_in + i * dilation_h + offset_h;
-            const float w_im     = w_in + j * dilation_w + offset_w;
+        for (int i = 0; i < kernel_h; ++i) {
+            for (int j = 0; j < kernel_w; ++j) {
+                // offset_h and offset_w in the same channel
+                const int data_offset_h_ptr =
+                    ((2 * (i * kernel_w + j)) * height_col + h_col) * width_col + w_col;
 
-            if (h_im >= 0 && w_im >= 0 && h_im < height && w_im < width) {
-                const float map_h = i * dilation_h + offset_h;
-                const float map_w = j * dilation_w + offset_w;
-                // cur_height (from h_in to height)
-                const int cur_height = height - h_in;
-                const int cur_width  = width - w_in;
-                val                  = deformable_im2col_bilinear(
-                                           data_im_ptr, width, cur_height, cur_width, map_h, map_w);
+                const int data_offset_w_ptr =
+                    ((2 * (i * kernel_w + j) + 1) * height_col + h_col) * width_col + w_col;
+                const float offset_h = data_offset_ptr[data_offset_h_ptr];
+                const float offset_w = data_offset_ptr[data_offset_w_ptr];
+                float val            = 0.f;
+                const float h_im     = h_in + i * dilation_h + offset_h;
+                const float w_im     = w_in + j * dilation_w + offset_w;
+
+                if (h_im >= 0 && w_im >= 0 && h_im < height && w_im < width) {
+                    const float map_h = i * dilation_h + offset_h;
+                    const float map_w = j * dilation_w + offset_w;
+                    // cur_height (from h_in to height)
+                    const int cur_height = height - h_in;
+                    const int cur_width  = width - w_in;
+                    val                  = deformable_im2col_bilinear(
+                                               data_im_ptr, width, cur_height, cur_width, map_h, map_w);
+                }
+
+                *data_col_ptr = val;
+                data_col_ptr += height_col * width_col;
             }
-
-            *data_col_ptr = val;
-            data_col_ptr += height_col * width_col;
         }
     }
 }
@@ -130,15 +135,18 @@ __kernel void gpu_add_bias(
     int in_w_stride,
     global const float* bias) {
     int global_idx = get_global_id(0);
-    int read_w     = global_idx % in_w;
-    int read_h     = (global_idx / (in_w)) % in_h;
-    int read_c     = (global_idx / (in_h * in_w)) % in_c;
-    int read_n     = (global_idx / (in_c * in_h * in_w)) % in_n;
 
-    int in_idx = read_n * in_n_stride + read_c * in_c_stride + read_h * in_h_stride
-                 + read_w * in_w_stride;
+    if (global_idx < count) {
+        int read_w     = global_idx % in_w;
+        int read_h     = (global_idx / (in_w)) % in_h;
+        int read_c     = (global_idx / (in_h * in_w)) % in_c;
+        int read_n     = (global_idx / (in_c * in_h * in_w)) % in_n;
 
-    float in_var     = out_data[in_idx];
-    float in_bias    = bias[read_c];
-    out_data[in_idx] = in_var + in_bias;
+        int in_idx = read_n * in_n_stride + read_c * in_c_stride + read_h * in_h_stride
+                     + read_w * in_w_stride;
+
+        float in_var     = out_data[in_idx];
+        float in_bias    = bias[read_c];
+        out_data[in_idx] = in_var + in_bias;
+    }
 }

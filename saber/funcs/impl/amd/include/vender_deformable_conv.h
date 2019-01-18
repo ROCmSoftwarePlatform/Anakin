@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -32,17 +32,19 @@ namespace anakin {
 namespace saber {
 
 template <DataType OpDtype>
-class VenderDeformableConv2D<AMD, OpDtype> : public ImplBase<AMD, OpDtype, ConvParam<AMD>> {
+class VenderDeformableConv2D<AMD, OpDtype> : public
+        ImplBase<AMD, OpDtype, DeformableConvParam<AMD>> {
 public:
     typedef typename DataTrait<AMD, OpDtype>::Dtype OpDataType;
     typedef AMD_API::TPtr PtrDtype;
 
-    typedef ImplBase<AMD, OpDtype, ConvParam<AMD>> Impl_t;
+    typedef ImplBase<AMD, OpDtype, DeformableConvParam<AMD>> Impl_t;
     VenderDeformableConv2D() :
         _conv_out_spatial_dim(0),
         _kernel_dim(0),
         _bottom_dim(0),
         _offset_dim(0),
+        _multikernel(false),
         _col_offset(0),
         _output_offset(0),
         _kernel_offset(0) {
@@ -56,19 +58,19 @@ public:
     virtual SaberStatus
     init(const std::vector<Tensor<AMD>*>& inputs,
          std::vector<Tensor<AMD>*>& outputs,
-         ConvParam<AMD>& param,
+         DeformableConvParam<AMD>& param,
          Context<AMD>& ctx) override;
 
     virtual SaberStatus
     create(const std::vector<Tensor<AMD>*>& inputs,
            std::vector<Tensor<AMD>*>& outputs,
-           ConvParam<AMD>& param,
+           DeformableConvParam<AMD>& param,
            Context<AMD>& ctx) override;
 
     virtual SaberStatus dispatch(
         const std::vector<Tensor<AMD>*>& inputs,
         std::vector<Tensor<AMD>*>& outputs,
-        ConvParam<AMD>& param) override;
+        DeformableConvParam<AMD>& param) override;
 
     SaberStatus trans_weights(
         Tensor<AMD>& target_weights,
