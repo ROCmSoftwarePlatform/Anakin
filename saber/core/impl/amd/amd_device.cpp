@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -25,21 +25,22 @@ namespace saber {
 typedef TargetWrapper<AMD> AMD_API;
 typedef TargetWrapper<AMDHX86> AMDHX86_API;
 
-size_t split(const std::string& txt, std::vector<std::string>& strs, char ch) {
-    size_t pos = txt.find(ch);
-    size_t initialPos = 0;
+size_t inline split(char* txt, std::vector<std::string>& strs, char d) {
     strs.clear();
+    char* pos_f = strchr(txt, d);
+    char* pos_c = txt;
 
-    // Decompose statement
-    while (pos != std::string::npos) {
-        strs.push_back(txt.substr(initialPos, pos - initialPos));
-        initialPos = pos + 1;
-
-        pos = txt.find(ch, initialPos);
+    while (pos_f != NULL) {
+        strs.push_back(std::string(pos_c, pos_f - pos_c));
+        pos_c = pos_f + 1;
+        pos_f = strchr(pos_c, d);
     }
 
-    // Add the last one
-    strs.push_back(txt.substr(initialPos, std::min(pos, txt.size()) - initialPos + 1));
+    if (pos_f == NULL) {
+        pos_f = txt + strlen(txt);
+    }
+
+    strs.push_back(std::string(pos_c, pos_f - pos_c + 1));
     return strs.size();
 }
 
@@ -116,10 +117,10 @@ void Device<AMD>::get_info() {
     free(num);
 
     get_param(id, CL_DEVICE_VERSION, &name);
-    std::string version = std::string(name);
     std::vector<std::string> strs;
-    split(version, strs, ' ');
+    split(name, strs, ' ');
     _info._generate_arch = (int)(stof(strs[1]) * 10);
+    strs.clear();
     free(name);
 
     cl_ulong* size;
