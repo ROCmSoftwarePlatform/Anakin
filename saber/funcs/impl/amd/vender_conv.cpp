@@ -626,12 +626,6 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
                 }
 
                 list.push_back(_kernels_ptr[i++]);
-                err = LaunchKernel(cm, list);
-
-                if (!err) {
-                    LOG(ERROR) << "Fail to set execution :" << err;
-                    return SaberInvalidValue;
-                }
 
                 for (int k = 0; k < param.group; k++) {
                     i = 1;

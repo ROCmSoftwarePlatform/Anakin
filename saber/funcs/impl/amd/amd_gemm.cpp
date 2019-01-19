@@ -43,15 +43,16 @@ bool findGenericGemm(bool fromSolver, std::vector<AMDKernelPtr>& vkptr,
             int N       = (inputs[0]->num()) * (output->height()) * (output->width());
             float alpha = 1.0f;
             float beta  = 0.0f;
-            bool tA     = false;
-            bool tB     = false;
-            bool tC     = false;
-            int lda     = K;
-            int ldb     = N;
-            int ldc     = N;
+            bool transA     = false;
+            bool transB     = false;
+            bool transC     = false;
+            int leadingd_A     = K;
+            int leadingd_B     = N;
+            int leadingd_C     = N;
 
             MIOpenGEMM::Geometry tgg {};
-            tgg = MIOpenGEMM::Geometry(true, tB, tA, tC, ldb, lda, ldc, N, M, K, 0, 'f');
+            tgg = MIOpenGEMM::Geometry(true, transB, transA, transC, leadingd_B, leadingd_A, leadingd_C, N, M,
+                                       K, 0, 'f');
 
             /////////////////////////////////////////////////////////////
             // transpose_NCHW2CNHW kernel
@@ -167,15 +168,16 @@ bool findGenericGemm(bool fromSolver, std::vector<AMDKernelPtr>& vkptr,
             int N       = (output->height()) * (output->width());
             float alpha = 1.0;
             float beta  = 0.0;
-            bool tA     = false;
-            bool tB     = false;
-            bool tC     = false;
-            int lda     = K;
-            int ldb     = N;
-            int ldc     = N;
+            bool transA     = false;
+            bool transB     = false;
+            bool transC     = false;
+            int leadingd_A     = K;
+            int leadingd_B     = N;
+            int leadingd_C     = N;
 
             MIOpenGEMM::Geometry tgg {};
-            tgg = MIOpenGEMM::Geometry(true, tB, tA, tC, ldb, lda, ldc, N, M, K, 0, 'f');
+            tgg = MIOpenGEMM::Geometry(true, transB, transA, transC, leadingd_B, leadingd_A, leadingd_C, N, M,
+                                       K, 0, 'f');
             AMD_API::stream_t cm = ctx.get_compute_stream();
 
             /////////////////////////////////////////////////////////////
@@ -275,15 +277,16 @@ bool findGenericGemm(bool fromSolver, std::vector<AMDKernelPtr>& vkptr,
         int N       = (output->height()) * (output->width());
         float alpha = 1.0;
         float beta  = 0.0;
-        bool tA     = false;
-        bool tB     = false;
-        bool tC     = false;
-        int lda     = K;
-        int ldb     = N;
-        int ldc     = N;
+        bool transA     = false;
+        bool transB     = false;
+        bool transC     = false;
+        int leadingd_A     = K;
+        int leadingd_B     = N;
+        int leadingd_C     = N;
 
         MIOpenGEMM::Geometry tgg {};
-        tgg = MIOpenGEMM::Geometry(true, tB, tA, tC, ldb, lda, ldc, N, M, K, 0, 'f');
+        tgg = MIOpenGEMM::Geometry(true, transB, transA, transC, leadingd_B, leadingd_A, leadingd_C, N, M,
+                                   K, 0, 'f');
 
         AMD_API::stream_t cm = ctx.get_compute_stream();
 

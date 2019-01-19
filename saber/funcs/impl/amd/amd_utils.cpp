@@ -155,63 +155,57 @@ void set_offsets_to_uint(std::string& clstr) {
 #define WG_SIZE 256
 #define MAX_ACTIVE_THREADS (64 * 4 * 64)
 
-void Im2ColGPU(AMDKernelPtr& kptr, int device_id, int c,
-               int h, int w, int wei_h, int wei_w, int out_h, int out_w,
-               int pad_h, int pad_w, int stride_h, int stride_w, int dilation_h,
-               int dilation_w) {
+void Im2ColGPU(AMDKernelPtr& kptr, int device_id, int c_in,
+               int h_in, int w_in, int h_wei, int w_wei, int h_out, int w_out,
+               int h_pad, int w_pad, int h_stride, int w_stride, int h_dilation,
+               int w_dilation) {
     KernelInfo kernelInfo;
     kernelInfo.kernel_file = "MIOpenUtilKernels.cl";
     kernelInfo.kernel_name = "Im2Col";
     kernelInfo.kernel_type = MIOPEN;
 
-    std::string params;
-    int num_ch_per_wg;
+    int tile_sz_x = 32;
+    int tile_sz_y = 8;
+    int num_im_blks_x = std::ceil(static_cast<float>(w_out) / tile_sz_x);
+    int num_im_blks = num_im_blks_x * std::ceil(static_cast<float>(h_out) / tile_sz_y);
+    int local_mem_size = 0;
+    int local_mem_size_x = (tile_sz_x - 1) * w_stride + (w_wei - 1) * w_dilation + 1;
+    int local_mem_size_y = (tile_sz_y - 1) * h_stride + (h_wei - 1) * h_dilation + 1;
+    int num_ch_per_wg = 0;
 
-    if ((out_h <= 8 && out_w <= 8) && (stride_h == 1 && stride_w == 1) &&
-            (c % 4 == 0)) {
+    if ((c_in % 4 == 0) && (h_out <= 8 && w_out <= 8) && (h_stride == 1 && w_stride == 1)) {
         num_ch_per_wg = 4;
     } else {
         num_ch_per_wg = 1;
     }
 
-    int tile_sz_x = 32;
-    int tile_sz_y = 8;
-    int num_blks_x = std::ceil(static_cast<float>(out_w) / tile_sz_x);
-    int num_blks = num_blks_x * std::ceil(static_cast<float>(out_h) / tile_sz_y);
-    int local_mem_sz;
+    if (num_ch_per_wg != 1) {
+        local_mem_size = std::max(
+                             local_mem_size_x *
+                             ((std::floor(static_cast<float>(tile_sz_y) / num_ch_per_wg)) *
+                              h_stride + (h_wei - 1) * h_dilation + 1) *
+                             num_ch_per_wg,
+                             local_mem_size_y *
+                             ((std::floor(static_cast<float>(tile_sz_x) / num_ch_per_wg)) *
+                              w_stride + (w_wei - 1) * w_dilation + 1) *
+                             num_ch_per_wg);
+    } else {
+        local_mem_size = local_mem_size_x * local_mem_size_y;
+    }
 
-    if (num_ch_per_wg == 1)
-        local_mem_sz = ((tile_sz_x - 1) * stride_w + (wei_w - 1) * dilation_w + 1) *
-                       ((tile_sz_y - 1) * stride_h + (wei_h - 1) * dilation_h + 1);
-    else
-        local_mem_sz = std::max(
-                           num_ch_per_wg *
-                           ((std::ceil(static_cast<float>(tile_sz_x) / num_ch_per_wg) - 1) *
-                            stride_w +
-                            (wei_w - 1) * dilation_w + 1) *
-                           ((tile_sz_y - 1) * stride_h + (wei_h - 1) * dilation_h + 1),
-                           num_ch_per_wg *
-                           ((tile_sz_x - 1) * stride_w + (wei_w - 1) * dilation_w + 1) *
-                           ((std::ceil(static_cast<float>(tile_sz_y) / num_ch_per_wg) - 1) *
-                            stride_h +
-                            (wei_h - 1) * dilation_h + 1));
-
-    // int data_size_off = data_size - im_offset;
-
-    params += " -DNUM_CH_PER_WG=" + std::to_string(num_ch_per_wg);
-    params += " -DNUM_IM_BLKS_X=" + std::to_string(num_blks_x);
-    params += " -DNUM_IM_BLKS=" + std::to_string(num_blks);
-    params += " -DLOCAL_MEM_SIZE=" + std::to_string(local_mem_sz);
-    params += " -DSTRIDE_GT_1=" +
-              std::to_string(static_cast<int>(stride_h * stride_w > 1));
-    params += " -DTILE_SZ_X=" + std::to_string(tile_sz_x);
-    params += " -DTILE_SZ_Y=" + std::to_string(tile_sz_y);
-    params += " -DUSE_IM_OFF_GUARD=1 -DMIOPEN_USE_FP16=0 -DMIOPEN_USE_FP32=1";
+    kernelInfo.comp_options = "";
+    kernelInfo.comp_options += " -DLOCAL_MEM_SIZE=" + std::to_string(local_mem_size);
+    kernelInfo.comp_options += " -DNUM_IM_BLKS=" + std::to_string(num_im_blks);
+    kernelInfo.comp_options += " -DSTRIDE_GT_1=" +
+                               std::to_string(static_cast<int>(h_stride * w_stride > 1));
+    kernelInfo.comp_options += " -DTILE_SZ_X=" + std::to_string(tile_sz_x);
+    kernelInfo.comp_options += " -DTILE_SZ_Y=" + std::to_string(tile_sz_y);
+    kernelInfo.comp_options += " -DNUM_CH_PER_WG=" + std::to_string(num_ch_per_wg);
+    kernelInfo.comp_options += " -DNUM_IM_BLKS_X=" + std::to_string(num_im_blks_x);
+    kernelInfo.comp_options += " -DUSE_IM_OFF_GUARD=1 -DMIOPEN_USE_FP16=0 -DMIOPEN_USE_FP32=1";
 
     kernelInfo.l_wk = {256, 1, 1};
-    kernelInfo.g_wk = {256 * std::max(1, (c / num_ch_per_wg))* num_blks, 1, 1};
-
-    kernelInfo.comp_options = params;
+    kernelInfo.g_wk = {256 * std::max(1, (c_in / num_ch_per_wg))* num_im_blks, 1, 1};
 
     kptr = CreateKernel(device_id, &kernelInfo);
 }

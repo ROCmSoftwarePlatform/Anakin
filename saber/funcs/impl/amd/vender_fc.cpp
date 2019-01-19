@@ -325,15 +325,16 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
 
             float alpha = 1.0;
             float beta  = 0.0;
-            bool tA     = false;
-            bool tB     = true;
-            bool tC     = false;
-            int lda     = K;
-            int ldb     = K;
-            int ldc     = N;
+            bool transA     = false;
+            bool transB     = true;
+            bool transC     = false;
+            int leadingd_A     = K;
+            int leadingd_B     = K;
+            int leadingd_C     = N;
 
             MIOpenGEMM::Geometry tgg {};
-            tgg = MIOpenGEMM::Geometry(false, tA, tB, tC, lda, ldb, ldc, M, N, K, 0, 'f');
+            tgg = MIOpenGEMM::Geometry(false, transA, transB, transC, leadingd_A, leadingd_B, leadingd_C, M, N,
+                                       K, 0, 'f');
             AMD_API::stream_t cm = this->_ctx->get_compute_stream();
 
             /////////////////////////////////////////////////////////////
@@ -421,15 +422,16 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
 
         float alpha = 1.0;
         float beta  = 0.0;
-        bool tA     = false;
-        bool tB     = false;
-        bool tC     = false;
-        int lda     = K;
-        int ldb     = N;
-        int ldc     = N;
+        bool transA     = false;
+        bool transB     = false;
+        bool transC     = false;
+        int leadingd_A     = K;
+        int leadingd_B     = N;
+        int leadingd_C     = N;
 
         MIOpenGEMM::Geometry tgg {};
-        tgg = MIOpenGEMM::Geometry(false, tA, tB, tC, lda, ldb, ldc, M, N, K, 0, 'f');
+        tgg = MIOpenGEMM::Geometry(false, transA, transB, transC, leadingd_A, leadingd_B, leadingd_C, M, N,
+                                   K, 0, 'f');
         AMD_API::stream_t cm = this->_ctx->get_compute_stream();
 
         /////////////////////////////////////////////////////////////
