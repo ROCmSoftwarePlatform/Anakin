@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 */
 #include "include/saber_detection_output.h"
 #include "saber/funcs/impl/detection_helper.h"
-
 
 namespace anakin {
 namespace saber {
@@ -38,14 +37,13 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::create(
     std::vector<Tensor<AMD>*>& outputs,
     DetectionOutputParam<AMD>& param,
     Context<AMD>& ctx) {
-    const int count = outputs[0]->valid_size();
 
     //! inputs[1]: confidence map, dims = 4 {N, classes * boxes, 1, 1}
     //! inputs[2]: prior boxes, dims = 4 {1, 1, 2, boxes * 4(xmin, ymin, xmax, ymax)}
     Shape sh_loc  = inputs[0]->valid_shape();
     Shape sh_conf = inputs[1]->valid_shape();
     Shape sh_box  = inputs[2]->valid_shape();
-    // Tensor<AMD> t_conf = inputs[1];
+
     //! shape {1, 1, 2, boxes * 4(xmin, ymin, xmax, ymax)}, boxes = size / 2 / 4
     //! layout must be 4 dims, the priors is in the last dim
     _num_priors = sh_box.count() / 8;
@@ -67,10 +65,11 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::create(
     _bbox_preds.reshape(sh_loc);
     _conf_permute.reshape(sh_conf);
 
-    CHECK_EQ(_num_priors * _num_loc_classes * 4, sh_loc[1])
-            << "Number of priors must match number of location predictions.";
-    CHECK_EQ(_num_priors * _num_classes, sh_conf[1])
-            << "Number of priors must match number of confidence predictions.";
+
+    CHECK_EQ(_num_priors * _num_loc_classes * 4, sh_loc.count() / sh_loc.num()) <<
+        "Number of priors must match number of location predictions.";
+    CHECK_EQ(_num_priors * _num_classes, sh_conf.count() / sh_conf.num()) <<
+        "Number of priors must match number of confidence predictions.";
 
     if (_conf_cpu_data != nullptr) {
         fast_free(_conf_cpu_data);
@@ -83,6 +82,7 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::create(
     _conf_cpu_data = (dtype*)fast_malloc(sizeof(dtype) * sh_conf.count());
     _bbox_cpu_data = (dtype*)fast_malloc(sizeof(dtype) * sh_loc.count());
 
+    // create kernels
     const int loc_count = _bbox_preds.valid_size();
 
     AMDKernelPtr kptr;
@@ -231,7 +231,6 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::dispatch(
     }
 
     err = LaunchKernel(cm, list);
-
     if (!err) {
         LOG(ERROR) << "Failed to set execution";
         return SaberInvalidValue;
@@ -249,6 +248,7 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::dispatch(
         _bbox_preds.valid_size() * sizeof(dtype),
         cm,
         __DtoH());
+
     AMD_API::async_memcpy(
         _conf_cpu_data,
         0,
@@ -264,7 +264,7 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::dispatch(
     std::vector<dtype> result;
 
     nms_detect(_bbox_cpu_data, _conf_cpu_data, result, num, this->_num_classes, _num_priors,
-               param.background_id, \
+               param.background_id,
                param.keep_top_k, param.nms_top_k, param.conf_thresh, param.nms_thresh, param.nms_eta,
                param.share_location);
 
@@ -290,6 +290,7 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::dispatch(
         result.size() * sizeof(dtype),
         cm,
         __HtoD());
+    AMD_API::sync_stream(NULL, cm);
 
     return SaberSuccess;
 }
