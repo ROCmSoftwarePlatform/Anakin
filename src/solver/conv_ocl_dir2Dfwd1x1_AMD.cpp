@@ -30,12 +30,26 @@
 namespace miopen {
 namespace solver {
 
+struct Arguments {
+    int tile_col;
+    int tile_row;
+};
+
+#define ARG_SIZE    4
+
+Arguments args[] = {
+    {32, 64},
+    {32, 32},
+    {16, 32},
+    {16, 16},
+};
+
 bool ConvOclDirectFwd1x1AMD::IsApplicable(const ConvolutionContext& params) const {
     bool result =
         params.direction.IsForward() && (params.kernel_size0 == 1 && params.kernel_size1 == 1)
         && /*(params.batch_sz <= 8) &&*/ (params.kernel_stride0 <= 2)
         && (params.kernel_stride0 == params.kernel_stride1)
-        && (params.pad0 == 0 && params.pad1 == 0)  && (params.in_height == params.in_width);
+        && (params.pad0 == 0 && params.pad1 == 0);
 #if 0
     && (params.n_inputs == 16 || params.n_inputs == 24 || params.n_inputs == 32
         || params.n_inputs == 64 || params.n_inputs == 96 || params.n_inputs == 128
@@ -180,6 +194,81 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
 
                 kernelInfo.l_wk = {1024, 1, 1};
                 kernelInfo.g_wk = {1024 * 64, 1, 1};
+            } else if (conv11_param.kernel_method == 4) {
+
+                int stride_per_iter = 16;
+
+                int tile_col;
+                int tile_row;
+                int wg_in;
+                int wg_wei;
+
+                for (int i = 0; i < ARG_SIZE; i++) {
+
+                    tile_col = args[i].tile_col;
+                    tile_row = args[i].tile_row;
+
+                    wg_in =
+                        (params.in_height * params.in_width + tile_col - 1) /
+                        tile_col;
+                    wg_wei =
+                        (params.n_outputs + tile_row - 1) / tile_row;
+
+                    int wl = wg_in * wg_wei * 8;
+
+                    if (wl > 128) {
+                        break;
+                    }
+                }
+
+                int global_split = 1;
+
+                for (; wg_in * wg_wei * global_split < 128; global_split *= 2) {
+                }
+
+                int wi_per_tile_col = tile_col / 16;
+                int wi_per_tile_row = tile_row / 16;
+
+
+
+                kernelInfo.kernel_file = "Conv1x1.cl";
+                kernelInfo.kernel_name = "conv1x1_act";
+
+                if (cc._usemacro) {
+                    kernelInfo.comp_options =
+                        std::string(" -DMACRO") +
+                        std::string(" -DBIAS=") + std::to_string(params.bias) +
+                        std::string(" -DN=") + std::to_string(params.batch_sz) +
+                        std::string(" -DH=") + std::to_string(params.in_height) +
+                        std::string(" -DW=") + std::to_string(params.in_width) +
+                        std::string(" -DC=") + std::to_string(params.n_inputs) +
+                        std::string(" -DK=") + std::to_string(params.n_outputs) +
+                        std::string(" -DSTRIDE=") + std::to_string(params.kernel_stride0) +
+                        std::string(" -DGLOBAL_SPLITU=") + std::to_string(global_split) +
+                        std::string(" -DPER_ITER_STRIDE=") + std::to_string(stride_per_iter) +
+                        std::string(" -DTILE_COL=") + std::to_string(tile_col) +
+                        std::string(" -DTILE_ROW=") + std::to_string(tile_row) +
+                        std::string(" -DPER_WI_TILE_ROW=") + std::to_string(wi_per_tile_row) +
+                        std::string(" -DPER_WI_TILE_COL=") + std::to_string(wi_per_tile_col) +
+                        std::string(" -DBRANCH=1") +
+                        std::string(" -DKERNEL_METHOD=") + std::to_string(conv11_param.kernel_method);
+                } else {
+                    kernelInfo.comp_options =
+                        std::string(" -DBIAS=") + std::to_string(params.bias) +
+                        std::string(" -DN=") + std::to_string(params.batch_sz) +
+                        std::string(" -DSTRIDE=") + std::to_string(params.kernel_stride0) +
+                        std::string(" -DGLOBAL_SPLITU=") + std::to_string(global_split) +
+                        std::string(" -DPER_ITER_STRIDE=") + std::to_string(stride_per_iter) +
+                        std::string(" -DTILE_COL=") + std::to_string(tile_col) +
+                        std::string(" -DTILE_ROW=") + std::to_string(tile_row) +
+                        std::string(" -DPER_WI_TILE_ROW=") + std::to_string(wi_per_tile_row) +
+                        std::string(" -DPER_WI_TILE_COL=") + std::to_string(wi_per_tile_col) +
+                        std::string(" -DBRANCH=1") +
+                        std::string(" -DKERNEL_METHOD=") + std::to_string(conv11_param.kernel_method);
+                }
+
+                kernelInfo.l_wk        = {256, 1, 1};
+                kernelInfo.g_wk        = {256 * wg_in* wg_wei * global_split, 1, 1};
             }
         } else if (conv11_param.kernel_name == "Conv1x1FC.cl") {
             kernelInfo.isMIOpenKernel = true;

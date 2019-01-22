@@ -48,7 +48,8 @@ bool ConvCommon::getKernelInfo(const ConvolutionContext& params, Conv1x1Type& mT
                 && params.poolingContext.kernel_stride0 == 2
                 && conv1x1type[i].dev == dev && conv1x1type[i].batch == params.batch_sz
                 && conv1x1type[i].stride == params.kernel_stride0 && conv1x1type[i].channel == params.n_inputs
-                && conv1x1type[i].width == params.in_width && conv1x1type[i].output_num == params.n_outputs) {
+                && conv1x1type[i].width == params.in_width && conv1x1type[i].height == params.in_height
+                && conv1x1type[i].output_num == params.n_outputs) {
 
             mType = conv1x1type[i];
             ALOGD("Got kernel:" << mType.kernel_name << "!!");
@@ -57,8 +58,16 @@ bool ConvCommon::getKernelInfo(const ConvolutionContext& params, Conv1x1Type& mT
                    && conv1x1type[i].batch == params.batch_sz
                    && conv1x1type[i].stride == params.kernel_stride0 && (conv1x1type[i].channel == params.n_inputs
                            || conv1x1type[i].channel == 0)
-                   && conv1x1type[i].width == params.in_width && conv1x1type[i].output_num == params.n_outputs
-                   && params.n_inputs % 16 == 0) {
+                   && conv1x1type[i].width == params.in_width && conv1x1type[i].height == params.in_height
+                   && conv1x1type[i].output_num == params.n_outputs
+                  ) {
+
+            mType = conv1x1type[i];
+            ALOGD("Got kernel:" << mType.kernel_name << "!!");
+            return true;
+        } else if (!conv1x1type[i].fusion_pooling && conv1x1type[i].dev == dev
+                   && conv1x1type[i].batch == params.batch_sz
+                   && conv1x1type[i].width == 0) {
 
             mType = conv1x1type[i];
             ALOGD("Got kernel:" << mType.kernel_name << "!!");
