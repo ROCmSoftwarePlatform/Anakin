@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ namespace anakin {
 namespace saber {
 
 typedef TargetWrapper<AMD> AMD_API;
+
+#define LDS_MAX_FLOAT4_NUM 1000
 
 template <DataType OpDtype>
 SaberStatus SaberArgmax<AMD, OpDtype>::init(
@@ -48,6 +50,15 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
         _group_max_value.re_alloc(Shape({outer_dim, group_num, 1, 1}, Layout_NCHW));
         _group_max_index.re_alloc(Shape({outer_dim, group_num, 1, 1}, Layout_NCHW));
     }
+
+    while (localSize > 1) {
+        if (2 * localSize * param.top_k > LDS_MAX_FLOAT4_NUM) {
+            localSize >>= 1;
+        } else {
+            break;
+        }
+    }
+
 
     KernelInfo kernelInfo;
     kernelInfo.kernel_file = "Argmax.cl";
