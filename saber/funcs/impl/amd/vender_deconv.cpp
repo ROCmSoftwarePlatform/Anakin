@@ -21,8 +21,6 @@ typedef TargetWrapper<AMD> AMD_API;
 typedef Env<AMD> AMD_ENV;
 typedef Tensor<AMD> TensorDf4;
 
-
-
 void set_offsets_to_uint(std::string& clstr, int times) {
     for (int i = 0; i < times; i++) {
         clstr = clstr.replace(clstr.find("const ulong"), 11, "const uint");
@@ -67,31 +65,28 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
 
     KernelInfo kernelInfo;
 
-    // bool isBias = (param.bias()->size() > 0) ? true : false;
     int isBias           = (param.bias()->size() > 0) ? 1 : 0;
     int relu_flag        = (param.activation_param.active == Active_relu) ? 1 : 0;
     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
-    // int K       = (param.weight()->num());
-    int K       = (param.weight()->channel());
-    int N       = (inputs[0]->height()) * (inputs[0]->width());
-    int M       = (outputs[0]->channel()) * (param.weight()->height()) * (param.weight()->width());
-    float alpha = 1.0;
-    float beta  = 0.0;
-    bool transA     = true;
-    bool transB     = false;
-    bool transC     = false;
-    int leadingd_A     = M;
-    int leadingd_B     = N;
-    int leadingd_C     = N;
-    int workspace_req = param.weight()->channel() * param.weight()->height()
-                        * param.weight()->width() * (inputs[0]->height()) * (inputs[0]->width());
-
-    MIOpenGEMM::Geometry tgg {};
-    tgg = MIOpenGEMM::Geometry(false, transA, transB, transC, leadingd_A, leadingd_B, leadingd_C, M, N,
-                               K, 0, 'f');
 
     if (param.weight()->height() == 1 && param.weight()->width() == 1 && param.stride_h == 1
-            && param.stride_w == 1 && param.pad_h == 0 && param.pad_w == 0) {
+            && param.stride_w == 1 && param.pad_h == 0 && param.pad_w == 0 && param.group == 1) {
+
+        int K       = (param.weight()->channel());
+        int N       = (inputs[0]->height()) * (inputs[0]->width());
+        int M       = (outputs[0]->channel()) * (param.weight()->height()) * (param.weight()->width());
+        float alpha = 1.0;
+        float beta  = 0.0;
+        bool transA     = true;
+        bool transB     = false;
+        bool transC     = false;
+        int leadingd_A     = M;
+        int leadingd_B     = N;
+        int leadingd_C     = N;
+
+        MIOpenGEMM::Geometry tgg {};
+        tgg = MIOpenGEMM::Geometry(false, transA, transB, transC, leadingd_A, leadingd_B, leadingd_C, M, N,
+                                   K, 0, 'f');
         _outGemmWorkspace = new Tensor<AMD>;
         Shape sh({inputs[0]->num(), inputs[0]->channel(), inputs[0]->height(), inputs[0]->width()});
 
@@ -190,11 +185,28 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
         _kernel_isBias = kptr_isBias;
         _kernels.push_back(kptr_isBias);
     } else {
+        int K       = (param.weight()->channel() / param.group);
+        int N       = (inputs[0]->height()) * (inputs[0]->width());
+        int M       = (outputs[0]->channel() / param.group) * (param.weight()->height()) *
+                      (param.weight()->width());
+        float alpha = 1.0;
+        float beta  = 0.0;
+        bool transA     = true;
+        bool transB     = false;
+        bool transC     = false;
+        int leadingd_A     = M;
+        int leadingd_B     = N;
+        int leadingd_C     = N;
+
+        MIOpenGEMM::Geometry tgg {};
+        tgg = MIOpenGEMM::Geometry(false, transA, transB, transC, leadingd_A, leadingd_B, leadingd_C, M, N,
+                                   K, 0, 'f');
+
         _outGemmWorkspace = new Tensor<AMD>();
         Shape sh({param.weight()->channel(),
                   param.weight()->height(),
                   param.weight()->width(),
-                  inputs[0]->height() * inputs[0]->width()
+                  inputs[0]->height() * inputs[0]->width() * param.group
                  });
         _outGemmWorkspace->re_alloc(sh);
         bool miopengemm_verbose = false;
@@ -264,15 +276,13 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
         _kernel_normal           = kptr_normal;
         _kernels.push_back(kptr_normal);
 
-        //kernelInfo.kernel_type = MIOPEN;
         kernelInfo.kernel_file = "MIOpenUtilKernels2.cl";
         kernelInfo.kernel_name = "Col2ImBiasRelu";
         kernelInfo.kernel_type = MIOPEN;
-        //kernelInfo.kernel_type = SABER;
         kernelInfo.wk_dim      = 1;
         kernelInfo.l_wk        = {256, 1, 1};
         kernelInfo.g_wk        = {
-            param.weight()->num()* outputs[0]->height()* outputs[0]->width(), 1, 1
+            outputs[0]->channel()* outputs[0]->height()* outputs[0]->width(), 1, 1
         };
 
         AMDKernelPtr kptr_col2Im_bias_relu = CreateKernel(inputs[0]->device_id(), &kernelInfo);
@@ -305,7 +315,7 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
     int relu_flag = (param.activation_param.active == Active_relu) ? 1 : 0;
 
     if (param.weight()->height() == 1 && param.weight()->width() == 1 && param.stride_h == 1
-            && param.stride_w == 1 && param.pad_h == 0 && param.pad_w == 0) {
+            && param.stride_w == 1 && param.pad_h == 0 && param.pad_w == 0 && param.group == 1) {
         cl_uint uintObjects[3]   = {0, 0, 0};
         cl_float floatObjects[2] = {1.0f, 0.0f};
         cl_uint im_offset        = 0;
@@ -407,8 +417,6 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
 
         cl_uint uintObjects[3]   = {0, 0, 0};
         cl_float floatObjects[2] = {1.0f, 0.0f};
-        cl_uint im_offset        = 0;
-        cl_uint out_offset       = 0;
         cl_mem memObjects[4]     = {(cl_mem)inputs[0]->data(),
                                     (cl_mem)param.weight()->data(),
                                     (cl_mem)outputs[0]->mutable_data(),
@@ -419,31 +427,39 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
         AMDKernel* kernel;
 
         for (int i = 0; i < (inputs[0]->num()); i++) {
-            uintObjects[0] =
-                i * (inputs[0]->channel()) * (inputs[0]->height()) * (inputs[0]->width());
 
             uintObjects[2] =
-                i * (param.weight()->num()) * outputs[0]->height() * outputs[0]->width();
+                i * outputs[0]->channel() * outputs[0]->height() * outputs[0]->width();
 
-            if (_multikernel) {
-                AMDKernel* kernel = _kernel_atomic.get();
+            for (int k = 0; k < param.group; k++) {
+                uintObjects[1] = k * (param.weight()->num()) * (param.weight()->channel() / param.group) *
+                                 (param.weight()->height()) * (param.weight()->width());
+                uintObjects[0] = (i * (inputs[0]->channel()) * (inputs[0]->height()) * (inputs[0]->width())) +
+                                 (k * (inputs[0]->channel() / param.group) * inputs[0]->height() * inputs[0]->width());
+                cl_uint gemmwksp_offset = k * (outputs[0]->channel()) * param.weight()->height() *
+                                          param.weight()->width() * inputs[0]->height() * inputs[0]->width() / param.group;
+
+                if (_multikernel) {
+                    AMDKernel* kernel = _kernel_atomic.get();
+                    kernel->SetKernelArgs(
+                        (PtrDtype)_outGemmWorkspace->mutable_data(), gemmwksp_offset, (float)floatObjects[1]);
+                    list.push_back(_kernel_atomic);
+                }
+
+                kernel = _kernel_normal.get();
                 kernel->SetKernelArgs(
-                    (PtrDtype)_outGemmWorkspace->mutable_data(), 0, (float)floatObjects[1]);
-                list.push_back(_kernel_atomic);
+                    (PtrDtype)memObjects[1],
+                    (int)uintObjects[1],
+                    (PtrDtype)memObjects[0],
+                    (int)uintObjects[0],
+                    (PtrDtype)_outGemmWorkspace->mutable_data(),
+                    gemmwksp_offset,
+                    (float)floatObjects[0],
+                    (float)floatObjects[1]);
+
+                list.push_back(_kernel_normal);
+                err = LaunchKernel(cm, list);
             }
-
-            kernel = _kernel_normal.get();
-            kernel->SetKernelArgs(
-                (PtrDtype)memObjects[1],
-                (int)uintObjects[1],
-                (PtrDtype)memObjects[0],
-                (int)uintObjects[0],
-                (PtrDtype)_outGemmWorkspace->mutable_data(),
-                (int)0,
-                (float)floatObjects[0],
-                (float)floatObjects[1]);
-
-            list.push_back(_kernel_normal);
 
             kernel = _kernel_col2Im_bias_relu.get();
             kernel->SetKernelArgs(
