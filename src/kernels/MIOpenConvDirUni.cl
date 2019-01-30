@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2018 Advanced Micro Devices, Inc.
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -133,11 +133,11 @@
 #endif
 
 #if MLO_DIR_FORWARD == 1
-#define MLO_IN_LCL_WIDTH \
-    ((MLO_IN_TILE0 - 1) * MLO_FILTER_STRIDE0 + MLO_FILTER_SIZE0) // here we use kernel size. it's
-                                                                 // important when padding == 0  2*
-                                                                 // MLO_FILTER_PAD0
-#define MLO_IN_LCL_HEIGHT ((MLO_IN_TILE1 - 1) * MLO_FILTER_STRIDE1 + MLO_FILTER_SIZE1)
+// here we use kernel size. it's
+// important when padding == 0  2*
+// MLO_FILTER_PAD0
+#define MLO_IN_LCL_WIDTH  ((MLO_IN_TILE0 - 1) * MLO_FILTER_STRIDE0 + (MLO_FILTER_SIZE0 - 1) * MLO_FILTER_DILATION0 + 1)
+#define MLO_IN_LCL_HEIGHT ((MLO_IN_TILE1 - 1) * MLO_FILTER_STRIDE1 + (MLO_FILTER_SIZE1 - 1) * MLO_FILTER_DILATION1 + 1)
 #else
 #define MLO_IN_LCL_WIDTH                                              \
     ((MLO_IN_TILE0 + MLO_FILTER_SIZE0 - 1 + MLO_FILTER_STRIDE0 - 1) / \
@@ -154,7 +154,7 @@
 
 #define MLO_PVT_ACCUM_DATA_SZ (MLO_N_OUT_TILES * MLO_OUT_TILE_SZ)
 #if MLO_DIR_FORWARD == 1
-#define MLO_PVT_IN_WIDTH ((MLO_OUT_TILE0 - 1) * MLO_FILTER_STRIDE0 + MLO_FILTER_SIZE0)
+#define MLO_PVT_IN_WIDTH  ((MLO_OUT_TILE0 - 1) * MLO_FILTER_STRIDE0 + (MLO_FILTER_SIZE0 - 1) * MLO_FILTER_DILATION0 + 1)
 #define MLO_PVT_IN_HEIGHT ((MLO_OUT_TILE1 - 1) * MLO_FILTER_STRIDE1 + 1)
 #else
 #define MLO_PVT_IN_WIDTH \
@@ -361,8 +361,8 @@ static inline void Conv(uint o_map_base,
         uint wei_stg_base_off = mad24(o_map_base,
                                       (uint)(MLO_N_IN_TILES_PERSTACK * MLO_FILTER_SZ),
                                       mul24(i_c, (uint)MLO_FILTER_SZ));
-        uint in_stg_off2 = in_stg_off1;
-        for(uint j = 0; j < MLO_PVT_IN_HEIGHT - 1; ++j,
+        int in_stg_off2 = in_stg_off1;
+        for(int j = 0; j < MLO_PVT_IN_HEIGHT - ((int)MLO_FILTER_DILATION1); ++j,
                  in_stg_off2 += (((j - MLO_PADDING_SHIFT1 + MLO_PADDING_FIX1) % MLO_FILTER_STRIDE1)
                                      ? 0
                                      : MLO_IN_LCL_WIDTH))
@@ -373,6 +373,10 @@ static inline void Conv(uint o_map_base,
             }
         }
 
+#if MLO_DIR_FORWARD == 1
+        in_stg_off2 = in_stg_off1 + (MLO_PVT_IN_HEIGHT - ((int)MLO_FILTER_DILATION1)) * MLO_IN_LCL_WIDTH;
+#endif
+
 // over filter rows
 #ifdef __AMDGCN__
 #if MLO_FILTER_SIZE1 < 6
@@ -382,7 +386,7 @@ static inline void Conv(uint o_map_base,
 #endif
 #endif
 #if MLO_DIR_FORWARD == 1
-        for(uint k = 0; k < MLO_FILTER_SIZE1; ++k, in_stg_off2 += MLO_IN_LCL_WIDTH)
+        for(uint k = 0; k < MLO_FILTER_SIZE1; ++k)
 #else
         for(uint k = 0; k < MLO_FILTER_SIZE1; ++k,
                  in_stg_off2 += (((k - MLO_PADDING_SHIFT1 + MLO_PADDING_FIX1) % MLO_FILTER_STRIDE1)
@@ -397,11 +401,20 @@ static inline void Conv(uint o_map_base,
             // load filter in reverse order
             k_act = MLO_FILTER_SIZE1 - 1 - k;
 #endif
-            // load next input row
-            for(uint i_pvt = 0; i_pvt < MLO_PVT_IN_WIDTH; ++i_pvt)
+            int refresh_line = MLO_FILTER_DILATION1;
+            if (MLO_FILTER_DILATION1 > MLO_PVT_IN_HEIGHT)
             {
-                pvt_in_stage[(MLO_PVT_IN_HEIGHT - 1) * MLO_PVT_IN_WIDTH + i_pvt] =
-                    lcl_indata[in_stg_off2 + i_pvt];
+                in_stg_off2 += MLO_IN_LCL_WIDTH * (MLO_FILTER_DILATION1 - MLO_PVT_IN_HEIGHT);
+                refresh_line = MLO_PVT_IN_HEIGHT;
+            }
+
+            // load next input row
+            for (int j_pvt = refresh_line; j_pvt>0; j_pvt--) {
+                for (uint i_pvt = 0; i_pvt < MLO_PVT_IN_WIDTH; ++i_pvt) {
+                    pvt_in_stage[(MLO_PVT_IN_HEIGHT - j_pvt) * MLO_PVT_IN_WIDTH + i_pvt] =
+                        lcl_indata[in_stg_off2 + i_pvt];
+                }
+                in_stg_off2 += MLO_IN_LCL_WIDTH;
             }
 
             // over all outputs
@@ -438,8 +451,8 @@ static inline void Conv(uint o_map_base,
                                 l_act = l;
 
 #else
-                            // in reverse horizontal and vertical orders
-                            l_act = MLO_FILTER_SIZE0 - 1 - l;
+                                // in reverse horizontal and vertical orders
+                                l_act = MLO_FILTER_SIZE0 - 1 - l;
 
 #endif
 
@@ -447,7 +460,7 @@ static inline void Conv(uint o_map_base,
                                 // Directly accumulating to `pvt_accum` here sometimes results in
                                 // validation error for half precision.
                                 sum += pvt_in_stage[j * MLO_PVT_IN_WIDTH * MLO_FILTER_STRIDE1 +
-                                                    i * MLO_FILTER_STRIDE0 + l] *
+                                                    i * MLO_FILTER_STRIDE0 + l * MLO_FILTER_DILATION0] *
                                        pvt_wei_stage[l_act];
 #else
                             if(((i + l + 1 - MLO_PADDING_SHIFT0 +
@@ -471,12 +484,12 @@ static inline void Conv(uint o_map_base,
             } // for(uint o_c = 0; o_c < MLO_N_OUT_TILES; ++o_c)
 
             // move data up
-            for(uint j = 0; j < MLO_PVT_IN_HEIGHT - 1; ++j)
+            for(int j = 0; j < MLO_PVT_IN_HEIGHT - ((int)MLO_FILTER_DILATION1); ++j)
             {
                 for(uint i = 0; i < MLO_PVT_IN_WIDTH; ++i)
                 {
                     pvt_in_stage[j * MLO_PVT_IN_WIDTH + i] =
-                        pvt_in_stage[(j + 1) * MLO_PVT_IN_WIDTH + i];
+                        pvt_in_stage[(j + MLO_FILTER_DILATION1) * MLO_PVT_IN_WIDTH + i];
                 }
             }
 

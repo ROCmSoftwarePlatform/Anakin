@@ -39,7 +39,7 @@ bool ConvOclDirectFwd::IsApplicable(const ConvolutionContext& params) const
         && (params.GetBackwardPad0() < 0 || params.GetBackwardPad1() < 0))
         return false;
 
-    if (params.kernel_dilation0 != 1 || params.kernel_dilation1 != 1)
+    if (params.direction.IsBackwardData() && (params.kernel_dilation0 != 1 || params.kernel_dilation1 != 1))
         return false;
 
     if (params.group_counts < 2)
@@ -208,8 +208,8 @@ bool ConvOclDirectFwd::IsValidPerformanceConfig(
     long long mlo_in_lcl_height;
     if(params.direction.IsForward())
     {
-        mlo_in_lcl_width  = ((mlo_in_tile0 - 1) * mlo_filter_stride0 + mlo_filter_size0);
-        mlo_in_lcl_height = ((mlo_in_tile1 - 1) * mlo_filter_stride1 + mlo_filter_size1);
+        mlo_in_lcl_width  = ((mlo_in_tile0 - 1) * mlo_filter_stride0 + (mlo_filter_size0 - 1) * params.kernel_dilation0 + 1);
+        mlo_in_lcl_height = ((mlo_in_tile1 - 1) * mlo_filter_stride1 + (mlo_filter_size1 - 1) * params.kernel_dilation1 + 1);
     }
     else
     {
@@ -338,6 +338,8 @@ ConvSolution ConvOclDirectFwd::GetSolution(const ConvolutionContext& params,
         std::to_string(static_cast<long long>(params.kernel_stride0)) +
         std::string(" -DMLO_FILTER_STRIDE1=") +
         std::to_string(static_cast<long long>(params.kernel_stride1)) +
+        std::string(" -DMLO_FILTER_DILATION0=") + std::to_string(static_cast<long long>(params.kernel_dilation0)) +
+        std::string(" -DMLO_FILTER_DILATION1=") + std::to_string(static_cast<long long>(params.kernel_dilation1)) +
         std::string(" -DMLO_N_OUTPUTS=") +
         std::to_string(static_cast<long long>(params.n_outputs)) + std::string(" -DMLO_N_INPUTS=") +
         std::to_string(static_cast<long long>(params.n_inputs)) + std::string(" -DMLO_BATCH_SZ=") +

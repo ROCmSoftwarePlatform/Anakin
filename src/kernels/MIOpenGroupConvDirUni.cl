@@ -129,11 +129,11 @@
 #endif
 
 #if MLO_DIR_FORWARD == 1
-#define MLO_IN_LCL_WIDTH \
-    ((MLO_IN_TILE0 - 1) * MLO_FILTER_STRIDE0 + MLO_FILTER_SIZE0) // here we use kernel size. it's
+// here we use kernel size. it's
 // important when padding == 0  2*
 // MLO_FILTER_PAD0
-#define MLO_IN_LCL_HEIGHT ((MLO_IN_TILE1 - 1) * MLO_FILTER_STRIDE1 + MLO_FILTER_SIZE1)
+#define MLO_IN_LCL_WIDTH ((MLO_IN_TILE0 - 1) * MLO_FILTER_STRIDE0 + (MLO_FILTER_SIZE0 - 1) * MLO_FILTER_DILATION0 + 1)
+#define MLO_IN_LCL_HEIGHT ((MLO_IN_TILE1 - 1) * MLO_FILTER_STRIDE1 + (MLO_FILTER_SIZE1 - 1) * MLO_FILTER_DILATION1 + 1)
 #else
 #define MLO_IN_LCL_WIDTH                                              \
     ((MLO_IN_TILE0 + MLO_FILTER_SIZE0 - 1 + MLO_FILTER_STRIDE0 - 1) / \
@@ -150,7 +150,7 @@
 
 #define MLO_PVT_ACCUM_DATA_SZ (MLO_N_OUT_TILES * MLO_OUT_TILE_SZ)
 #if MLO_DIR_FORWARD == 1
-#define MLO_PVT_IN_WIDTH ((MLO_OUT_TILE0 - 1) * MLO_FILTER_STRIDE0 + MLO_FILTER_SIZE0)
+#define MLO_PVT_IN_WIDTH ((MLO_OUT_TILE0 - 1) * MLO_FILTER_STRIDE0 + (MLO_FILTER_SIZE0 - 1) * MLO_FILTER_DILATION0 + 1)
 #define MLO_PVT_IN_HEIGHT ((MLO_OUT_TILE1 - 1) * MLO_FILTER_STRIDE1 + 1)
 #else
 #define MLO_PVT_IN_WIDTH \
@@ -347,9 +347,9 @@ static inline void Conv(uint o_map_base,
         uint wei_stg_base_off = mad24(o_map_base,
                                       (uint)(MLO_N_IN_TILES_PERSTACK * MLO_FILTER_SZ),
                                       mul24(i_c, (uint)MLO_FILTER_SZ));
-        uint in_stg_off2 = in_stg_off1;
+        int in_stg_off2 = in_stg_off1;
 
-        for (uint j = 0; j < MLO_PVT_IN_HEIGHT - 1; ++j,
+        for (int j = 0; j < MLO_PVT_IN_HEIGHT - ((int)MLO_FILTER_DILATION1); ++j,
 #if MLO_DIR_FORWARD == 1
                 in_stg_off2 += MLO_IN_LCL_WIDTH
 #else
@@ -363,6 +363,10 @@ static inline void Conv(uint o_map_base,
             }
         }
 
+#if MLO_DIR_FORWARD == 1
+        in_stg_off2 = in_stg_off1 + (MLO_PVT_IN_HEIGHT - ((int)MLO_FILTER_DILATION1)) * MLO_IN_LCL_WIDTH;
+#endif
+
         // over filter rows
 #ifdef __AMDGCN__
 #if MLO_FILTER_SIZE1 < 6
@@ -373,7 +377,7 @@ static inline void Conv(uint o_map_base,
 #endif
 #if MLO_DIR_FORWARD == 1
 
-        for (uint k = 0; k < MLO_FILTER_SIZE1; ++k, in_stg_off2 += MLO_IN_LCL_WIDTH)
+        for (uint k = 0; k < MLO_FILTER_SIZE1; ++k)
 #else
         for (uint k = 0; k < MLO_FILTER_SIZE1; ++k,
                 in_stg_off2 += (((k - MLO_PADDING_SHIFT1 + MLO_PADDING_FIX1) % MLO_FILTER_STRIDE1)
@@ -388,11 +392,20 @@ static inline void Conv(uint o_map_base,
             // load filter in reverse order
             k_act = MLO_FILTER_SIZE1 - 1 - k;
 #endif
+            int refresh_line = MLO_FILTER_DILATION1;
+            if (MLO_FILTER_DILATION1 > MLO_PVT_IN_HEIGHT)
+            {
+                in_stg_off2 += MLO_IN_LCL_WIDTH * (MLO_FILTER_DILATION1 - MLO_PVT_IN_HEIGHT);
+                refresh_line = MLO_PVT_IN_HEIGHT;
+            }
 
             // load next input row
-            for (uint i_pvt = 0; i_pvt < MLO_PVT_IN_WIDTH; ++i_pvt) {
-                pvt_in_stage[(MLO_PVT_IN_HEIGHT - 1) * MLO_PVT_IN_WIDTH + i_pvt] =
-                    lcl_indata[in_stg_off2 + i_pvt];
+            for (int j_pvt = refresh_line; j_pvt>0; j_pvt--) {
+                for (uint i_pvt = 0; i_pvt < MLO_PVT_IN_WIDTH; ++i_pvt) {
+                    pvt_in_stage[(MLO_PVT_IN_HEIGHT - j_pvt) * MLO_PVT_IN_WIDTH + i_pvt] =
+                        lcl_indata[in_stg_off2 + i_pvt];
+                }
+                in_stg_off2 += MLO_IN_LCL_WIDTH;
             }
 
             // over all outputs
@@ -436,7 +449,7 @@ static inline void Conv(uint o_map_base,
                                 // Directly accumulating to `pvt_accum` here sometimes results in
                                 // validation error for half precision.
                                 sum += pvt_in_stage[j * MLO_PVT_IN_WIDTH * MLO_FILTER_STRIDE1 +
-                                                    i * MLO_FILTER_STRIDE0 + l] *
+                                                    i * MLO_FILTER_STRIDE0 + l*MLO_FILTER_DILATION0] *
                                        pvt_wei_stage[l_act];
 #else
 
@@ -462,10 +475,10 @@ static inline void Conv(uint o_map_base,
             } // for(uint o_c = 0; o_c < MLO_N_OUT_TILES; ++o_c)
 
             // move data up
-            for (uint j = 0; j < MLO_PVT_IN_HEIGHT - 1; ++j) {
+            for (int j = 0; j < MLO_PVT_IN_HEIGHT - ((int)MLO_FILTER_DILATION1); ++j) {
                 for (uint i = 0; i < MLO_PVT_IN_WIDTH; ++i) {
                     pvt_in_stage[j * MLO_PVT_IN_WIDTH + i] =
-                        pvt_in_stage[(j + 1) * MLO_PVT_IN_WIDTH + i];
+                        pvt_in_stage[(j + MLO_FILTER_DILATION1) * MLO_PVT_IN_WIDTH + i];
                 }
             }
 
@@ -496,6 +509,7 @@ MIOpenGroupConvUni(const __global _FLOAT* __restrict in,
     __private _FLOAT pvt_in_stage[MLO_PVT_IN_HEIGHT * MLO_PVT_IN_WIDTH];
     __private _FLOAT pvt_wei_stage[MLO_FILTER_SIZE0];
 
+
     uint grp_id0 = get_group_id(0);
 #if MLO_N_OUT_TILE_BLOCKS0 & (MLO_N_OUT_TILE_BLOCKS0 - 1)
     uint y_tile_blk = iDiv(grp_id0, MLO_N_OUT_TILE_BLOCKS0);
@@ -508,6 +522,7 @@ MIOpenGroupConvUni(const __global _FLOAT* __restrict in,
     uint b_pack = get_group_id(2); // batch block
 
     uint lcl_id = get_local_id(0);
+
 #if MLO_ALUTILES_STACK_SZ >= MLO_GRP_SZ
     uint stack        = 0;
     uint alu_stack_id = lcl_id;
@@ -820,6 +835,8 @@ MIOpenGroupConvUni(const __global _FLOAT* __restrict in,
         //      barrier(CLK_LOCAL_MEM_FENCE);
     }
 
+#if 1
+
     // write results out
 #if MLO_DIR_FORWARD == 1
 #if MLO_FILTER_STRIDE0 == 1
@@ -885,13 +902,14 @@ MIOpenGroupConvUni(const __global _FLOAT* __restrict in,
 #endif
 
 #if MLO_OUT_TILE0 != 1
-                    }
-                }
+                            }
+                        }
 
 #endif
+                    }
+                }
             }
         }
     }
-}
-}
+#endif
 }
