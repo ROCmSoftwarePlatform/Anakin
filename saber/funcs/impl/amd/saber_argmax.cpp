@@ -20,7 +20,7 @@ namespace saber {
 
 typedef TargetWrapper<AMD> AMD_API;
 
-#define LDS_MAX_FLOAT4_NUM 1000
+#define LDS_MAX_FLOAT4_NUM 10000
 
 template <DataType OpDtype>
 SaberStatus SaberArgmax<AMD, OpDtype>::init(
@@ -42,6 +42,8 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
 
     int localSize  = 256;
     int globalSize = 0;
+
+    _localWorkSize = localSize;
 
     if (!param.has_axis) {
         int inner_dim = inputs[0]->count(1, inputs[0]->dims());
@@ -67,7 +69,7 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
 
     std::string strLocalSize = std::to_string(kernelInfo.l_wk[0]);
     std::string strTreeMemSize =
-        std::to_string(2 * sizeof(float) * kernelInfo.l_wk[0] * param.top_k);
+        std::to_string(2 * kernelInfo.l_wk[0] * param.top_k);
     kernelInfo.comp_options = std::string(" -DLOCAL_WORK_SIZE=") + strLocalSize
                               + std::string(" -DTREE_MEM_SIZE=") + strTreeMemSize;
 
@@ -91,8 +93,6 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
             }
 
             _kernel_map[TOP_1_CHANNEL]     = kptr;
-            _globalWorkSize[TOP_1_CHANNEL] = kernelInfo.g_wk[0];
-            _localWorkSize[TOP_1_CHANNEL]  = kernelInfo.l_wk[0];
         } else {
             kernelInfo.kernel_name = "topk_channel";
             kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
@@ -103,8 +103,6 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
             }
 
             _kernel_map[TOPK_CHANNEL]     = kptr;
-            _globalWorkSize[TOPK_CHANNEL] = kernelInfo.g_wk[0];
-            _localWorkSize[TOPK_CHANNEL]  = kernelInfo.l_wk[0];
         }
     } else {
         int inner_dim = inputs[0]->count(1, inputs[0]->dims());
@@ -123,12 +121,10 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
                 }
 
                 _kernel_map[TOP_1]     = kptr;
-                _globalWorkSize[TOP_1] = kernelInfo.g_wk[0];
-                _localWorkSize[TOP_1]  = kernelInfo.l_wk[0];
             } else {
                 kernelInfo.kernel_name = "block_top1";
-                int groupNum           = (inner_dim + kernelInfo.l_wk[0] - 1) / kernelInfo.l_wk[0];
-                globalSize             = groupNum * outer_dim * kernelInfo.l_wk[0];
+                int inner_group_num    = (inner_dim + kernelInfo.l_wk[0] - 1) / kernelInfo.l_wk[0];
+                globalSize             = inner_group_num * outer_dim * kernelInfo.l_wk[0];
                 kernelInfo.g_wk        = {globalSize};
                 kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
@@ -138,8 +134,6 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
                 }
 
                 _kernel_map[BLOCK_TOP_1]     = kptr;
-                _globalWorkSize[BLOCK_TOP_1] = kernelInfo.g_wk[0];
-                _localWorkSize[BLOCK_TOP_1]  = kernelInfo.l_wk[0];
 
                 kernelInfo.kernel_name = "top1_big";
                 globalSize             = outer_dim * kernelInfo.l_wk[0];
@@ -152,8 +146,6 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
                 }
 
                 _kernel_map[TOP_1_BIG]     = kptr;
-                _globalWorkSize[TOP_1_BIG] = kernelInfo.g_wk[0];
-                _localWorkSize[TOP_1_BIG]  = kernelInfo.l_wk[0];
             }
         } else {
             globalSize             = outer_dim * kernelInfo.l_wk[0];
@@ -167,8 +159,6 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
             }
 
             _kernel_map[TOPK_HEAP_SHARED]     = kptr;
-            _globalWorkSize[TOPK_HEAP_SHARED] = kernelInfo.g_wk[0];
-            _localWorkSize[TOPK_HEAP_SHARED]  = kernelInfo.l_wk[0];
         }
     }
 
@@ -237,7 +227,7 @@ SaberStatus SaberArgmax<AMD, OpDtype>::dispatch(
         int outer_dim = inputs[0]->num();
 
         if (param.top_k == 1) {
-            if (inner_dim / _localWorkSize[TOP_1] < 10) {
+            if (inner_dim / _localWorkSize < 10) {
                 kernel = _kernel_map[TOP_1].get();
                 err    = kernel->SetKernelArgs(
                              (PtrDtype)inputs[0]->data(),
@@ -253,11 +243,13 @@ SaberStatus SaberArgmax<AMD, OpDtype>::dispatch(
 
                 list.push_back(_kernel_map[TOP_1]);
             } else {
+                int inner_group_num = (inner_dim + _localWorkSize - 1) / _localWorkSize;
                 kernel = _kernel_map[BLOCK_TOP_1].get();
                 err    = kernel->SetKernelArgs(
                              (PtrDtype)inputs[0]->data(),
                              (int)outer_dim,
                              (int)inner_dim,
+                             (int)inner_group_num,
                              (PtrDtype)_group_max_value.mutable_data(),
                              (PtrDtype)_group_max_index.mutable_data());
 
@@ -268,14 +260,12 @@ SaberStatus SaberArgmax<AMD, OpDtype>::dispatch(
 
                 list.push_back(_kernel_map[BLOCK_TOP_1]);
 
-                int groupNum =
-                    (inner_dim + _localWorkSize[TOP_1_BIG] - 1) / _localWorkSize[TOP_1_BIG];
                 kernel = _kernel_map[TOP_1_BIG].get();
                 err    = kernel->SetKernelArgs(
                              (PtrDtype)_group_max_value.data(),
                              (PtrDtype)_group_max_index.data(),
                              (int)outer_dim,
-                             (int)groupNum,
+                             (int)inner_group_num,
                              (int)param.out_max_val,
                              (PtrDtype)outputs[0]->mutable_data());
 

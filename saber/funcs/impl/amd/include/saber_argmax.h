@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -57,15 +57,14 @@ public:
            Context<AMD>& ctx) override;
 
     virtual SaberStatus dispatch(
-            const std::vector<Tensor<AMD>*>& inputs,
-            std::vector<Tensor<AMD>*>& outputs,
-            ArgmaxParam<AMD>& param) override;
+        const std::vector<Tensor<AMD>*>& inputs,
+        std::vector<Tensor<AMD>*>& outputs,
+        ArgmaxParam<AMD>& param) override;
 
 private:
     Tensor<AMD> _group_max_value;
     Tensor<AMD> _group_max_index;
-    std::unordered_map<int, size_t> _globalWorkSize;
-    std::unordered_map<int, size_t> _localWorkSize;
+    int _localWorkSize;
     std::unordered_map<int, AMDKernelPtr> _kernel_map;
 };
 
