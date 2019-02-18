@@ -78,29 +78,30 @@ bool ConvBinWinograd3x3U::IsApplicable(const ConvolutionContext& params) const {
     assert(params.weights_layout.length() == 0); // weights_layout is not supported yet.
     // clang-format off
     return params.pad0 == 1
-           && params.pad1 == 1
-           && params.kernel_size0 == 3
-           && params.kernel_size1 == 3
-           && ((params.kernel_stride0 == 1 && params.kernel_stride1 == 1)
-               || (params.kernel_stride0 == 2 && params.kernel_stride1 == 2))
-           && params.batch_sz < std::pow(2, 16)
-           && params.n_inputs < std::pow(2, 16)
-           && params.n_outputs < std::pow(2, 16)
-           && params.in_height < std::pow(2, 16)
-           && params.in_width < std::pow(2, 16)
-           && grid_workgroup_count_x < std::pow(2, 16)
-           && (params.n_inputs * params.in_height * params.in_width) <= std::pow(2, 28)
-           && (params.n_outputs * params.in_height * params.in_width) <= std::pow(2, 28)
-           && (params.n_inputs * params.kernel_size0 * params.kernel_size1) <= std::pow(2, 28)
-           && (params.n_outputs * params.kernel_size0 * params.kernel_size1) <= std::pow(2, 28)
-           && params.n_inputs % 2 == 0 && params.n_inputs >= (device_is_gfx8 ? 16 : 18)
-           && params.float_size == 32
-           && params.in_layout == "NCHW";
-    /// \todo _n_inputs > 18 is a requirement of the v7 shader and NOT a dependency on gfx9
-    /// The current way of implemenation is a hack as gfx8 uses v3.0 shader and gfx9 uses v7.
-    /// && (isForwardDirection() ? _weights_layout == "KCHW" : _weights_layout == "CKHW" )
-    /// Actually, K<->C flpping is controlled by separate flag, so we can support either
-    /// layout in both directions.
+        && params.pad1 == 1
+        && params.kernel_size0 == 3
+        && params.kernel_size1 == 3
+        && ((params.kernel_stride0 == 1 && params.kernel_stride1 == 1)
+             || (params.kernel_stride0 == 2 && params.kernel_stride1 == 2))
+        && params.batch_sz < std::pow(2, 16)
+        && (params.n_inputs / params.group_counts) < std::pow(2, 16)
+        && (params.n_outputs / params.group_counts) < std::pow(2, 16)
+        && params.in_height < std::pow(2, 16)
+        && params.in_width < std::pow(2, 16)
+        && grid_workgroup_count_x < std::pow(2, 16)
+        && ((params.n_inputs / params.group_counts) * params.in_height * params.in_width) <= std::pow(2, 28)
+        && ((params.n_outputs / params.group_counts) * params.in_height * params.in_width) <= std::pow(2, 28)
+        && ((params.n_inputs / params.group_counts) * params.kernel_size0 * params.kernel_size1) <= std::pow(2, 28)
+        && ((params.n_outputs / params.group_counts) * params.kernel_size0 * params.kernel_size1) <= std::pow(2, 28)
+        && (params.n_inputs / params.group_counts) % 2 == 0 && (params.n_inputs / params.group_counts) >= (device_is_gfx8 ? 16 : 18)
+        && params.float_size == 32
+        && params.in_layout == "NCHW"
+        && params.group_counts < 16;
+        /// \todo _n_inputs > 18 is a requirement of the v7 shader and NOT a dependency on gfx9
+        /// The current way of implemenation is a hack as gfx8 uses v3.0 shader and gfx9 uses v7.
+        /// && (isForwardDirection() ? _weights_layout == "KCHW" : _weights_layout == "CKHW" )
+        /// Actually, K<->C flpping is controlled by separate flag, so we can support either
+        /// layout in both directions.
 
     // clang-format on
 }
@@ -109,6 +110,8 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
     ConvSolution result;
     const auto n_groups = params.GetStream().GetMaxComputeUnits();
     const auto name     = params.GetStream().GetDeviceName();
+    int n_inputs = params.n_inputs / params.group_counts;
+    int n_outputs = params.n_outputs / params.group_counts;
 
     result.status = miopenStatusInternalError;
 
@@ -148,22 +151,22 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
                             && params.poolingContext.pad0 == 0
                             && params.poolingContext.pad1 == 0) {
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_pooling.so";
-                    } else if ((params.n_inputs == 128 && params.n_outputs == 128
+                    } else if ((n_inputs == 128 && n_outputs == 128
                                 && params.in_height == 28 && params.in_width == 28 && params.batch_sz == 1)
-                               || (params.n_inputs == 1024 && params.n_outputs == 1024
-                                   && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 2)
-                               || (params.n_inputs == 512 && params.n_outputs == 512
-                                   && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 4)
-                               || (params.n_inputs == 512 && params.n_outputs == 512
-                                   && params.in_height == 14 && params.in_width == 14 && params.batch_sz == 1)
-                               || (params.n_inputs == 256 && params.n_outputs == 256
-                                   && params.in_height == 14 && params.in_width == 14 && params.batch_sz <= 2)
-                               || (params.n_outputs == 384 && params.in_height == 13
-                                   && params.in_width == 13 && params.batch_sz <= 1)
-                               || (params.n_outputs == 128 && params.in_height == 6
-                                   && params.in_width == 64 && params.batch_sz <= 2)
-                               || (params.n_outputs == 64 && params.in_height == 12
-                                   && params.in_width == 128 && params.batch_sz <= 1)) {
+                              || (n_inputs == 1024 && n_outputs == 1024
+                                && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 2)
+                              || (n_inputs == 512 && n_outputs == 512
+                                && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 4)
+                              || (n_inputs == 512 && n_outputs == 512
+                                && params.in_height == 14 && params.in_width == 14 && params.batch_sz == 1)
+                              || (n_inputs == 256 && n_outputs == 256
+                                && params.in_height == 14 && params.in_width == 14 && params.batch_sz <= 2)
+                              || (n_outputs == 384 && params.in_height == 13
+                                && params.in_width == 13 && params.batch_sz <= 1)
+                              || (n_outputs == 128 && params.in_height == 6
+                                && params.in_width == 64 && params.batch_sz <= 2)
+                              || (n_outputs == 64 && params.in_height == 12
+                                && params.in_width == 128 && params.batch_sz <= 1)) {
                         //todo: remove n_inputs = n_outputs
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_sw.so";
                     } else {
@@ -192,25 +195,24 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
         } else if (params.rmv == rocm_meta_version::AMDHSA_1_0) {
             if (params.has_active && params.bias) {
                 if (params.kernel_stride0 == 1) {
-                    if ((params.n_inputs == 128 && params.n_outputs == 128
-                            && params.in_height == 28 && params.in_width == 28 && params.batch_sz == 1)
-                            || (params.n_inputs == 1024 && params.n_outputs == 1024
-                                && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 2)
-                            || (params.n_inputs == 512 && params.n_outputs == 512
-                                && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 4)
-                            || (params.n_inputs == 512 && params.n_outputs == 512
-                                && params.in_height == 14 && params.in_width == 14 && params.batch_sz == 1)
-                            || (params.n_inputs == 256 && params.n_outputs == 256
-                                && params.in_height == 14 && params.in_width == 14 && params.batch_sz <= 2)) {
+                    if ((n_inputs == 128 && n_outputs == 128
+                         && params.in_height == 28 && params.in_width == 28 && params.batch_sz == 1)
+                       || (n_inputs == 1024 && n_outputs == 1024
+                         && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 2)
+                       || (n_inputs == 512 && n_outputs == 512
+                         && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 4)
+                       || (n_inputs == 512 && n_outputs == 512
+                         && params.in_height == 14 && params.in_width == 14 && params.batch_sz == 1)
+                       || (n_inputs == 256 && n_outputs == 256
+                         && params.in_height == 14 && params.in_width == 14 && params.batch_sz <= 2)) {
                         //todo: remove n_inputs = n_outputs
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu_sw.so";
                     } else {
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu.so";
                     }
                 } else if (params.kernel_stride0 == 2
-                           && params.n_inputs == 1024 && params.in_height == 14 && params.in_width == 14) {
-                    kernel.kernel_file =   "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu_stride2.so"
-                                           ;
+                           && n_inputs == 1024 && params.in_height == 14 && params.in_width == 14) {
+                    kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu_stride2.so";
                 } else {
                     return result;
                 }

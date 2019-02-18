@@ -31,6 +31,14 @@
 namespace miopen {
 namespace solver {
 
+static bool using_MIOpenGroupConvDirUni_out_pixel_1x1(const ConvolutionContext& params)
+{
+    return params.direction.IsForward()
+        && params.group_counts > 1
+        && params.kernel_size0 <= 3 && params.kernel_size1 <= 3
+        && ((params.n_outputs / params.group_counts) >= 16 || params.kernel_dilation0 != 1 || params.kernel_dilation1 != 1);
+}
+
 bool ConvOclDirectFwd::IsApplicable(const ConvolutionContext& params) const
 {
     // clang-format off
@@ -71,8 +79,7 @@ bool ConvOclDirectFwd::IsApplicable(const ConvolutionContext& params) const
             /// it seems that is has 4x..20x worse precision, and some "test_conv --half" tests fail.
             && !(params.direction.IsForward()
                  && params.float_size == 16
-                 && params.kernel_stride0 == 2)
-            && IsValidPerformanceConfig(params, GetPerformanceConfig(params));
+                 && params.kernel_stride0 == 2);
     }
     // clang-format on
 }
@@ -102,12 +109,23 @@ bool ConvOclDirectFwd::IsValidPerformanceConfig(
     result.n_out_pix_tiles = std::min(params.n_outputs / (group_counts > 0 ? group_counts : 1), searched_params.n_out_pix_tiles);
 
     // hacky fix of the incorrect kernel local memory address calculation for data
-    result.out_pix_tile1 = (!params.direction.IsForward() && params.kernel_stride1 > 1)
-                               ? params.kernel_stride1
-                               : searched_params.out_pix_tile1;
-    result.out_pix_tile0 = (!params.direction.IsForward() && params.kernel_stride0 > 1)
-                               ? params.kernel_stride0
-                               : searched_params.out_pix_tile0;
+    if (using_MIOpenGroupConvDirUni_out_pixel_1x1(params))
+    {
+        result.in_tile0 = result.in_tile0 / result.out_pix_tile0;
+        result.in_tile1 = result.in_tile1 / result.out_pix_tile1;
+
+        result.out_pix_tile1 = 1;
+        result.out_pix_tile0 = 1;
+    }
+    else
+    {
+        result.out_pix_tile1 = (!params.direction.IsForward() && params.kernel_stride1 > 1)
+                                   ? params.kernel_stride1
+                                   : searched_params.out_pix_tile1;
+        result.out_pix_tile0 = (!params.direction.IsForward() && params.kernel_stride0 > 1)
+                                   ? params.kernel_stride0
+                                   : searched_params.out_pix_tile0;
+    }
 
     if(result.out_pix_tile1 == 0 || result.out_pix_tile0 == 0 /* DIV/0 */)
     {
@@ -261,12 +279,23 @@ ConvSolution ConvOclDirectFwd::GetSolution(const ConvolutionContext& params,
     result.n_out_pix_tiles = std::min(params.n_outputs / (group_counts > 0 ? group_counts : 1), searched_params.n_out_pix_tiles);
 
     // hacky fix of the incorrect kernel local memory address calculation for data
-    result.out_pix_tile1 = (!params.direction.IsForward() && params.kernel_stride1 > 1)
-                               ? params.kernel_stride1
-                               : searched_params.out_pix_tile1;
-    result.out_pix_tile0 = (!params.direction.IsForward() && params.kernel_stride0 > 1)
-                               ? params.kernel_stride0
-                               : searched_params.out_pix_tile0;
+    if (using_MIOpenGroupConvDirUni_out_pixel_1x1(params))
+    {
+        result.in_tile0 = result.in_tile0 / result.out_pix_tile0;
+        result.in_tile1 = result.in_tile1 / result.out_pix_tile1;
+
+        result.out_pix_tile1 = 1;
+        result.out_pix_tile0 = 1;
+    }
+    else
+    {
+        result.out_pix_tile1 = (!params.direction.IsForward() && params.kernel_stride1 > 1)
+                                   ? params.kernel_stride1
+                                   : searched_params.out_pix_tile1;
+        result.out_pix_tile0 = (!params.direction.IsForward() && params.kernel_stride0 > 1)
+                                   ? params.kernel_stride0
+                                   : searched_params.out_pix_tile0;
+    }
 
     if(result.out_pix_tile1 == 0 || result.out_pix_tile0 == 0 /* DIV/0 */)
     {
@@ -425,8 +454,16 @@ ConvSolution ConvOclDirectFwd::GetSolution(const ConvolutionContext& params,
     kernel_params.g_wk.push_back(gbl_wk1);
     kernel_params.g_wk.push_back(gbl_wk2);
 
-    kernel_params.kernel_file = group_counts >= 2 ? "MIOpenGroupConvDirUni.cl" : "MIOpenConvDirUni.cl";
-    kernel_params.kernel_name = group_counts >= 2 ? "MIOpenGroupConvUni" : "MIOpenConvUni";
+    if (using_MIOpenGroupConvDirUni_out_pixel_1x1(params))
+    {
+        kernel_params.kernel_file = "MIOpenGroupConvDirUni_out_pixel_1x1.cl";
+        kernel_params.kernel_name = "MIOpenGroupConvUni";
+    }
+    else
+    {
+        kernel_params.kernel_file = group_counts >= 2 ? "MIOpenGroupConvDirUni.cl" : "MIOpenConvDirUni.cl";
+        kernel_params.kernel_name = group_counts >= 2 ? "MIOpenGroupConvUni" : "MIOpenConvUni";
+    }
 
     result.construction_params.push_back(kernel_params);
 

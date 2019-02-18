@@ -360,7 +360,7 @@ ConvOclDirectFwdLegacyExhaustiveSearch::Search(const ConvolutionContext& params)
     int tile_sz1[4]        = {8, 16, 32, 64};
     int tile_sz0[4]        = {8, 16, 32, 64};
     int out_pix_tile_sz[3] = {1, 2, 4};
-    int n_out_tiles_rg[5]  = {1, 2, 4, 8};
+    int n_out_tiles_rg[6]  = {1, 2, 4, 8, 16, 32};
     int n_in_tiles_rg[3]   = {1, 2, 4};
     int n_in_stacks_sz[2]  = {1, 2};
     int in_tiles[4]        = {64, 128, 256, 2048};
@@ -370,7 +370,7 @@ ConvOclDirectFwdLegacyExhaustiveSearch::Search(const ConvolutionContext& params)
     size_t run_counter = 0;
 
     int out_pix_tl_cnt = 3; // out_pix_tile_sz[1];
-    int n_out_tls      = 4;
+    int n_out_tls      = 6;
     int n_in_tls       = 3;
     int stack_cnt      = std::min(params.batch_sz, 2);
     int n_tile0_sz     = 4;
