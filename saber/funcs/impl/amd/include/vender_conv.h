@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -33,8 +33,6 @@ public:
     typedef AMD_API::TPtr PtrDtype;
 
     VenderConv2D() {
-        _outGemmWorkspace = nullptr;
-        _slot = nullptr;
         _kernels_ptr.clear();
         vkernel.clear();
     }
@@ -45,10 +43,32 @@ public:
 
         if (_outGemmWorkspace) {
             delete _outGemmWorkspace;
+            _outGemmWorkspace = nullptr;
         }
 
         if (_slot) {
             delete _slot;
+            _slot = nullptr;
+        }
+
+        if (_subgroup_input) {
+            delete _subgroup_input;
+            _subgroup_input = nullptr;
+        }
+
+        if (_subgroup_weight) {
+            delete _subgroup_weight;
+            _subgroup_weight = nullptr;
+        }
+
+        if (_subgroup_bias) {
+            delete _subgroup_bias;
+            _subgroup_bias = nullptr;
+        }
+
+        if (_subgroup_output) {
+            delete _subgroup_output;
+            _subgroup_output = nullptr;
         }
     }
 
@@ -78,8 +98,12 @@ public:
 
 private:
     std::vector<AMDKernelPtr> _kernels_ptr;
-    Tensor<AMD>* _outGemmWorkspace;
-    Tensor<AMD>* _slot;
+    Tensor<AMD>* _outGemmWorkspace {nullptr};
+    Tensor<AMD>* _slot {nullptr};
+    Tensor<AMD>* _subgroup_input {nullptr};
+    Tensor<AMD>* _subgroup_weight {nullptr};
+    Tensor<AMD>* _subgroup_bias {nullptr};
+    Tensor<AMD>* _subgroup_output {nullptr};
     Tensor<AMD> _tensile_bias;
     void CreateKernelList(int device_id, KernelInfo& kernelInfo);
     std::vector<KernelInfo> vkernel;

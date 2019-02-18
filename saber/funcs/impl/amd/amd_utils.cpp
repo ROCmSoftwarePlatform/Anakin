@@ -576,7 +576,10 @@ std::vector<KernelInfo> FindSolution(
     miopen::solver::ConvSolution solution;
 
     if (convContext.group_counts > 1) {
-        solution = miopen::solver::SearchForSolution <miopen::solver::ConvOclDirectFwd > (convContext, db);
+        solution = miopen::solver::SearchForSolution <
+                       miopen::solver::ConvBinWinograd3x3U,
+                       miopen::solver::ConvOclDirectFwd
+                   > (convContext, db);
     } else {
         solution = miopen::solver::SearchForSolution <
                    miopen::solver::ConvBinWinograd3x3U,
