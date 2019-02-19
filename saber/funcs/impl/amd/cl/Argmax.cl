@@ -40,7 +40,6 @@ void adjust_small_heap_with_index_device(
         }
     }
 }
-
 void adjust_small_heap_with_index_device_stride(
     __local float* tree,
     __local float* index_tree,

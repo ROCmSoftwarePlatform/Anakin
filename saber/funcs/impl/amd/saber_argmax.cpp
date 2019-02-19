@@ -108,57 +108,38 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
         int inner_dim = inputs[0]->count(1, inputs[0]->dims());
         int outer_dim = inputs[0]->num();
 
-        if (param.top_k == 1) {
-            if (inner_dim / kernelInfo.l_wk[0] < 10) {
-                globalSize             = outer_dim * kernelInfo.l_wk[0];
-                kernelInfo.g_wk        = {globalSize};
-                kernelInfo.kernel_name = "top1";
-                kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+        {
+            unsigned int size = inner_dim;
+            unsigned int begin_bit = 0;
+            unsigned int end_bit = 8 * type_length(OpDtype);
+            radix_sort_genIndexBuffer<AK_INT32>(inputs[0], _values_input);
+            radix_sort_genRadixSortBuffer<AK_FLOAT, AK_INT32>(size, _keys_output, _values_output,
+                    _batch_digit_counts, _digit_counts, _keys_tmp, _values_tmp, _radix_params, begin_bit, end_bit);
+            radix_sort_gen_kernel<7>(_radix_sort_kernel_map, 0, inputs[0]->device_id(), _radix_params);
+            radix_sort_gen_kernel<7>(_radix_sort_kernel_map, 1, inputs[0]->device_id(), _radix_params);
+            radix_sort_gen_kernel<7>(_radix_sort_kernel_map, 2, inputs[0]->device_id(), _radix_params);
+            radix_sort_gen_kernel<7>(_radix_sort_kernel_map, 3, inputs[0]->device_id(), _radix_params);
 
-                if (NULL == kptr) {
-                    LOG(ERROR) << "Failed to load program";
-                    return SaberInvalidValue;
-                }
+            radix_sort_gen_kernel<6>(_radix_sort_kernel_map, 0, inputs[0]->device_id(), _radix_params);
+            radix_sort_gen_kernel<6>(_radix_sort_kernel_map, 1, inputs[0]->device_id(), _radix_params);
+            radix_sort_gen_kernel<6>(_radix_sort_kernel_map, 2, inputs[0]->device_id(), _radix_params);
+            radix_sort_gen_kernel<6>(_radix_sort_kernel_map, 3, inputs[0]->device_id(), _radix_params);
 
-                _kernel_map[TOP_1]     = kptr;
-            } else {
-                kernelInfo.kernel_name = "block_top1";
-                int inner_group_num    = (inner_dim + kernelInfo.l_wk[0] - 1) / kernelInfo.l_wk[0];
-                globalSize             = inner_group_num * outer_dim * kernelInfo.l_wk[0];
-                kernelInfo.g_wk        = {globalSize};
-                kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+            KernelInfo kernelInfo;
+            kernelInfo.kernel_file = "Argmax_radix_sort.cl";
+            kernelInfo.kernel_name = "topk_radix_sort";
+            kernelInfo.wk_dim      = 1;
+            kernelInfo.l_wk        = {localSize};
+            kernelInfo.g_wk        = {param.top_k};
 
-                if (NULL == kptr) {
-                    LOG(ERROR) << "Failed to load program";
-                    return SaberInvalidValue;
-                }
+            kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
-                _kernel_map[BLOCK_TOP_1]     = kptr;
-
-                kernelInfo.kernel_name = "top1_big";
-                globalSize             = outer_dim * kernelInfo.l_wk[0];
-                kernelInfo.g_wk        = {globalSize};
-                kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
-
-                if (NULL == kptr) {
-                    LOG(ERROR) << "Failed to load program";
-                    return SaberInvalidValue;
-                }
-
-                _kernel_map[TOP_1_BIG]     = kptr;
-            }
-        } else {
-            globalSize             = outer_dim * kernelInfo.l_wk[0];
-            kernelInfo.g_wk        = {globalSize};
-            kernelInfo.kernel_name = "topk_heap_shared";
-            kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
-
-            if (NULL == kptr) {
+            if (!kptr.get()->isInit()) {
                 LOG(ERROR) << "Failed to load program";
                 return SaberInvalidValue;
             }
 
-            _kernel_map[TOPK_HEAP_SHARED]     = kptr;
+            _radix_sort_kernel_map[RADIX_SORT_OUTPUT_COMBINE] = kptr;
         }
     }
 
@@ -226,72 +207,105 @@ SaberStatus SaberArgmax<AMD, OpDtype>::dispatch(
         int inner_dim = inputs[0]->count(1, inputs[0]->dims());
         int outer_dim = inputs[0]->num();
 
-        if (param.top_k == 1) {
-            if (inner_dim / _localWorkSize < 10) {
-                kernel = _kernel_map[TOP_1].get();
+        {
+            for (int i = 0; i < outer_dim; i++) {
+                unsigned int bit = 0;
+                unsigned int begin_bit = 0;
+                unsigned int end_bit = 8 * type_length(OpDtype);
+
+                unsigned int iterations = _radix_params.long_iterations + _radix_params.short_iterations;
+                bool to_output = (iterations - 1) % 2 == 0;
+
+                Tensor<AMD> sub_input;
+                int device_id = inputs[0]->device_id();
+                size_t count = inner_dim * type_length(OpDtype);
+                size_t offset = i * count;
+                sub_input.re_alloc(Shape({1, inner_dim, 1, 1}), OpDtype);
+
+                AMD_API::sync_memcpy(sub_input.mutable_data(), 0, device_id,
+                                     inputs[0]->data(), offset, device_id, count, __DtoD());
+
+
+                for (unsigned int i = 0; i < _radix_params.long_iterations; i++) {
+                    err = radix_sort_launch_kernel<7>(_radix_sort_kernel_map,
+                                                      (cl_mem)sub_input.data(),
+                                                      (cl_mem)_keys_tmp.mutable_data(),
+                                                      (cl_mem)_keys_output.mutable_data(),
+                                                      (cl_mem)_values_input.data(),
+                                                      (cl_mem)_values_tmp.mutable_data(),
+                                                      (cl_mem)_values_output.mutable_data(),
+                                                      (cl_mem)_batch_digit_counts.mutable_data(),
+                                                      (cl_mem)_digit_counts.mutable_data(),
+                                                      inner_dim,
+                                                      to_output,
+                                                      bit,
+                                                      begin_bit,
+                                                      end_bit,
+                                                      _radix_params,
+                                                      cm);
+
+                    if (!err) {
+                        LOG(ERROR) << "Fail to set execution";
+                        return SaberInvalidValue;
+                    }
+
+                    to_output = !to_output;
+                    bit += 7;
+                }
+
+                for (unsigned int i = 0; i < _radix_params.short_iterations; i++) {
+                    err = radix_sort_launch_kernel<6>(_radix_sort_kernel_map,
+                                                      (PtrDtype)sub_input.data(),
+                                                      (PtrDtype)_keys_tmp.mutable_data(),
+                                                      (PtrDtype)_keys_output.mutable_data(),
+                                                      (PtrDtype)_values_input.data(),
+                                                      (PtrDtype)_values_tmp.mutable_data(),
+                                                      (PtrDtype)_values_output.mutable_data(),
+                                                      (PtrDtype)_batch_digit_counts.mutable_data(),
+                                                      (PtrDtype)_digit_counts.mutable_data(),
+                                                      inner_dim,
+                                                      to_output,
+                                                      bit,
+                                                      begin_bit,
+                                                      end_bit,
+                                                      _radix_params,
+                                                      cm);
+
+                    if (!err) {
+                        LOG(ERROR) << "Fail to set execution";
+                        return SaberInvalidValue;
+                    }
+
+                    to_output = !to_output;
+                    bit += 6;
+                }
+
+                kernel = _radix_sort_kernel_map[RADIX_SORT_OUTPUT_COMBINE].get();
                 err    = kernel->SetKernelArgs(
-                             (PtrDtype)inputs[0]->data(),
-                             (int)outer_dim,
+                             (PtrDtype)outputs[0]->mutable_data(),
+                             (int)i,
                              (int)inner_dim,
+                             (int)param.top_k,
                              (int)param.out_max_val,
-                             (PtrDtype)outputs[0]->mutable_data());
+                             (PtrDtype)_keys_output.data(),
+                             (PtrDtype)_values_output.data());
 
                 if (!err) {
                     LOG(ERROR) << "Failed to set kernel args";
                     return SaberInvalidValue;
                 }
 
-                list.push_back(_kernel_map[TOP_1]);
-            } else {
-                int inner_group_num = (inner_dim + _localWorkSize - 1) / _localWorkSize;
-                kernel = _kernel_map[BLOCK_TOP_1].get();
-                err    = kernel->SetKernelArgs(
-                             (PtrDtype)inputs[0]->data(),
-                             (int)outer_dim,
-                             (int)inner_dim,
-                             (int)inner_group_num,
-                             (PtrDtype)_group_max_value.mutable_data(),
-                             (PtrDtype)_group_max_index.mutable_data());
+                list.push_back(_radix_sort_kernel_map[RADIX_SORT_OUTPUT_COMBINE]);
+                err = LaunchKernel(cm, list);
 
                 if (!err) {
-                    LOG(ERROR) << "Failed to set kernel args";
+                    LOG(ERROR) << "Fail to set execution";
                     return SaberInvalidValue;
                 }
-
-                list.push_back(_kernel_map[BLOCK_TOP_1]);
-
-                kernel = _kernel_map[TOP_1_BIG].get();
-                err    = kernel->SetKernelArgs(
-                             (PtrDtype)_group_max_value.data(),
-                             (PtrDtype)_group_max_index.data(),
-                             (int)outer_dim,
-                             (int)inner_group_num,
-                             (int)param.out_max_val,
-                             (PtrDtype)outputs[0]->mutable_data());
-
-                if (!err) {
-                    LOG(ERROR) << "Failed to set kernel args";
-                    return SaberInvalidValue;
-                }
-
-                list.push_back(_kernel_map[TOP_1_BIG]);
-            }
-        } else {
-            kernel = _kernel_map[TOPK_HEAP_SHARED].get();
-            err    = kernel->SetKernelArgs(
-                         (PtrDtype)outputs[0]->mutable_data(),
-                         (int)outer_dim,
-                         (int)inner_dim,
-                         (int)param.top_k,
-                         (int)param.out_max_val,
-                         (PtrDtype)inputs[0]->data());
-
-            if (!err) {
-                LOG(ERROR) << "Failed to set kernel args";
-                return SaberInvalidValue;
             }
 
-            list.push_back(_kernel_map[TOPK_HEAP_SHARED]);
+            LOG(INFO) << "COMPLETE EXECUTION";
+            return SaberSuccess;
         }
     }
 

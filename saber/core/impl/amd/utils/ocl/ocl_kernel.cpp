@@ -236,6 +236,20 @@ cl_program CreateProgramFromSource(cl_context context, cl_device_id device_id, K
 
     if (ki->kernel_type == SOURCE) {
         source = ki->kernel_file;
+
+        if (miopen::EndsWith(ki->kernel_file, ".hsaco")) {
+            is_binary = true;
+            std::ifstream kernelFile(ki->kernel_file, std::ios::in);
+
+            if (!kernelFile.is_open()) {
+                LOG(ERROR) << "Failed to open file for reading: " << ki->kernel_file << std::endl;
+                return NULL;
+            }
+
+            std::ostringstream oss;
+            oss << kernelFile.rdbuf();
+            source = oss.str();
+        }
     } else {
         try {
             if (ki->kernel_type == MIOPEN) {

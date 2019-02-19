@@ -22,6 +22,7 @@
 #include "saber/funcs/impl/impl_base.h"
 #include "saber/saber_funcs_param.h"
 #include "saber/core/impl/amd/utils/amd_kernel.h"
+#include "amd_radix_sort.h"
 #include <unordered_map>
 
 #define TOP_1 0
@@ -65,7 +66,21 @@ private:
     Tensor<AMD> _group_max_value;
     Tensor<AMD> _group_max_index;
     int _localWorkSize;
+
+    Tensor<AMD> _values_input;
+    Tensor<AMD> _keys_tmp;
+    Tensor<AMD> _values_tmp;
+
+    Tensor<AMD> _keys_output;
+    Tensor<AMD> _values_output;
+
+    Tensor<AMD> _batch_digit_counts;
+    Tensor<AMD> _digit_counts;
+
+    radix_sort_paramter _radix_params;
+
     std::unordered_map<int, AMDKernelPtr> _kernel_map;
+    std::unordered_map<int, AMDKernelPtr> _radix_sort_kernel_map;
 };
 
 } // namespace saber

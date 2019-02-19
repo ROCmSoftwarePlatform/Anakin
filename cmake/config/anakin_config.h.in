@@ -94,6 +94,8 @@
 #cmakedefine ENABLE_AMD_DO_SEARCH
 #cmakedefine ENABLE_AMD_EXPAND_ALL_SEARCH
 
+#cmakedefine AMD_RADIX_SORT_KERNEL_PATH "@AMD_RADIX_SORT_KERNEL_PATH@"
+
 #if defined(ANDROID) || defined(__ANDROID__)
 #define PLATFORM_ANDROID
 #define IS_MOBILE_PLATFORM

@@ -50,6 +50,10 @@ set(ANAKIN_UNIT_TEST ${ANAKIN_ROOT}/test)
 set(ANAKIN_EXAMPLES ${ANAKIN_ROOT}/examples)
 set(ANAKIN_SGX ${ANAKIN_ROOT}/sgx)
 
+if(AMD_GPU)
+    set(AMD_RADIX_SORT_KERNEL_PATH ${ANAKIN_ROOT}/saber/funcs/impl/amd/cl/radix_sort.hsaco)
+endif()
+
 
 # ----------------------------------------------------------------------------
 # section: options for anakin
