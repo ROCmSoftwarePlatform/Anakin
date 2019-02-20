@@ -553,21 +553,33 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
                               out_offset,
                               floatObjects[0]);
                 } else {
-                    if (isBias) {
-                        err = _kernels_ptr[i].get()->SetKernelArgs(
-                                  (PtrDtype)param.bias()->data(),
-                                  negative_slope,
-                                  (PtrDtype)inputs[0]->data(),
-                                  in_offset,
-                                  (PtrDtype)param.weight()->data(),
-                                  0,
-                                  (PtrDtype)outputs[0]->mutable_data(),
-                                  out_offset,
-                                  floatObjects[0],
-                                  floatObjects[1]);
+                    if (inputs[0]->num() == 1) {
+                        if (isBias) {
+                            err = _kernels_ptr[i].get()->SetKernelArgs(
+                                      (PtrDtype)param.bias()->data(),
+                                      negative_slope,
+                                      (PtrDtype)inputs[0]->data(),
+                                      in_offset,
+                                      (PtrDtype)param.weight()->data(),
+                                      0,
+                                      (PtrDtype)outputs[0]->mutable_data(),
+                                      out_offset,
+                                      floatObjects[0],
+                                      floatObjects[1]);
+                        } else {
+                            err = _kernels_ptr[i].get()->SetKernelArgs(
+                                      negative_slope,
+                                      (PtrDtype)inputs[0]->data(),
+                                      in_offset,
+                                      (PtrDtype)param.weight()->data(),
+                                      0,
+                                      (PtrDtype)outputs[0]->mutable_data(),
+                                      out_offset,
+                                      floatObjects[0],
+                                      floatObjects[1]);
+                        }
                     } else {
                         err = _kernels_ptr[i].get()->SetKernelArgs(
-                                  negative_slope,
                                   (PtrDtype)inputs[0]->data(),
                                   in_offset,
                                   (PtrDtype)param.weight()->data(),
@@ -591,6 +603,8 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
                     LOG(ERROR) << "Fail to set execution :" << err;
                     return SaberInvalidValue;
                 }
+
+                list.clear();
             }
         } else if (_kernels_ptr[i].get()->GetName() == "Im2Col") {
             LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "GEMM Not 1x1";

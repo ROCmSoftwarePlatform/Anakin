@@ -58,7 +58,7 @@ bool findGenericGemm(bool fromSolver, std::vector<AMDKernelPtr>& vkptr,
 
     if (fromSolver) {
         if ((inputs[0]->num() > 1
-                && inputs[0]->width() <= 14 && param.stride_h == 1)
+                && inputs[0]->width() <= 14 && inputs[0]->height() <= 14 && param.stride_h == 1)
                 || (param.stride_h == 2)) {
             LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "GEMM 1x1, 14x14";
             //The below section of code are as MIT license, the permission notice is from above (line 16 to 36)
