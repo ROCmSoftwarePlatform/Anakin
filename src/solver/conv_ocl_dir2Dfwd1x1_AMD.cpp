@@ -105,6 +105,7 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
     const LegacyPerformanceConfig& searched_params) const {
     ConvSolution result;
     // searched_params.CopyTo(result);
+    result.min_proc_time = searched_params.min_proc_time;
 
     ConvCommon cc;
     Conv1x1Type conv11_param;
@@ -421,5 +422,208 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
 
     return result;
 }
+
+template <class Solver>
+static void ExpandGetSolution(ConvSolution& kernel_search_result, const ConvolutionContext& params, const LegacyPerformanceConfig& result, Solver&& s)
+{
+    if(!kernel_search_result.Succeeded()) // once
+    {
+        if(s.IsApplicable(params))
+        {
+            if(s.IsValidPerformanceConfig(params, result))
+            {
+                kernel_search_result = s.GetSolution(params, result);
+            }
+        }
+    }
+}
+
+template <class Solver, class... Solvers>
+static void ExpandGetSolution(ConvSolution& kernel_search_result, const ConvolutionContext& params, const LegacyPerformanceConfig& result, Solver&& solver, Solvers&&... solvers)
+{
+    ExpandGetSolution(kernel_search_result, result, solver);
+    ExpandGetSolution(kernel_search_result, result, solvers...);
+}
+
+template <class... Solvers>
+static int MeasureLoop(Handle* profile_h,
+                       Data_t bot_ocl_buf,
+                       Data_t top_ocl_buf,
+                       Data_t wei_ocl_buf,
+                       Data_t bias_ocl_buf,
+                       double& processing_time,
+                       const ConvolutionContext& params,
+                       const LegacyPerformanceConfig& result)
+{
+    ConvSolution kernel_search_result{miopenStatusNotInitialized};
+
+#if(__cplusplus >= 201402L)
+    miopen::each_args(
+        [&](auto s) {
+            if(!kernel_search_result.Succeeded()) // once
+            {
+                if(s.IsApplicable(params))
+                {
+                    if(s.IsValidPerformanceConfig(params, result))
+                    {
+                        kernel_search_result = s.GetSolution(params, result);
+                    }
+                }
+            }
+        },
+        Solvers{}...);
+#else
+    ExpandGetSolution(kernel_search_result, params, result, Solvers{}...);
+#endif
+    if(!kernel_search_result.Succeeded())
+    {
+        return 1;
+    }
+
+    MIOPEN_LOG_I2("Trying " << result);
+    const auto kernel_params     = kernel_search_result.construction_params[0];
+    std::string compiler_options = params.general_compile_options + kernel_params.comp_options;
+
+    // Creating OCLKernel obj
+    try
+    {
+
+        float padding_value = 0;
+
+        if(profile_h)
+        {
+            processing_time = std::numeric_limits<float>::max();
+
+            auto k = profile_h->AddKernel("",
+                                          "",
+                                          kernel_params.kernel_file,
+                                          kernel_params.kernel_name,
+                                          kernel_params.l_wk,
+                                          kernel_params.g_wk,
+                                          compiler_options);
+
+            if(params.bias)
+            {
+                k(wei_ocl_buf, bot_ocl_buf, top_ocl_buf, bias_ocl_buf, params.negative_slope, params.n_inputs, params.in_height, params.in_width, params.n_outputs);
+            }
+            else
+            {
+                k(wei_ocl_buf, bot_ocl_buf, top_ocl_buf, params.negative_slope, params.n_inputs, params.in_height, params.in_width, params.n_outputs);
+            }
+            processing_time = profile_h->GetKernelTime();
+        }
+    }
+
+    catch(miopen::Exception& ex)
+    {
+        MIOPEN_LOG_E("MeasureLoop failed for: " << ex.what());
+        return -1;
+    }
+
+    //MIOPEN_LOG_I2("\t\t\t\t" << processing_time);
+    std::cout << "\t\t\t\t" << processing_time << std::endl;
+    return 0;
+}
+        
+
+LegacyPerformanceConfig
+ConvOclDirectFwd1x1AMD::SearchForMeasureOnce(const ConvolutionContext& params) const
+{
+    LegacyPerformanceConfig result;
+
+    miopen::Handle profile_h;
+    double processing_time = std::numeric_limits<double>::max();
+    double min_proc_time = std::numeric_limits<double>::max();
+
+    
+
+    // allocate tem input/output buffers
+    size_t bot_sz = params.bot_sz / sizeof(float);
+    std::vector<float> bot_sys_buf(bot_sz);
+
+    for(int i = 0; i < bot_sz; i++)
+    {
+        bot_sys_buf[i] = static_cast<float>(rand() * (1.0 / RAND_MAX));
+    }
+
+    auto bot_ocl_buf = profile_h.Write(bot_sys_buf);
+
+    size_t top_sz = params.top_sz / sizeof(float);
+    std::vector<float> top_sys_buf(top_sz);
+
+    auto top_ocl_buf = profile_h.Write(top_sys_buf);
+
+    std::vector<float> random_top_sys_buf(top_sz);
+    for(int i = 0; i < top_sz; i++)
+    {
+        random_top_sys_buf[i] = static_cast<float>(rand() * (1.0 / RAND_MAX));
+    }
+
+    size_t weights_sz = params.weights_sz / sizeof(float);
+    std::vector<float> wei_sys_buf(weights_sz);
+
+    std::cout << "top_sz:" << top_sz << " bot_sz:" << bot_sz << " weights_sz:" << weights_sz << std::endl;
+
+    for(int i = 0; i < weights_sz; i++)
+    {
+        wei_sys_buf[i] = static_cast<float>((rand() * (1.0 / RAND_MAX) - 0.5) * 0.001);
+    }
+
+    auto wei_ocl_buf = profile_h.Write(wei_sys_buf);
+
+    std::vector<float> bias_sys_buf;
+    miopen::Allocator::ManageDataPtr bias_ocl_buf = nullptr;
+
+    if(params.bias != 0)
+    {
+        size_t bias_sz = params.bias_sz / sizeof(float);
+        bias_sys_buf   = std::vector<float>(bias_sz);
+        for(int i = 0; i < bias_sz; i++)
+        {
+            bias_sys_buf[i] = static_cast<float>(rand() * (1.0 / RAND_MAX));
+        }
+
+        bias_ocl_buf = profile_h.Write(bias_sys_buf);
+    }
+
+    // randomize output
+    profile_h.WriteTo(reinterpret_cast<const void*>(random_top_sys_buf.data()),
+          top_ocl_buf,
+          random_top_sys_buf.size() * sizeof(float));
+
+    // enable profiling for the handle for benchmarking
+    profile_h.EnableProfiling(true);
+    const auto ret = MeasureLoop<ConvOclDirectFwd1x1AMD>(&profile_h,
+                              bot_ocl_buf.get(),
+                              top_ocl_buf.get(),
+                              wei_ocl_buf.get(),
+                              bias_ocl_buf.get(),
+                              processing_time,
+                              params,
+                              result);
+
+     if(min_proc_time > processing_time)
+    {
+        min_proc_time = processing_time;
+        MIOPEN_LOG_I2("processing_time = " << processing_time << ", result = " << result);
+    }
+
+    std::cout << std::endl << "=Score: " << min_proc_time << std::endl;
+
+    result.grp_tile0       = 0;
+    result.grp_tile1       = 0;
+    result.in_tile0        = 0;
+    result.in_tile1        = 0;
+    result.out_pix_tile0   = 0;
+    result.out_pix_tile1   = 0;
+    result.n_out_pix_tiles = 0;
+    result.n_in_data_tiles = 0;
+    result.n_stacks        = 0;
+    result.min_proc_time   = min_proc_time;
+
+    profile_h.EnableProfiling(false);
+    return result;
+}
+
 } // namespace solver
 } // namespace miopen

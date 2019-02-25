@@ -63,6 +63,7 @@ set( MIOpen_Source
 #    convolution_api.cpp
 #    convolution_fft.cpp
     boost_utils.cpp
+    gemm_utils.cpp
     db.cpp
     db_record.cpp
     find_controls.cpp
@@ -128,6 +129,7 @@ set( MIOpen_Source
     solver/conv_ocl_dir2Dfwd1x1.cpp
     solver/conv_ocl_dir2D_utils.cpp
     solver/conv_ocl_dir2Dfwd1x1_AMD.cpp
+    solver/conv_ocl_dir2Dfwd1x1_gemm.cpp
     solver/solver_conv_common.cpp
     )
 
@@ -383,10 +385,12 @@ endif()
 #
 ############################################################
 # MIOpen depends on miopengemm
-#if(miopengemm_FOUND)
-#    list(APPEND PACKAGE_DEPENDS PACKAGE miopengemm)
-#    target_internal_library(MIOpen miopengemm)
-#endif()
+if(miopengemm_FOUND)
+    list(APPEND PACKAGE_DEPENDS PACKAGE miopengemm)
+    target_include_directories(MIOpen SYSTEM PUBLIC ${miopengemm_INCLUDE_DIRS} )
+    target_link_libraries( MIOpen PUBLIC ${miopengemm_LIBRARIES} )
+    #target_internal_library(MIOpen miopengemm)
+endif()
 #
 #if(WIN32 AND NOT MSVC)
 #    if(BUILD_DEV)

@@ -2,7 +2,7 @@
 *
 * MIT License
 *
-* Copyright (c) 2017 Advanced Micro Devices, Inc.
+* Copyright (c) 2019 Advanced Micro Devices, Inc.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -45,6 +45,7 @@ struct LegacyPerformanceConfig : Serializable<LegacyPerformanceConfig>
     int n_out_pix_tiles = 0;
     int n_in_data_tiles = 0;
     int n_stacks        = 0;
+    double min_proc_time = 0;
 
     template <class Solution>
     void CopyTo(Solution& iud) const
@@ -58,6 +59,7 @@ struct LegacyPerformanceConfig : Serializable<LegacyPerformanceConfig>
         iud.n_out_pix_tiles = n_out_pix_tiles;
         iud.n_in_data_tiles = n_in_data_tiles;
         iud.n_stacks        = n_stacks;
+        iud.min_proc_time   = min_proc_time;
     }
 
     template <class Self, class F>
@@ -72,6 +74,7 @@ struct LegacyPerformanceConfig : Serializable<LegacyPerformanceConfig>
         f(self.n_out_pix_tiles, "temp.n_out_pix_tiles");
         f(self.n_in_data_tiles, "temp.n_in_data_tiles");
         f(self.n_stacks, "temp.n_stacks");
+        f(self.min_proc_time, "temp.min_proc_time");
     }
 };
 } // namespace solver

@@ -1,7 +1,32 @@
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
 /*
  * handleocl.cpp
  *
- *  Created on: Sep 5, 2018
+ *  Created on: Sep 5, 2019
  *      Author: junpeng
  */
 
@@ -93,7 +118,10 @@ KernelInvoke Handle::AddKernel(const std::string& algorithm,
                                std::size_t cache_index)
 {
     bool is_kernel_str = algorithm.find("GEMM") != std::string::npos;
-    std::cout <<"addKernel:"<<program_name<<" kernel name:"<<kernel_name<<" params:"<<params<<std::endl;
+    if (!is_kernel_str)
+        std::cout <<"addKernel:"<<program_name<<" kernel name:"<<kernel_name<<" params:"<<params<<std::endl;
+    else
+        std::cout <<"addKernel kernel name:"<<kernel_name<<" params:"<<params<<std::endl;
     auto p = miopen::LoadProgram(miopen::GetContext(this->GetStream()),
                                          miopen::GetDevice(this->GetStream()),
                                          program_name,
@@ -126,6 +154,11 @@ void Handle::SetProfilingResult(cl_event& e)
 void Handle::EnableProfiling(bool enable)
 {
     enable_profiling = enable;
+}
+
+bool Handle::IsProfilingEnabled() const 
+{ 
+    return enable_profiling; 
 }
 
 float Handle::GetKernelTime() const { return this->profiling_result; }

@@ -2,7 +2,7 @@
 *
 * MIT License
 *
-* Copyright (c) 2018 Advanced Micro Devices, Inc.
+* Copyright (c) 2019 Advanced Micro Devices, Inc.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -115,6 +115,7 @@ struct ConvSolution
     int n_out_pix_tiles; // # output pixel tiles per wk-item (ALU)
     int n_in_data_tiles; // # of blocks of different inputs in LDS
     int n_stacks;        // # of diff stacks (part of batch).
+    double min_proc_time;// the minimum processing time
 
     ConvSolution(miopenStatus_t status_ = miopenStatusSuccess)
         : status(status_),
@@ -128,7 +129,8 @@ struct ConvSolution
           out_pix_tile0(-1),
           n_out_pix_tiles(-1),
           n_in_data_tiles(-1),
-          n_stacks(-1)
+          n_stacks(-1),
+          min_proc_time(std::numeric_limits<double>::max())
     {
     }
 
@@ -192,10 +194,18 @@ auto FindSolutionImpl(rank<1>, Solver s, const Context& context, Db& db)
         {
             MIOPEN_LOG_I("Starting search: " << SolverDbId(s) << ", enforce: " << enforce);
             if (s.IsOptimized()) {
-                MIOPEN_LOG_I("skip search for optimized kernel");
-                LegacyPerformanceConfig result;
-                db.Update(context, SolverDbId(s), result);
-                return s.GetSolution(context, result);
+                MIOPEN_LOG_I("skip search for optimized kernel");                
+                if (context.do_all_search) {
+                    auto c = s.SearchForMeasureOnce(context);
+                    db.Update(context, SolverDbId(s), c);
+                    auto solution = s.GetSolution(context, c);
+                    solution.min_proc_time = c.min_proc_time;
+                    return solution;
+                } else {
+                    LegacyPerformanceConfig result;
+                    db.Update(context, SolverDbId(s), result);
+                    return s.GetSolution(context, result);
+                }
             } else {
                 try
                 {
@@ -217,6 +227,11 @@ template <class Solver, class Context, class Db>
 auto FindSolutionImpl(rank<0>, Solver s, const Context& context, Db&)
     -> decltype(s.GetSolution(context))
 {
+#if 0
+    auto solution = s.GetSolution(context);
+    s.ExecuteAndMeasureSolution(context, solution);
+    return solution;
+#endif 
     MIOPEN_LOG_I(SolverDbId(s) << " (not searchable)");
     return s.GetSolution(context);
 }
@@ -313,7 +328,69 @@ static inline bool IsPureOpenCLSolution(const Solution& s)
     return true;
 }
 
-#if(__cplusplus >= 201402L)
+template <class Context, class Solution, class Db, class T, class Solver>
+void ExpandSearchAllSolution(const Context& search_params, Db& db, std::vector<Solution>& ss, T& no_perf_filtering, Solver& solver)
+{
+    bool skip_the_rest = false;
+    if(!skip_the_rest
+       && solver.IsApplicable(search_params)
+       && (no_perf_filtering || solver.IsFast(search_params)))
+    { // clang-format on
+        const Solution s = FindSolution(solver, search_params, db);
+        if(s.Succeeded())
+        {
+            ss.push_back(s);
+            MIOPEN_LOG_I2(SolverDbId(solver) << ": Success.");
+
+            if(miopen::IsEnabled(MIOPEN_DEBUG_FIND_FIRST_CONV{}))
+            {
+                skip_the_rest = true;
+            }
+            else if(IsPureOpenCLSolution(s))
+            {
+                /// \todo (algorithm == Direct) is not checked here.
+                /// This is ok so far, as SearchForAllSolutions() is used only for direct
+                /// convolutions (for now).
+                if((search_params.direction.IsForward() &&
+                    miopen::IsEnabled(
+                        MIOPEN_OPENCL_WORKAROUND_FIND_ALL_CONV_DIRECT_FWD{})) ||
+                   (search_params.direction.IsBackwardData() &&
+                    miopen::IsEnabled(
+                        MIOPEN_OPENCL_WORKAROUND_FIND_ALL_CONV_DIRECT_BWD{})) ||
+                   (search_params.direction.IsBackwardWrW() &&
+                    miopen::IsEnabled(MIOPEN_OPENCL_WORKAROUND_FIND_ALL_CONV_DIRECT_WRW{})))
+                {
+                    skip_the_rest = true;
+                }
+            }
+        }
+        else
+        {
+            /// \todo If Solver is applicable it must provide an appropriate Solution.
+            /// This is not the case for some 20x5 convolutions (and possibly others).
+            /// Normally we should not get here and message level should be Error.
+            /// For now, let's use Info (not Warning) level to avoid
+            /// flooding the console.
+            MIOPEN_LOG_I(SolverDbId(solver)
+                         << ": [Warning] Applicable Solver not succeeded.");
+        }
+    }
+    else
+    {
+        MIOPEN_LOG_I2(SolverDbId(solver) << ": "
+                                         << (skip_the_rest ? "Skipped" : "Not applicable"));
+    }
+    std::cout<<"ss.size()="<<ss.size()<<std::endl;
+    return;
+}
+
+template <class Context, class Solution, class Db, class T, class Solver, class... Solvers>
+void ExpandSearchAllSolution(const Context& search_params, Db& db, std::vector<Solution>& ss, T& no_perf_filtering, Solver&& solver, Solvers&&... solvers)
+{
+    ExpandSearchAllSolution(search_params, db, ss, no_perf_filtering, solver);
+    ExpandSearchAllSolution(search_params, db, ss, no_perf_filtering, solvers...);
+}
+
 // Search for all applicable solutions among many solvers
 template <class... Solvers, class Context, class Db, class Solution = miopen::solver::ConvSolution>
 std::vector<Solution> SearchForAllSolutions(const Context& search_params, Db db)
@@ -327,7 +404,7 @@ std::vector<Solution> SearchForAllSolutions(const Context& search_params, Db db)
         auto no_perf_filtering =
             miopen::IsDisabled(MIOPEN_DEBUG_AMD_ASM_KERNELS_PERF_FILTERING{}) ||
             !miopen::IsEnabled(MIOPEN_DEBUG_FIND_FIRST_CONV{});
-
+#if(__cplusplus >= 201402L)
     bool skip_the_rest = false;
     miopen::each_args( // clang-format off
         [&](auto solver) { // cppcheck-suppress knownConditionTrueFalse
@@ -381,9 +458,11 @@ std::vector<Solution> SearchForAllSolutions(const Context& search_params, Db db)
             }
         },
         Solvers{}...);
+#else
+    ExpandSearchAllSolution(search_params, db, ss, no_perf_filtering, Solvers{}...);
+#endif
     return ss;
 }
-#endif
 
 void addPoolingKernel(const ConvolutionContext& params, ConvSolution& result);
 
@@ -609,6 +688,7 @@ struct ConvOclDirectFwdLegacyExhaustiveSearch : SolverBase<ConvolutionContext>
 {
     LegacyPerformanceConfig GetPerformanceConfig(const ConvolutionContext&) const;
     LegacyPerformanceConfig Search(const ConvolutionContext&) const;
+    LegacyPerformanceConfig SearchForMeasureOnce(const ConvolutionContext&);
 };
 
 struct ConvOclDirectFwd : ConvOclDirectFwdLegacyExhaustiveSearch
@@ -637,6 +717,27 @@ struct ConvOclDirectFwd1x1AMD : ConvOclDirectFwdLegacyExhaustiveSearch
 
     ConvSolution GetSolution(const ConvolutionContext& params,
                              const LegacyPerformanceConfig& searched_params) const;
+
+    LegacyPerformanceConfig SearchForMeasureOnce(const ConvolutionContext&) const;
+    bool IsValidPerformanceConfig(const ConvolutionContext&, const LegacyPerformanceConfig&) const
+    {
+        return true;
+    }
+
+    bool IsOptimized() const
+    {
+        return true;
+    }
+};
+
+struct ConvOclDirectFwd1x1Gemm : ConvOclDirectFwdLegacyExhaustiveSearch
+{
+    bool IsApplicable(const ConvolutionContext& params) const;
+
+    ConvSolution GetSolution(const ConvolutionContext& params,
+                             const LegacyPerformanceConfig& searched_params) const;
+
+    LegacyPerformanceConfig SearchForMeasureOnce(const ConvolutionContext&) const;
     bool IsValidPerformanceConfig(const ConvolutionContext&, const LegacyPerformanceConfig&) const
     {
         return true;

@@ -87,13 +87,13 @@ bool ConvCommon::getKernelInfo(const ConvolutionContext& params, Conv1x1Type& mT
         }
     }
 
-    if (params.batch_sz < 32 && ((params.kernel_stride0 == 1 && params.n_inputs >= 256 && params.n_outputs >= 256)
+    /*if (params.batch_sz < 32 && ((params.kernel_stride0 == 1 && params.n_inputs >= 256 && params.n_outputs >= 256)
                                  || (params.in_width <= 14 && params.in_height <= 14 && params.kernel_stride0 == 1)
                                  || (params.kernel_stride0 == 2))) {
         mType.kernel_name = "xGemm";
         ALOGD("Got kernel:" << mType.kernel_name << "!!");
         return true;
-    }
+    }*/
 
     return false;
 }
