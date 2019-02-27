@@ -694,6 +694,7 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
                         LOG(ERROR) << "Fail to set execution :" << err;
                         return SaberInvalidValue;
                     }
+                    list.clear();
                 }
             }
         } else if (_kernels_ptr[i].get()->GetName() == "BiasReluBoth") {
