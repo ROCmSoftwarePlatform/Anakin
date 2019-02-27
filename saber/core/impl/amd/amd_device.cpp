@@ -27,6 +27,11 @@ typedef TargetWrapper<AMDHX86> AMDHX86_API;
 
 size_t inline split(char* txt, std::vector<std::string>& strs, char d) {
     strs.clear();
+
+    if (txt == NULL || strlen(txt) == 0) {
+        return 0;
+    }
+
     char* pos_f = strchr(txt, d);
     char* pos_c = txt;
 
@@ -37,7 +42,7 @@ size_t inline split(char* txt, std::vector<std::string>& strs, char d) {
     }
 
     if (pos_f == NULL) {
-        pos_f = txt + strlen(txt);
+        pos_f = txt + strlen(txt) - 1;
     }
 
     strs.push_back(std::string(pos_c, pos_f - pos_c + 1));
