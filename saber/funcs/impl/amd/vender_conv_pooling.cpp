@@ -419,6 +419,76 @@ SaberStatus VenderConv2DPooling<AMD, OpDtype>::dispatch(
             }
 
             list.push_back(_kernels_ptr[i]);
+        } else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConvRxSU") {
+            int d_n_groups = 64, d_flags = 0;
+            err = _kernels_ptr[i].get()->SetKernelArgs(
+                      (unsigned int)inputs[0]->num(),
+                      (unsigned int)inputs[0]->channel(),
+                      (unsigned int)inputs[0]->height(),
+                      (unsigned int)inputs[0]->width(),
+                      (unsigned int)param.conv_param.weight()->num(),
+                      (unsigned int)d_n_groups,
+                      (unsigned int)d_flags,
+                      (unsigned int)0,
+                      (PtrDtype)inputs[0]->data(),
+                      (PtrDtype)param.conv_param.weight()->data(),
+                      (PtrDtype)_outConvRelu->mutable_data(),
+                      (PtrDtype)nullptr,
+                      (unsigned int)param.conv_param.weight()->height(),
+                      (unsigned int)param.conv_param.weight()->width(),
+                      (unsigned int)param.conv_param.pad_h,
+                      (unsigned int)param.conv_param.pad_w,
+                      (unsigned int)_outConvRelu->height(),
+                      (unsigned int)_outConvRelu->width()
+                  );
+
+            if (!err) {
+                LOG(ERROR) << "Fail to set kernel args :" << err;
+                return SaberInvalidValue;
+            }
+
+            list.push_back(_kernels_ptr[i]);
+        } else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConvRxSU_CBA") {
+            int d_n_groups = 64, d_flags = 0;
+
+            if (isBias) {
+                d_flags |= 128;
+            }
+
+            if (isActive) {
+                d_flags |= 256;
+            }
+
+            PtrDtype biasMemObject = isBias ? param.conv_param.bias()->data() : 0;
+            err = _kernels_ptr[i].get()->SetKernelArgs(
+                      (unsigned int)inputs[0]->num(),
+                      (unsigned int)inputs[0]->channel(),
+                      (unsigned int)inputs[0]->height(),
+                      (unsigned int)inputs[0]->width(),
+                      (unsigned int)param.conv_param.weight()->num(),
+                      (unsigned int)d_n_groups,
+                      (unsigned int)d_flags,
+                      (unsigned int)0,
+                      (PtrDtype)inputs[0]->data(),
+                      (PtrDtype)param.conv_param.weight()->data(),
+                      (PtrDtype)_outConvRelu->mutable_data(),
+                      (PtrDtype)nullptr,
+                      (unsigned int)param.conv_param.weight()->height(),
+                      (unsigned int)param.conv_param.weight()->width(),
+                      (unsigned int)param.conv_param.pad_h,
+                      (unsigned int)param.conv_param.pad_w,
+                      (unsigned int)_outConvRelu->height(),
+                      (unsigned int)_outConvRelu->width(),
+                      (PtrDtype)biasMemObject,
+                      negative_slope
+                  );
+
+            if (!err) {
+                LOG(ERROR) << "Fail to set kernel args :" << err;
+                return SaberInvalidValue;
+            }
+
+            list.push_back(_kernels_ptr[i]);
         } else if (_kernels_ptr[i].get()->GetName() == "mloPooling") {
             if (needBias) {
                 if (isBias) {

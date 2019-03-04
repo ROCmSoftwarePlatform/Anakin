@@ -583,6 +583,7 @@ std::vector<KernelInfo> FindSolution(
     } else {
         solution = miopen::solver::SearchForSolution <
                    miopen::solver::ConvBinWinograd3x3U,
+                   miopen::solver::ConvBinWinogradRxS,
                    miopen::solver::ConvOclDirectFwd1x1AMD,
                    // miopen::solver::ConvAsm3x3U,
                    // miopen::solver::ConvAsm1x1U,
@@ -720,6 +721,7 @@ std::vector<KernelInfo> FindSolutionWithPooling(
 
         solution = miopen::solver::SearchForSolution <
                    miopen::solver::ConvBinWinograd3x3U,
+                   miopen::solver::ConvBinWinogradRxS,
                    miopen::solver::ConvOclDirectFwd1x1AMD,
                    // miopen::solver::ConvAsm3x3U,
                    // miopen::solver::ConvAsm1x1U,

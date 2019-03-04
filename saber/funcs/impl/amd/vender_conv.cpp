@@ -526,6 +526,70 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
             }
 
             list.push_back(_kernels_ptr[i]);
+        }  else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConvRxSU") {
+            int d_n_groups = 64, d_flags = 0;
+            err = _kernels_ptr[i].get()->SetKernelArgs(
+                      (unsigned int)inputs[0]->num(),
+                      (unsigned int)inputs[0]->channel(),
+                      (unsigned int)inputs[0]->height(),
+                      (unsigned int)inputs[0]->width(),
+                      (unsigned int)param.weight()->num(),
+                      (unsigned int)d_n_groups,
+                      (unsigned int)d_flags,
+                      (unsigned int)0,
+                      (PtrDtype)inputs[0]->data(),
+                      (PtrDtype)param.weight()->data(),
+                      (PtrDtype)outputs[0]->mutable_data(),
+                      (PtrDtype)nullptr,
+                      (unsigned int)param.weight()->height(),
+                      (unsigned int)param.weight()->width(),
+                      (unsigned int)param.pad_h,
+                      (unsigned int)param.pad_w,
+                      (unsigned int)outputs[0]->height(),
+                      (unsigned int)outputs[0]->width()
+                  );
+
+            if (!err) {
+                LOG(ERROR) << "Fail to set kernel args :" << err;
+                return SaberInvalidValue;
+            }
+
+            list.push_back(_kernels_ptr[i]);
+        } else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConvRxSU_CBA") {
+            int d_n_groups = 64, d_flags = 0;
+            if (isBias)
+                d_flags |= 128;
+            if (isActive)
+                d_flags |= 256;
+            err = _kernels_ptr[i].get()->SetKernelArgs(
+                      (unsigned int)inputs[0]->num(),
+                      (unsigned int)inputs[0]->channel(),
+                      (unsigned int)inputs[0]->height(),
+                      (unsigned int)inputs[0]->width(),
+                      (unsigned int)param.weight()->num(),
+                      (unsigned int)d_n_groups,
+                      (unsigned int)d_flags,
+                      (unsigned int)0,
+                      (PtrDtype)inputs[0]->data(),
+                      (PtrDtype)param.weight()->data(),
+                      (PtrDtype)outputs[0]->mutable_data(),
+                      (PtrDtype)nullptr,
+                      (unsigned int)param.weight()->height(),
+                      (unsigned int)param.weight()->width(),
+                      (unsigned int)param.pad_h,
+                      (unsigned int)param.pad_w,
+                      (unsigned int)outputs[0]->height(),
+                      (unsigned int)outputs[0]->width(),
+                      (PtrDtype)param.bias()->data(),
+                      negative_slope
+                  );
+
+            if (!err) {
+                LOG(ERROR) << "Fail to set kernel args :" << err;
+                return SaberInvalidValue;
+            }
+
+            list.push_back(_kernels_ptr[i]);
         } else if (_kernels_ptr[i].get()->GetName() == "ConvFwd1x1") {
             if (isBias) {
                 if (isActive) {
@@ -847,6 +911,7 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
                         LOG(ERROR) << "Fail to set execution :" << err;
                         return SaberInvalidValue;
                     }
+
                     list.clear();
                 }
             }
