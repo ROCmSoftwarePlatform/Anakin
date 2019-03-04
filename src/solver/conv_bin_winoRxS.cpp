@@ -198,21 +198,26 @@ ConvSolution ConvBinWinogradRxS::GetSolution(const ConvolutionContext& params) c
     kernel.l_wk.push_back(1);
     kernel.l_wk.push_back(1);
 
-    if (params.bias == 0) {
+    if (params.direction.IsForward()) {
+        if (params.bias == 0) {
+            kernel.kernel_name = "sp3AsmConvRxSU";
+            kernel.kernel_file = "conv_3x3_wheel_alpha_v9_0_15";
+        } else {
+            kernel.kernel_name = "sp3AsmConvRxSU_CBA";
+            kernel.kernel_file = "conv_3x3_wheel_alpha_v9_2_7";
+        }
+    } else {
+        // WA: MIOpen didn't release the v9_2_7 stride 2 version for transpose convolution.
+        // Using fake fusion instead of it.
         kernel.kernel_name = "sp3AsmConvRxSU";
         kernel.kernel_file = "conv_3x3_wheel_alpha_v9_0_15";
-    } else {
-        kernel.kernel_name = "sp3AsmConvRxSU_CBA";
-        kernel.kernel_file = "conv_3x3_wheel_alpha_v9_2_7";
     }
 
     if (params.kernel_stride0 == 2) {
         if (params.direction.IsForward()) {
             kernel.kernel_file += "_stride_2_dec";
-        } else if (!params.direction.IsForward() && params.bias == 0) {
+        else {
             kernel.kernel_file += "_stride_2_dil";
-        } else {
-            MIOPEN_THROW("ConvBinWinogradRxS: Unsupported metadata version.");
         }
     }
 
@@ -229,7 +234,145 @@ ConvSolution ConvBinWinogradRxS::GetSolution(const ConvolutionContext& params) c
     kernel.kernel_file += ".so";
 
     result.construction_params.push_back(kernel);
+
+    // WA: MIOpen didn't release the v9_2_7 stride 2 version for transpose convolution.
+    // Using fake fusion instead of it.
+    if(/*!(params.kernel_stride0 == 1 && params.bias) &&*/ params.direction.IsBackwardData())
+    {
+        kernel.g_wk = {params.batch_sz * params.n_outputs * params.out_height * params.out_width, 1, 1};
+        kernel.l_wk = {256, 1, 1};
+
+        if (params.bias && params.has_active) {
+            kernel.kernel_name = "BiasReluBoth";
+        } else if (params.bias) {
+            kernel.kernel_name = "BiasOnly";
+        } else if (params.has_active) {
+            kernel.kernel_name = "ReluOnly";
+        }
+        kernel.kernel_file = "BiasReLuUni.cl";
+        kernel.isMIOpenKernel = false;
+
+        result.construction_params.push_back(kernel);
+    } else if (params.direction.IsForward() && params.bias == 0 && params.has_active) {
+        kernel.g_wk = {params.batch_sz * params.n_outputs * params.out_height * params.out_width, 1, 1};
+        kernel.l_wk = {256, 1, 1};
+        kernel.kernel_name = "ReluOnly";
+        kernel.kernel_file = "BiasReLuUni.cl";
+        kernel.isMIOpenKernel = false;
+    }
+
     return result;
 }
+
+int ConvBinWinogradRxS::ExecuteAndMeasureSolution(const ConvolutionContext& params,
+                     ConvSolution& solution) const
+{
+    // Allocate buffers, init input buffers.
+    size_t top_size  = params.top_sz / sizeof(float);
+    size_t bot_size  = params.bot_sz / sizeof(float);
+    size_t wei_size  = params.weights_sz / sizeof(float);
+    size_t bias_size = params.bias_sz / sizeof(float);
+
+    std::vector<float> top(top_size);
+    std::vector<float> bot(bot_size);
+    std::vector<float> wei(wei_size);
+    std::vector<float> bias(bias_size);
+
+    float* p = bot.data();
+    for(int i = 0; i < bot.size(); ++i)
+        *p++ = static_cast<float>(rand() * (1.0 / RAND_MAX));
+    if(!params.direction.IsBackwardWrW()) {
+        p = wei.data();
+        for(int i = 0; i < wei.size(); ++i)
+            *p++ = static_cast<float>((rand() * (1.0 / RAND_MAX) + -0.5) * 0.001);
+    }
+    if(params.bias) {
+        p = bias.data();
+        for(int i = 0; i < bias.size(); ++i)
+            *p++ = static_cast<float>(rand() * (1.0 / RAND_MAX));
+    }
+    miopen::Handle profile_h;
+    auto bot_ocl_buf  = profile_h.Write(bot);
+    auto top_ocl_buf  = profile_h.Write(top);
+    auto wei_ocl_buf  = profile_h.Write(wei);
+    auto bias_ocl_buf = params.bias ? profile_h.Write(bias) : nullptr;
+    profile_h.EnableProfiling(false);
+#ifdef NDEBUG
+    try
+#endif
+    {
+        solution.min_proc_time = std::numeric_limits<double>::max();
+        // ConvolutionContext::general_compile_options is for OpenCL kernels
+        // and thus not applicable for assembly.
+        const KernelInfo k_info = solution.construction_params[0];
+        auto kernel = profile_h.AddKernel("",
+                                          "",
+                                          k_info.kernel_file,
+                                          k_info.kernel_name,
+                                          k_info.l_wk,
+                                          k_info.g_wk,
+                                          k_info.comp_options);
+        int flags        = 7;
+        int reserved     = 0;
+        int* return_addr = nullptr;
+
+        for (int i = 0; i < WARM_UP; i++) {
+            kernel(params.batch_sz,
+                  params.n_inputs,
+                  params.in_height,
+                  params.in_width,
+                  params.n_outputs,
+                  64,
+                  flags,
+                  reserved,
+                  bot_ocl_buf.get(),
+                  wei_ocl_buf.get(),
+                  top_ocl_buf.get(),
+                  //bias_ocl_buf.get(),
+                  return_addr,
+                  params.kernel_size0,
+                  params.kernel_size1,
+                  params.kernel_size0 - params.pad0 - 1,
+                  params.kernel_size1 - params.pad1 - 1,
+                  params.out_height,
+                  params.out_width
+                );
+        }
+        profile_h.Finish();
+
+        profile_h.EnableProfiling(true);
+        //Real run here
+        kernel(params.batch_sz,
+              params.n_inputs,
+              params.in_height,
+              params.in_width,
+              params.n_outputs,
+              64,
+              flags,
+              reserved,
+              bot_ocl_buf.get(),
+              wei_ocl_buf.get(),
+              top_ocl_buf.get(),
+              //bias_ocl_buf.get(),
+              return_addr,
+              params.kernel_size0,
+              params.kernel_size1,
+              params.kernel_size0 - params.pad0 - 1,
+              params.kernel_size1 - params.pad1 - 1,
+              params.out_height,
+              params.out_width
+            );
+        solution.min_proc_time = profile_h.GetKernelTime();
+    }
+#ifdef NDEBUG
+    catch(miopen::Exception&)
+    {
+        return -1;
+    }
+#endif
+    return 0;
+
+}
+
 } // namespace solver
 } // namespace miopen

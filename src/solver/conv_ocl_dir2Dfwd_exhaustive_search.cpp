@@ -759,14 +759,6 @@ ConvOclDirectFwdLegacyExhaustiveSearch::Search(const ConvolutionContext& params)
     result.n_stacks        = min_n_stacks;
     result.min_proc_time   = min_proc_time;
 
-    std::cout       
-        << "kkkkk min time so far : " << result.min_proc_time << ", "
-        << result.grp_tile1
-        << ", " << result.grp_tile0 << ", " << result.in_tile1 << ", "
-        << result.in_tile0 << ", " << result.out_pix_tile1 << ", "
-        << result.out_pix_tile0 << ", " << result.n_out_pix_tiles << ", "
-        << result.n_in_data_tiles << ", " << result.n_stacks << std::endl;
-
     profile_h.EnableProfiling(false);
     if(!is_passed)
         MIOPEN_THROW("Search failed for ConvOclDirectFwdLegacyExhaustiveSearch");

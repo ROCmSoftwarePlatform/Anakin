@@ -78,6 +78,7 @@ MIOPEN_DECLARE_ENV_VAR(MIOPEN_OPENCL_WORKAROUND_FIND_ALL_CONV_DIRECT_BWD)
 MIOPEN_DECLARE_ENV_VAR(MIOPEN_OPENCL_WORKAROUND_FIND_ALL_CONV_DIRECT_WRW)
 
 namespace solver {
+#define WARM_UP 2
 /// \todo Move wave_size into abstraction wich represent GPU information
 const int wave_size = 64;
 /// Describes a kernel source and whatever information required in order
@@ -224,16 +225,18 @@ auto FindSolutionImpl(rank<1>, Solver s, const Context& context, Db& db)
 }
 
 template <class Solver, class Context, class Db>
-auto FindSolutionImpl(rank<0>, Solver s, const Context& context, Db&)
+auto FindSolutionImpl(rank<0>, Solver s, const Context& context, Db& db)
     -> decltype(s.GetSolution(context))
 {
-#if 0
-    auto solution = s.GetSolution(context);
-    s.ExecuteAndMeasureSolution(context, solution);
-    return solution;
-#endif 
     MIOPEN_LOG_I(SolverDbId(s) << " (not searchable)");
-    return s.GetSolution(context);
+
+    // Dummy Performance Config for bin or asm cases
+    LegacyPerformanceConfig config;
+    auto solution = s.GetSolution(context);
+    config.min_proc_time = solution.min_proc_time;
+    s.ExecuteAndMeasureSolution(context, solution);
+    db.Update(context, SolverDbId(s), config);
+    return solution;
 }
 
 /// Finds optimized Solution. Generic method.
@@ -527,6 +530,8 @@ struct SolverBase
     ///                          const ConvolutionContext& params,
     ///                          const ConvSolution& solution,
     ///                          float& elapsed_time) const;
+    int ExecuteAndMeasureSolution (const ConvolutionContext& params,
+                                 const ConvSolution& solution) const { return 0; }
     bool IsOptimized() const { return false; }
 };
 
@@ -759,6 +764,9 @@ struct ConvBinWinogradRxS : SolverBase<ConvolutionContext>
 {
     bool IsApplicable(const ConvolutionContext& params) const;
     ConvSolution GetSolution(const ConvolutionContext& params) const;
+    int ExecuteAndMeasureSolution(const ConvolutionContext& params,
+                                 ConvSolution& solution) const;
+
 };
 
 struct PerformanceConfigAsmDirect3x3WrW : Serializable<PerformanceConfigAsmDirect3x3WrW>
