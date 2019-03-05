@@ -550,7 +550,7 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
                               (PtrDtype)param.bias()->data(),
                               (PtrDtype)outputs[0]->mutable_data(),
                               (PtrDtype)_slot->mutable_data(),
-                              param.activation_param.negative_slope);
+                              negative_slope);
                 } else {
                     err = _kernels_ptr[i].get()->SetKernelArgs(
                               (PtrDtype)inputs[0]->data(),
@@ -568,7 +568,7 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
                               (PtrDtype)_tensile_bias.data(),
                               (PtrDtype)outputs[0]->mutable_data(),
                               (PtrDtype)_slot->mutable_data(),
-                              param.activation_param.negative_slope);
+                              negative_slope);
                 } else {
                     err = _kernels_ptr[i].get()->SetKernelArgs(
                               (PtrDtype)inputs[0]->data(),

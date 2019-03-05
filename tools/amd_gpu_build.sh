@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+# Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ cmake \
     -DENABLE_VERBOSE_MSG=NO \
     -DENABLE_AMD_PROFILING=NO \
     -DENABLE_AMD_DO_SEARCH=NO \
+    -DENABLE_AMD_EXPAND_ALL_SEARCH=NO \
     -DDISABLE_ALL_WARNINGS=YES \
     -DENABLE_NOISY_WARNINGS=NO \
     -DUSE_OPENMP=NO\

@@ -553,6 +553,12 @@ std::vector<KernelInfo> FindSolution(
 #else
     convContext.do_search       = false;
 #endif
+
+#ifdef ENABLE_AMD_EXPAND_ALL_SEARCH
+    convContext.do_all_search    = true;
+#else
+    convContext.do_all_search    = false;
+#endif
     convContext.save_srch_req   = true;
     convContext.in_layout       = "NCHW";
     convContext.out_layout      = "NCHW";
@@ -577,21 +583,78 @@ std::vector<KernelInfo> FindSolution(
 
     if (convContext.group_counts > 1) {
         solution = miopen::solver::SearchForSolution <
-                       // miopen::solver::ConvBinWinograd3x3U,
-                       miopen::solver::ConvOclDirectFwd
+                   // miopen::solver::ConvBinWinograd3x3U,
+                   miopen::solver::ConvOclDirectFwd
                    > (convContext, db);
     } else {
-        solution = miopen::solver::SearchForSolution <
-                   miopen::solver::ConvBinWinograd3x3U,
-                   miopen::solver::ConvBinWinogradRxS,
-                   miopen::solver::ConvOclDirectFwd1x1AMD,
-                   // miopen::solver::ConvAsm3x3U,
-                   // miopen::solver::ConvAsm1x1U,
-                   miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
-                   miopen::solver::ConvOclDirectFwdGen,
-                   miopen::solver::ConvOclDirectFwd3x3,
-                   miopen::solver::ConvOclDirectFwd1x1,
-                   miopen::solver::ConvOclDirectFwd > (convContext, db);
+
+#ifdef ENABLE_AMD_EXPAND_ALL_SEARCH
+        auto candidate_solutions = miopen::solver::SearchForAllSolutions <
+                                   miopen::solver::ConvBinWinograd3x3U,
+                                   miopen::solver::ConvOclDirectFwd1x1AMD,
+                                   miopen::solver::ConvOclDirectFwd1x1Gemm,
+                                   //miopen::solver::ConvAsm3x3U,
+                                   //miopen::solver::ConvAsm1x1U,
+                                   miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
+                                   miopen::solver::ConvOclDirectFwdGen,
+                                   miopen::solver::ConvOclDirectFwd3x3,
+                                   miopen::solver::ConvOclDirectFwd1x1,
+                                   miopen::solver::ConvOclDirectFwd > (convContext, db);
+        solution = candidate_solutions[0];
+        double min_time = std::numeric_limits<float>::max();
+
+        for (int i = 0; i < candidate_solutions.size(); i++) {
+            auto tmp_solution = candidate_solutions[i];
+
+            if (min_time > tmp_solution.min_proc_time) {
+                min_time = tmp_solution.min_proc_time;
+                solution = tmp_solution;
+            }
+        }
+
+#else
+
+        if (param.weight()->width() == 1
+                && param.weight()->height() == 1) {
+            auto candidate_solutions = miopen::solver::SearchForAllSolutions <
+                                       miopen::solver::ConvBinWinograd3x3U,
+                                       miopen::solver::ConvOclDirectFwd1x1AMD,
+                                       miopen::solver::ConvOclDirectFwd1x1Gemm,
+                                       //miopen::solver::ConvAsm3x3U,
+                                       //miopen::solver::ConvAsm1x1U,
+                                       miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
+                                       miopen::solver::ConvOclDirectFwdGen,
+                                       miopen::solver::ConvOclDirectFwd3x3,
+                                       miopen::solver::ConvOclDirectFwd1x1,
+                                       miopen::solver::ConvOclDirectFwd > (convContext, db);
+            solution = candidate_solutions[0];
+            double min_time = std::numeric_limits<float>::max();
+
+            for (int i = 0; i < candidate_solutions.size(); i++) {
+                auto tmp_solution = candidate_solutions[i];
+
+                if (min_time > tmp_solution.min_proc_time) {
+                    min_time = tmp_solution.min_proc_time;
+                    solution = tmp_solution;
+                }
+            }
+        } else {
+            solution = miopen::solver::SearchForSolution <
+                       miopen::solver::ConvBinWinograd3x3U,
+                       miopen::solver::ConvBinWinogradRxS,
+                       miopen::solver::ConvOclDirectFwd1x1AMD,
+                       miopen::solver::ConvOclDirectFwd1x1Gemm,
+                       // miopen::solver::ConvAsm3x3U,
+                       // miopen::solver::ConvAsm1x1U,
+                       miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
+                       miopen::solver::ConvOclDirectFwdGen,
+                       miopen::solver::ConvOclDirectFwd3x3,
+                       miopen::solver::ConvOclDirectFwd1x1,
+                       miopen::solver::ConvOclDirectFwd > (convContext, db);
+        }
+
+#endif
+
     }
 
     miopen::Handle::clearClEnv();
@@ -628,6 +691,13 @@ std::vector<KernelInfo> FindSolutionWithPooling(
 #else
     convContext.do_search        = false;
 #endif
+
+#ifdef ENABLE_AMD_EXPAND_ALL_SEARCH
+    convContext.do_all_search    = true;
+#else
+    convContext.do_all_search    = false;
+#endif
+
     convContext.general_compile_options += "";
     // context.SetStream(&profile_h);
     convContext.n_inputs         = inputs[0]->channel();
@@ -718,18 +788,72 @@ std::vector<KernelInfo> FindSolutionWithPooling(
     if (convContext.group_counts > 1) {
         solution = miopen::solver::SearchForSolution <miopen::solver::ConvOclDirectFwd > (convContext, db);
     } else {
+#ifdef ENABLE_AMD_EXPAND_ALL_SEARCH
+        auto candidate_solutions = miopen::solver::SearchForAllSolutions <
+                                   miopen::solver::ConvBinWinograd3x3U,
+                                   miopen::solver::ConvOclDirectFwd1x1AMD,
+                                   miopen::solver::ConvOclDirectFwd1x1Gemm,
+                                   //miopen::solver::ConvAsm3x3U,
+                                   //miopen::solver::ConvAsm1x1U,
+                                   miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
+                                   miopen::solver::ConvOclDirectFwdGen,
+                                   miopen::solver::ConvOclDirectFwd3x3,
+                                   miopen::solver::ConvOclDirectFwd1x1,
+                                   miopen::solver::ConvOclDirectFwd > (convContext, db);
+        solution = candidate_solutions[0];
+        double min_time = std::numeric_limits<float>::max();
 
-        solution = miopen::solver::SearchForSolution <
-                   miopen::solver::ConvBinWinograd3x3U,
-                   miopen::solver::ConvBinWinogradRxS,
-                   miopen::solver::ConvOclDirectFwd1x1AMD,
-                   // miopen::solver::ConvAsm3x3U,
-                   // miopen::solver::ConvAsm1x1U,
-                   miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
-                   miopen::solver::ConvOclDirectFwdGen,
-                   miopen::solver::ConvOclDirectFwd3x3,
-                   miopen::solver::ConvOclDirectFwd1x1,
-                   miopen::solver::ConvOclDirectFwd > (convContext, db);
+        for (int i = 0; i < candidate_solutions.size(); i++) {
+            auto tmp_solution = candidate_solutions[i];
+
+            if (min_time > tmp_solution.min_proc_time) {
+                min_time = tmp_solution.min_proc_time;
+                solution = tmp_solution;
+            }
+        }
+
+#else
+
+        if (param.conv_param.weight()->width() == 1
+                && param.conv_param.weight()->height() == 1) {
+            auto candidate_solutions = miopen::solver::SearchForAllSolutions <
+                                       miopen::solver::ConvBinWinograd3x3U,
+                                       miopen::solver::ConvOclDirectFwd1x1AMD,
+                                       miopen::solver::ConvOclDirectFwd1x1Gemm,
+                                       //miopen::solver::ConvAsm3x3U,
+                                       //miopen::solver::ConvAsm1x1U,
+                                       miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
+                                       miopen::solver::ConvOclDirectFwdGen,
+                                       miopen::solver::ConvOclDirectFwd3x3,
+                                       miopen::solver::ConvOclDirectFwd1x1,
+                                       miopen::solver::ConvOclDirectFwd > (convContext, db);
+            solution = candidate_solutions[0];
+            double min_time = std::numeric_limits<float>::max();
+
+            for (int i = 0; i < candidate_solutions.size(); i++) {
+                auto tmp_solution = candidate_solutions[i];
+
+                if (min_time > tmp_solution.min_proc_time) {
+                    min_time = tmp_solution.min_proc_time;
+                    solution = tmp_solution;
+                }
+            }
+        } else {
+            solution = miopen::solver::SearchForSolution <
+                       miopen::solver::ConvBinWinograd3x3U,
+                       miopen::solver::ConvBinWinogradRxS,
+                       miopen::solver::ConvOclDirectFwd1x1AMD,
+                       miopen::solver::ConvOclDirectFwd1x1Gemm,
+                       // miopen::solver::ConvAsm3x3U,
+                       // miopen::solver::ConvAsm1x1U,
+                       miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
+                       miopen::solver::ConvOclDirectFwdGen,
+                       miopen::solver::ConvOclDirectFwd3x3,
+                       miopen::solver::ConvOclDirectFwd1x1,
+                       miopen::solver::ConvOclDirectFwd > (convContext, db);
+        }
+
+#endif
     }
 
     miopen::Handle::clearClEnv();

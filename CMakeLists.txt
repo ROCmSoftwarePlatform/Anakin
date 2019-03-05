@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+# Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -164,6 +164,7 @@ endif()
 anakin_option(ENABLE_AMD_PROFILING "Enable amd profiling" NO)
 anakin_option(ENABLE_AMD_DEBUG "Enable amd debug" NO)
 anakin_option(ENABLE_AMD_DO_SEARCH "Enable amd kernel search" YES)
+anakin_option(ENABLE_AMD_EXPAND_ALL_SEARCH "Enable amd all kernel search" YES)
 
 # ----------------------------------------------------------------------------
 # section: anakin compiler and linker options

@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@
 
 #cmakedefine USE_PYTHON
 
-#cmakedefine USE_OPENCL 
+#cmakedefine USE_OPENCL
 
 #cmakedefine USE_OPENCV
 
@@ -75,7 +75,7 @@
 
 #cmakedefine NVIDIA_GPU
 
-#cmakedefine AMD_GPU 
+#cmakedefine AMD_GPU
 
 #cmakedefine ENABLE_STACKTRACES
 
@@ -92,34 +92,35 @@
 #cmakedefine ENABLE_AMD_DEBUG
 
 #cmakedefine ENABLE_AMD_DO_SEARCH
+#cmakedefine ENABLE_AMD_EXPAND_ALL_SEARCH
 
 #if defined(ANDROID) || defined(__ANDROID__)
-    #define PLATFORM_ANDROID
-    #define IS_MOBILE_PLATFORM
+#define PLATFORM_ANDROID
+#define IS_MOBILE_PLATFORM
 #elif defined(__APPLE__)
-    #define PLATFORM_POSIX
-    #include "TargetConditionals.h"
-    #if TARGET_IPHONE_SIMULATOR
-        #define IS_MOBILE_PLATFORM
-    #elif TARGET_OS_IPHONE
-        #define IS_MOBILE_PLATFORM
-    #endif
+#define PLATFORM_POSIX
+#include "TargetConditionals.h"
+#if TARGET_IPHONE_SIMULATOR
+#define IS_MOBILE_PLATFORM
+#elif TARGET_OS_IPHONE
+#define IS_MOBILE_PLATFORM
+#endif
 #elif defined(_WIN32)
-    #define PLATFORM_WINDOWS
+#define PLATFORM_WINDOWS
 #elif defined(__arm__)
-    #define PLATFORM_POSIX
-    // Require an outside macro to tell us if we're building for Raspberry Pi.
-    #if !defined(RASPBERRY_PI)
-        #define IS_MOBILE_PLATFORM
-    #endif  // !defined(RASPBERRY_PI)
+#define PLATFORM_POSIX
+// Require an outside macro to tell us if we're building for Raspberry Pi.
+#if !defined(RASPBERRY_PI)
+#define IS_MOBILE_PLATFORM
+#endif  // !defined(RASPBERRY_PI)
 #else
-    // If no platform specified, use:
-    #define PLATFORM_POSIX
+// If no platform specified, use:
+#define PLATFORM_POSIX
 #endif
 
 // Look for both gcc/clang and Visual Studio macros indicating if compiling for an x86 device.
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_IX86) || defined(_M_X64)
-    #define PLATFORM_X86
+#define PLATFORM_X86
 #endif
 
 #endif
