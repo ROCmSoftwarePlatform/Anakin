@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -114,6 +114,11 @@ std::vector<KernelInfo> FindSolutionWithPooling(
     Tensor<AMD>*& workspace,
     std::vector<Tensor<AMD>*>& outputs,
     ConvPoolingParam<AMD>& param);
+
+std::vector<KernelInfo> FindDeconvSolution(
+    const std::vector<Tensor<AMD>*>& inputs,
+    std::vector<Tensor<AMD>*>& outputs,
+    ConvParam<AMD>& param);
 } // namespace saber
 } // namespace anakin
 #endif

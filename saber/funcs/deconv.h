@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include "saber/funcs/impl/impl_deconv.h"
 
 #ifdef AMD_GPU
+#include "saber/funcs/impl/amd/include/saber_deconv.h"
 #include "saber/funcs/impl/amd/include/vender_deconv.h"
 #endif
 #ifdef USE_CUDA

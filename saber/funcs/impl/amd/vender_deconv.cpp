@@ -14,19 +14,19 @@
 */
 /*
    MIT License
-   
-   Copyright (c) 2017 Advanced Micro Devices, Inc. All Rights Reserved. 
-   
+
+   Copyright (c) 2017 Advanced Micro Devices, Inc. All Rights Reserved.
+
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
    in the Software without restriction, including without limitation the rights
    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
    copies of the Software, and to permit persons to whom the Software is
    furnished to do so, subject to the following conditions:
-   
+
    The above copyright notice and this permission notice shall be included in all
    copies or substantial portions of the Software.
-   
+
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -70,21 +70,30 @@ void set_offsets_to_uint(std::string& clstr) {
 }
 
 template <DataType OpDtype>
-SaberStatus VenderDeconv2D<AMD, OpDtype>::init(
-    const std::vector<Tensor<AMD>*>& inputs,
-    std::vector<Tensor<AMD>*>& outputs,
-    ConvParam<AMD>& param,
-    Context<AMD>& ctx) {
-    this->_ctx = &ctx;
-    return create(inputs, outputs, param, ctx);
+void VenderDeconv2D<AMD, OpDtype>::CreateKernelList(int device_id, KernelInfo& kernelInfo) {
+    AMDKernelPtr kptr = CreateKernel(device_id, &kernelInfo);
+
+    if (!kptr.get()->isInit()) {
+        LOG(ERROR) << "Failed to load program";
+        return;
+    }
+
+    _kernels_ptr.push_back(kptr);
 }
 
 template <DataType OpDtype>
-SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
+SaberStatus VenderDeconv2D<AMD, OpDtype>::create_gemm(
     const std::vector<Tensor<AMD>*>& inputs,
     std::vector<Tensor<AMD>*>& outputs,
     ConvParam<AMD>& param,
     Context<AMD>& ctx) {
+
+    _use_gemm = true;
+    _kernel_atomic = NULL;
+    _kernel_normal = NULL;
+    _kernel_col2Im = NULL;
+    _kernel_col2Im_bias_relu = NULL;
+    _kernel_isBias = NULL;
 
     KernelInfo kernelInfo;
 
@@ -133,19 +142,19 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
         size_t local_work_size;
         size_t global_work_size;
         cl_int errCode;
-        int i = 0;
+        int soln_tgks_indx = 0;
 
         if (soln.v_tgks.size() == 2) {
             _multikernel = true;
 
             // jn : the main kernel is at the back of the solution vector
-            kernel_clstring = soln.v_tgks[i].kernstr;
+            kernel_clstring = soln.v_tgks[soln_tgks_indx].kernstr;
             set_offsets_to_uint(kernel_clstring, 1);
 
             kernelInfo.kernel_type = SOURCE;
-            kernelInfo.kernel_name = soln.v_tgks[i].fname;
-            local_work_size        = soln.v_tgks[i].local_work_size;
-            global_work_size       = soln.v_tgks[i].global_work_size;
+            kernelInfo.kernel_name = soln.v_tgks[soln_tgks_indx].fname;
+            local_work_size        = soln.v_tgks[soln_tgks_indx].local_work_size;
+            global_work_size       = soln.v_tgks[soln_tgks_indx].global_work_size;
 
             kernelInfo.kernel_file   = kernel_clstring;
             kernelInfo.wk_dim        = 1;
@@ -159,18 +168,17 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
             }
 
             _kernel_atomic = kptr_atomic;
-            _kernels.push_back(kptr_atomic);
 
-            i++;
+            soln_tgks_indx++;
         }
 
         // jn : the main kernel is at the back of the solution vector
-        kernel_clstring = soln.v_tgks[i].kernstr;
+        kernel_clstring = soln.v_tgks[soln_tgks_indx].kernstr;
         set_offsets_to_uint(kernel_clstring, 3);
 
-        kernelInfo.kernel_name = soln.v_tgks[i].fname;
-        local_work_size        = soln.v_tgks[i].local_work_size;
-        global_work_size       = soln.v_tgks[i].global_work_size;
+        kernelInfo.kernel_name = soln.v_tgks[soln_tgks_indx].fname;
+        local_work_size        = soln.v_tgks[soln_tgks_indx].local_work_size;
+        global_work_size       = soln.v_tgks[soln_tgks_indx].global_work_size;
 
         kernelInfo.kernel_file = kernel_clstring;
         kernelInfo.wk_dim      = 1;
@@ -186,7 +194,6 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
         }
 
         _kernel_normal = kptr_normal;
-        _kernels.push_back(kptr_normal);
 
         kernelInfo.kernel_file = "BiasReLuUni.cl";
         kernelInfo.kernel_name = "BiasReluBoth";
@@ -207,7 +214,6 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
         }
 
         _kernel_isBias = kptr_isBias;
-        _kernels.push_back(kptr_isBias);
     } else {
         //The below section of code are as MIT license, the permission notice is from above (line 16 to 36)
         int K       = (param.weight()->channel() / param.group);
@@ -252,17 +258,17 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
         size_t local_work_size;
         size_t global_work_size;
         cl_int errCode;
-        int i = 0;
+        int soln_tgks_indx = 0;
 
         if (soln.v_tgks.size() == 2) {
             _multikernel = true;
 
-            kernel_clstring = soln.v_tgks[i].kernstr;
+            kernel_clstring = soln.v_tgks[soln_tgks_indx].kernstr;
             set_offsets_to_uint(kernel_clstring, 1);
 
-            kernelInfo.kernel_name = soln.v_tgks[i].fname;
-            local_work_size        = soln.v_tgks[i].local_work_size;
-            global_work_size       = soln.v_tgks[i].global_work_size;
+            kernelInfo.kernel_name = soln.v_tgks[soln_tgks_indx].fname;
+            local_work_size        = soln.v_tgks[soln_tgks_indx].local_work_size;
+            global_work_size       = soln.v_tgks[soln_tgks_indx].global_work_size;
 
             kernelInfo.kernel_file = kernel_clstring;
             kernelInfo.wk_dim      = 1;
@@ -278,17 +284,16 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
             }
 
             _kernel_atomic = kptr_atomic;
-            _kernels.push_back(kptr_atomic);
-            i++;
+            soln_tgks_indx++;
         }
 
         // jn : the main kernel is at the back of the solution vector
-        kernel_clstring = soln.v_tgks[i].kernstr;
+        kernel_clstring = soln.v_tgks[soln_tgks_indx].kernstr;
         set_offsets_to_uint(kernel_clstring, 3);
 
-        kernelInfo.kernel_name = soln.v_tgks[i].fname;
-        local_work_size        = soln.v_tgks[i].local_work_size;
-        global_work_size       = soln.v_tgks[i].global_work_size;
+        kernelInfo.kernel_name = soln.v_tgks[soln_tgks_indx].fname;
+        local_work_size        = soln.v_tgks[soln_tgks_indx].local_work_size;
+        global_work_size       = soln.v_tgks[soln_tgks_indx].global_work_size;
 
         kernelInfo.kernel_file = kernel_clstring;
 
@@ -299,7 +304,6 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
 
         AMDKernelPtr kptr_normal = CreateKernel(inputs[0]->device_id(), &kernelInfo);
         _kernel_normal           = kptr_normal;
-        _kernels.push_back(kptr_normal);
 
         kernelInfo.kernel_file = "MIOpenUtilKernels2.cl";
         kernelInfo.kernel_name = "Col2ImBiasRelu";
@@ -318,26 +322,89 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
         }
 
         _kernel_col2Im_bias_relu = kptr_col2Im_bias_relu;
-        _kernels.push_back(kptr_col2Im_bias_relu);
 
     }
 
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE CREATE KERNEL";
     return SaberSuccess;
 }
-template <DataType OpDtype>
 
-SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
+template <DataType OpDtype>
+SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
     const std::vector<Tensor<AMD>*>& inputs,
     std::vector<Tensor<AMD>*>& outputs,
-    ConvParam<AMD>& param) {
-    bool err;
-    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "dispatch";
-    amd_kernel_list list;
+    ConvParam<AMD>& param,
+    Context<AMD>& ctx) {
 
-    AMD_API::stream_t cm = this->_ctx->get_compute_stream();
-    int isBias    = (param.bias()->size() > 0) ? 1 : 0;
-    int relu_flag = (param.activation_param.active == Active_relu) ? 1 : 0;
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "create";
+
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
+            << "AMD Summary: input size N " << inputs[0]->num()
+            << " C " << inputs[0]->channel()
+            << " H " << inputs[0]->height()
+            << " W " << inputs[0]->width();
+
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
+            << "AMD Summary: op param K " << param.weight()->num()
+            << " Y " << param.weight()->height() << " X " << param.weight()->width()
+            << " SH " << param.stride_h << " SW " << param.stride_w
+            << " PH " << param.pad_h << " PW " << param.pad_w
+            << " DH " << param.dilation_h << " DW " << param.dilation_w
+            << " Alpha " << param.alpha << " Beta " << param.beta << " GP " << param.group
+            << " hasAct " << param.activation_param.has_active
+            << " ActType " << param.activation_param.active
+            << " slop " << param.activation_param.negative_slope
+            << " coef " << param.activation_param.coef;
+
+    // Clear the kernel object ptr
+    _kernels_ptr.clear();
+
+    std::vector<KernelInfo> solution = FindDeconvSolution(inputs, outputs, param);
+
+    if (!solution.empty()) {
+        _use_gemm = false;
+
+        for (auto s : solution) {
+            CreateKernelList(inputs[0]->device_id(), s);
+            LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "s.kernel_name=" << s.kernel_name;
+        }
+    } else {
+#if NOT_USE_GEMM
+        LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "No solution found!!!";
+        return SaberInvalidValue;
+#else
+        LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "No solution found!!!Trying to use GEMM";
+        create_gemm(inputs, outputs, param, ctx);
+#endif
+    }
+
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE CREATE KERNEL";
+
+    return SaberSuccess;
+}
+
+template <DataType OpDtype>
+SaberStatus VenderDeconv2D<AMD, OpDtype>::init(
+    const std::vector<Tensor<AMD>*>& inputs,
+    std::vector<Tensor<AMD>*>& outputs,
+    ConvParam<AMD>& param,
+    Context<AMD>& ctx) {
+    this->_ctx = &ctx;
+    return create(inputs, outputs, param, ctx);
+}
+
+template <DataType OpDtype>
+SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch_gemm(
+    const std::vector<Tensor<AMD>*>& inputs,
+    std::vector<Tensor<AMD>*>& outputs,
+    ConvParam<AMD>& param,
+    amd_kernel_list& list) {
+
+    bool err;
+    AMD_API::stream_t cm    = this->_ctx->get_compute_stream();
+    bool isBias             = (param.bias()->size() > 0) ? 1 : 0;
+    bool isActive           = param.activation_param.has_active;
+    int relu_flag           = (param.activation_param.active == Active_relu) ? 1 : 0;
 
     if (param.weight()->height() == 1 && param.weight()->width() == 1 && param.stride_h == 1
             && param.stride_w == 1 && param.pad_h == 0 && param.pad_w == 0 && param.group == 1) {
@@ -382,13 +449,12 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
             LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE SET ARGUMENT";
 
             err = LaunchKernel(cm, list);
+            list.clear();
 
             if (!err) {
                 LOG(ERROR) << "Fialed to set execution.";
                 return SaberInvalidValue;
             }
-
-            list.clear();
         }
 
         if (isBias) {
@@ -429,17 +495,14 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
         }
 
         err = LaunchKernel(cm, list);
+        list.clear();
 
         if (!err) {
             LOG(ERROR) << "Fialed to set execution.";
             return SaberInvalidValue;
         }
 
-        list.clear();
-    } else // param.weight()->height() != 1 && param.weight()->width() != 1 && param.stride_h != 1
-        // && param.stride_w != 1
-    {
-
+    } else {
         cl_uint uintObjects[3]   = {0, 0, 0};
         cl_float floatObjects[2] = {1.0f, 0.0f};
         cl_mem memObjects[4]     = {(cl_mem)inputs[0]->data(),
@@ -484,6 +547,7 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
 
                 list.push_back(_kernel_normal);
                 err = LaunchKernel(cm, list);
+                list.clear();
             }
 
             kernel = _kernel_col2Im_bias_relu.get();
@@ -514,15 +578,233 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
             LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE SET ARGUMENT";
 
             err = LaunchKernel(cm, list);
+            list.clear();
 
             if (!err) {
                 LOG(ERROR) << "Fialed to set execution.";
                 return SaberInvalidValue;
             }
-
-            list.clear();
         }
 
+    }
+}
+
+template <DataType OpDtype>
+SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
+    const std::vector<Tensor<AMD>*>& inputs,
+    std::vector<Tensor<AMD>*>& outputs,
+    ConvParam<AMD>& param) {
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "dispatch";
+
+    bool err;
+    AMD_API::stream_t cm    = this->_ctx->get_compute_stream();
+    bool isBias             = (param.bias()->size() > 0) ? 1 : 0;
+    bool isActive           = param.activation_param.has_active;
+    float negative_slope    = 1.0f;
+
+    amd_kernel_list list;
+    list.clear();
+
+    if (isActive) {
+
+        if (param.activation_param.active == Active_relu) {
+            negative_slope = 0.0f;
+        } else {
+            negative_slope = param.activation_param.negative_slope;
+        }
+
+        LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << " param.activation_param.has_active="
+                                             << param.activation_param.has_active
+                                             << " param.activation_param.negative_slope=" << param.activation_param.negative_slope
+                                             << " param.activation_param.active=" << param.activation_param.active
+                                             << " param.activation_param.coef=" << param.activation_param.coef;
+    }
+
+    if (_use_gemm) {
+        dispatch_gemm(inputs, outputs, param, list);
+    } else {
+        if (_kernels_ptr[0] == NULL || _kernels_ptr[0].get() == NULL) {
+            LOG(ERROR) << "Kernel is not exist";
+            return SaberInvalidValue;
+        }
+
+        for (int i = 0; i < _kernels_ptr.size(); i++) {
+            LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "kernel size:" << _kernels_ptr.size() << " name:" <<
+                                                 _kernels_ptr[i].get()->GetName();
+
+            if ((_kernels_ptr[i].get()->GetName() == "MIOpenConvUni")
+                    || (_kernels_ptr[i].get()->GetName() == "MIOpenGroupConvUni")) {
+
+                if (isBias) {
+                    if (isActive) {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                                  (PtrDtype)inputs[0]->data(),
+                                  (PtrDtype)param.weight()->data(),
+                                  (PtrDtype)param.bias()->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  negative_slope,
+                                  0.0f);
+                    } else {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                                  (PtrDtype)inputs[0]->data(),
+                                  (PtrDtype)param.weight()->data(),
+                                  (PtrDtype)param.bias()->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  0.0f);
+                    }
+                } else {
+                    if (isActive) {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                                  (PtrDtype)inputs[0]->data(),
+                                  (PtrDtype)param.weight()->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  negative_slope,
+                                  0.0f);
+                    } else {
+                        err = _kernels_ptr[i].get()->SetKernelArgs(
+                                  (PtrDtype)inputs[0]->data(),
+                                  (PtrDtype)param.weight()->data(),
+                                  (PtrDtype)outputs[0]->mutable_data(),
+                                  0.0f);
+                    }
+                }
+
+                if (!err) {
+                    LOG(ERROR) << "Fail to set kernel args :" << err;
+                    return SaberInvalidValue;
+                }
+
+                list.push_back(_kernels_ptr[i]);
+            } else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConvRxSU") {
+                int d_n_groups  = 64;
+                int d_flags     = 7;
+                int reserved    = 0;
+                int* return_addr = nullptr;
+
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                          (unsigned int)inputs[0]->num(),
+                          (unsigned int)inputs[0]->channel(),
+                          (unsigned int)inputs[0]->height(),
+                          (unsigned int)inputs[0]->width(),
+                          (unsigned int)param.weight()->num(),
+                          (unsigned int)d_n_groups,
+                          (unsigned int)d_flags,
+                          (unsigned int)reserved,
+                          (PtrDtype)inputs[0]->data(),
+                          (PtrDtype)param.weight()->data(),
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (PtrDtype)return_addr,
+                          (unsigned int)param.weight()->height(),
+                          (unsigned int)param.weight()->width(),
+                          (unsigned int)(param.weight()->height() - param.pad_h - 1),
+                          (unsigned int)(param.weight()->height() - param.pad_w - 1),
+                          (unsigned int)outputs[0]->height(),
+                          (unsigned int)outputs[0]->width());
+
+                if (!err) {
+                    LOG(ERROR) << "Fail to set kernel args :" << err;
+                    return SaberInvalidValue;
+                }
+
+                list.push_back(_kernels_ptr[i]);
+            } else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConvRxSU_CBA") {
+                int d_n_groups  = 64;
+                int d_flags     = 7;
+                int reserved    = 0;
+                int* return_addr = nullptr;
+
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                          (unsigned int)inputs[0]->num(),
+                          (unsigned int)inputs[0]->channel(),
+                          (unsigned int)inputs[0]->height(),
+                          (unsigned int)inputs[0]->width(),
+                          (unsigned int)param.weight()->num(),
+                          (unsigned int)d_n_groups,
+                          (unsigned int)d_flags,
+                          (unsigned int)reserved,
+                          (PtrDtype)inputs[0]->data(),
+                          (PtrDtype)param.weight()->data(),
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (PtrDtype)return_addr,
+                          (unsigned int)param.weight()->height(),
+                          (unsigned int)param.weight()->width(),
+                          (unsigned int)param.pad_h,
+                          (unsigned int)param.pad_w,
+                          (unsigned int)outputs[0]->height(),
+                          (unsigned int)outputs[0]->width(),
+                          (PtrDtype)param.bias()->data(),
+                          negative_slope
+                      );
+
+                if (!err) {
+                    LOG(ERROR) << "Fail to set kernel args :" << err;
+                    return SaberInvalidValue;
+                }
+
+                list.push_back(_kernels_ptr[i]);
+            } else if (_kernels_ptr[i].get()->GetName() == "BiasReluBoth") {
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (PtrDtype)param.bias()->data(),
+                          negative_slope,
+                          (inputs[0]->num()),
+                          (outputs[0]->channel()),
+                          (outputs[0]->height()),
+                          (outputs[0]->width()),
+                          1,
+                          1);
+
+                if (!err) {
+                    LOG(ERROR) << "Fail to set kernel args :" << err;
+                    return SaberInvalidValue;
+                }
+
+                list.push_back(_kernels_ptr[i]);
+            } else if (_kernels_ptr[i].get()->GetName() == "BiasOnly") {
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (PtrDtype)param.bias()->data(),
+                          negative_slope,
+                          (inputs[0]->num()),
+                          (outputs[0]->channel()),
+                          (outputs[0]->height()),
+                          (outputs[0]->width()));
+
+                if (!err) {
+                    LOG(ERROR) << "Fail to set kernel args :" << err;
+                    return SaberInvalidValue;
+                }
+
+                list.push_back(_kernels_ptr[i]);
+            } else if (_kernels_ptr[i].get()->GetName() == "ReluUni") {
+                err = _kernels_ptr[i].get()->SetKernelArgs(
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          negative_slope);
+
+                if (!err) {
+                    LOG(ERROR) << "Fail to set kernel args :" << err;
+                    return SaberInvalidValue;
+                }
+
+                list.push_back(_kernels_ptr[i]);
+            } else {
+                LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "Not implement kernel name:" <<
+                                                     _kernels_ptr[i].get()->GetName();
+            }
+        }
+
+        if (list.size() > 0) {
+            err = LaunchKernel(cm, list);
+            list.clear();
+
+            if (!err) {
+                LOG(ERROR) << "Fail to set execution :" << err;
+                return SaberInvalidValue;
+            }
+        }
     }
 
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE EXECUTION";

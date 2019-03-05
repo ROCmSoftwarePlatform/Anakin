@@ -13,43 +13,33 @@
    limitations under the License.
 */
 
-#ifndef ANAKIN_SABER_FUNCS_IMPL_AMD_VENDER_DECOAMD_H
-#define ANAKIN_SABER_FUNCS_IMPL_AMD_VENDER_DECOAMD_H
+#ifndef ANAKIN_SABER_FUNCS_IMPL_AMD_SABER_DEPTHWISE_DECONV_H
+#define ANAKIN_SABER_FUNCS_IMPL_AMD_SABER_DEPTHWISE_DECONV_H
 
-#include "saber/funcs/impl/impl_deconv.h"
 #include "saber/core/impl/amd/utils/amd_base.h"
 #include "saber/funcs/base.h"
 #include "saber/core/impl/amd/utils/amd_kernel.h"
 #include "saber/funcs/funcs_utils.h"
 #include "saber/funcs/impl/amd/include/amd_utils.h"
-#include <miopengemm/miogemm.hpp>
-#include <miopengemm/gemm.hpp>
-#include <miopengemm/geometry.hpp>
+#include "saber/saber_funcs_param.h"
+#include "saber/funcs/impl/impl_base.h"
+#include "saber/core/tensor.h"
 
 namespace anakin {
-
 namespace saber {
 
-template <DataType OpDtype>
-class VenderDeconv2D<AMD, OpDtype> :
+template <typename TargetType, DataType OpDtype>
+class SaberDepthwiseDeconv :
     public ImplBase<AMD, OpDtype, ConvParam<AMD> > {
 public:
     typedef typename DataTrait<AMD, OpDtype>::Dtype OpDataType;
     typedef AMD_API::TPtr PtrDtype;
 
     typedef ImplBase<AMD, OpDtype, ConvParam<AMD> > Impl_t;
-    VenderDeconv2D() {
-        _multikernel = false;
-        _outGemmWorkspace = nullptr;
-        _kernels_ptr.clear();
+    SaberDepthwiseDeconv() {
     }
 
-    ~VenderDeconv2D() {
-        if (_outGemmWorkspace) {
-            delete _outGemmWorkspace;
-        }
-
-        _kernels_ptr.clear();
+    ~SaberDepthwiseDeconv() {
     }
 
     virtual SaberStatus init(const std::vector<Tensor<AMD> *>& inputs,
@@ -58,7 +48,7 @@ public:
 
     virtual SaberStatus create(const std::vector<Tensor<AMD> *>& inputs,
                                std::vector<Tensor<AMD> *>& outputs,
-                               ConvParam<AMD>& param, Context<AMD>& ctx) override;
+                               ConvParam<AMD>& param, Context<AMD>& ctx);
 
     virtual SaberStatus dispatch(const std::vector<Tensor<AMD>*>& inputs,
                                  std::vector<Tensor<AMD>*>& outputs,
@@ -72,31 +62,9 @@ public:
                               int dilation_h, int dilation_w,
                               int group);
 private:
-
-    std::vector<AMDKernelPtr> _kernels_ptr;
-    void CreateKernelList(int device_id, KernelInfo& kernelInfo);
-    SaberStatus create_gemm(const std::vector<Tensor<AMD> *>& inputs,
-                            std::vector<Tensor<AMD> *>& outputs,
-                            ConvParam<AMD>& param, Context<AMD>& ctx);
-    SaberStatus dispatch_gemm(const std::vector<Tensor<AMD>*>& inputs,
-                              std::vector<Tensor<AMD>*>& outputs,
-                              ConvParam<AMD>& param,
-                              amd_kernel_list& list);
-
-    bool _use_gemm;
-    AMDKernelPtr _kernel_atomic;
-    AMDKernelPtr _kernel_normal;
-    AMDKernelPtr _kernel_col2Im;
-    AMDKernelPtr _kernel_col2Im_bias_relu;
-    AMDKernelPtr _kernel_isBias;
-
-    bool _multikernel;
-    Tensor<AMD>* _outGemmWorkspace;
-
+    AMDKernelPtr _kernel_ptr;
 };
 
-//template class SaberDeconv2D<AMD, AK_FLOAT>;
 } //namespace saber
-
 } //namespace anakin
-#endif //ANAKIN_SABER_FUNCS_IMPL_CUDA_SABER_DECONV_H
+#endif //ANAKIN_SABER_FUNCS_IMPL_AMD_SABER_DEPTHWISE_DECONV_H
