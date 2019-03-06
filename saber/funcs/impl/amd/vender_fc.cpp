@@ -12,6 +12,29 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+/*
+   MIT License
+   
+   Copyright (c) 2017 Advanced Micro Devices, Inc. All Rights Reserved. 
+   
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+   
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+   
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+*/
 
 #include "include/vender_fc.h"
 #include "saber/funcs/impl/amd/include/amd_utils.h"
@@ -322,7 +345,7 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
         } else { // gemm
             _outGemmWorkspace = new Tensor<AMD>();
             _outGemmWorkspace->re_alloc(outputs[0]->shape());
-
+            //The below section of code are as MIT license, the permission notice is from above (line 16 to 36)
             float alpha = 1.0;
             float beta  = 0.0;
             bool transA     = false;
@@ -415,6 +438,7 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
         }
     } else {
         LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "Transpose Weights!";
+        //The below section of code are as MIT license, the permission notice is from above (line 16 to 36)
         // gemm
         _branch          = 0;
         _outGemmWorkspace = new Tensor<AMD>();

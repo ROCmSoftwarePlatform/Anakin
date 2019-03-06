@@ -12,6 +12,29 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+/*
+   MIT License
+   
+   Copyright (c) 2017 Advanced Micro Devices, Inc. All Rights Reserved. 
+   
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+   
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+   
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+*/
 #include "include/vender_deconv.h"
 namespace anakin {
 
@@ -72,6 +95,7 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
     if (param.weight()->height() == 1 && param.weight()->width() == 1 && param.stride_h == 1
             && param.stride_w == 1 && param.pad_h == 0 && param.pad_w == 0 && param.group == 1) {
 
+        //The below section of code are as MIT license, the permission notice is from above (line 16 to 36)
         int K       = (param.weight()->channel());
         int N       = (inputs[0]->height()) * (inputs[0]->width());
         int M       = (outputs[0]->channel()) * (param.weight()->height()) * (param.weight()->width());
@@ -185,6 +209,7 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::create(
         _kernel_isBias = kptr_isBias;
         _kernels.push_back(kptr_isBias);
     } else {
+        //The below section of code are as MIT license, the permission notice is from above (line 16 to 36)
         int K       = (param.weight()->channel() / param.group);
         int N       = (inputs[0]->height()) * (inputs[0]->width());
         int M       = (outputs[0]->channel() / param.group) * (param.weight()->height()) *

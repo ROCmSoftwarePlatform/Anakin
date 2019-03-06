@@ -12,6 +12,29 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+/*
+   MIT License
+   
+   Copyright (c) 2017 Advanced Micro Devices, Inc. All Rights Reserved. 
+   
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+   
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+   
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+*/
 #include "saber/funcs/impl/amd/include/amd_utils.h"
 #include "saber/funcs/impl/amd/include/amd_gemm.h"
 #include "saber/funcs/conv.h"
@@ -38,6 +61,7 @@ bool findGenericGemm(bool fromSolver, std::vector<AMDKernelPtr>& vkptr,
                 && inputs[0]->width() <= 14 && param.stride_h == 1)
                 || (param.stride_h == 2)) {
             LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "GEMM 1x1, 14x14";
+            //The below section of code are as MIT license, the permission notice is from above (line 16 to 36)
             int K       = (inputs[0]->channel());
             int M       = (param.weight()->num());
             int N       = (inputs[0]->num()) * (output->height()) * (output->width());
@@ -162,6 +186,7 @@ bool findGenericGemm(bool fromSolver, std::vector<AMDKernelPtr>& vkptr,
 
         } else {
             LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "GEMM 1x1";
+            //The below section of code are as MIT license, the permission notice is from above (line 16 to 36)
             int K = (inputs[0]->channel()) * (param.weight()->height())
                     * (param.weight()->width());
             int M       = (param.weight()->num());
@@ -270,6 +295,7 @@ bool findGenericGemm(bool fromSolver, std::vector<AMDKernelPtr>& vkptr,
         }
     } else {
         LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "Not GEMM 1x1";
+        //The below section of code are as MIT license, the permission notice is from above (line 16 to 36)
         needBiasRelu = true;
         int K = (inputs[0]->channel() / param.group) * (param.weight()->height())
                 * (param.weight()->width());
