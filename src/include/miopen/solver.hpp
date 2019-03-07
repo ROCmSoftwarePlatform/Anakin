@@ -233,8 +233,8 @@ auto FindSolutionImpl(rank<0>, Solver s, const Context& context, Db& db)
     // Dummy Performance Config for bin or asm cases
     LegacyPerformanceConfig config;
     auto solution = s.GetSolution(context);
-    config.min_proc_time = solution.min_proc_time;
     s.ExecuteAndMeasureSolution(context, solution);
+    config.min_proc_time = solution.min_proc_time;
     db.Update(context, SolverDbId(s), config);
     return solution;
 }

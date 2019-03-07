@@ -237,11 +237,10 @@ ConvSolution ConvBinWinogradRxS::GetSolution(const ConvolutionContext& params) c
 
     // WA: MIOpen didn't release the v9_2_7 stride 2 version for transpose convolution.
     // Using fake fusion instead of it.
-    if(/*!(params.kernel_stride0 == 1 && params.bias) &&*/ params.direction.IsBackwardData())
+    if(/*!(params.kernel_stride0 == 1 && params.bias) &&*/ params.direction.IsBackwardData() && (params.bias || params.has_active))
     {
         kernel.g_wk = {params.batch_sz * params.n_outputs * params.out_height * params.out_width, 1, 1};
         kernel.l_wk = {256, 1, 1};
-
         if (params.bias && params.has_active) {
             kernel.kernel_name = "BiasReluBoth";
         } else if (params.bias) {
