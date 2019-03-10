@@ -552,7 +552,27 @@ static int MeasureLoop(Handle* profile_h,
         {
             processing_time = std::numeric_limits<float>::max();
 
-            auto k = profile_h->AddKernel("",
+            
+
+            std::cout << "kernel name:" << kernel_params.kernel_name << std::endl;
+            if (kernel_params.kernel_name == "conv1x1_act") {
+                auto k = profile_h->AddKernel("",
+                                          "",
+                                          kernel_params.kernel_file,
+                                          kernel_params.kernel_name,
+                                          kernel_params.l_wk,
+                                          kernel_params.g_wk,
+                                          compiler_options);
+                if(params.bias)
+                {
+                    k(wei_ocl_buf, bot_ocl_buf, bias_ocl_buf, top_ocl_buf, params.negative_slope, params.n_inputs, params.in_height, params.in_width, params.n_outputs);
+                }
+                else
+                {
+                    k(wei_ocl_buf, bot_ocl_buf, top_ocl_buf, params.negative_slope, params.n_inputs, params.in_height, params.in_width, params.n_outputs);
+                }
+            } else if (kernel_params.kernel_name == "InnerProduct") {
+                auto k = profile_h->AddKernel("",
                                           "",
                                           kernel_params.kernel_file,
                                           kernel_params.kernel_name,
@@ -560,13 +580,43 @@ static int MeasureLoop(Handle* profile_h,
                                           kernel_params.g_wk,
                                           compiler_options);
 
-            if(params.bias)
-            {
-                k(wei_ocl_buf, bot_ocl_buf, top_ocl_buf, bias_ocl_buf, params.negative_slope, params.n_inputs, params.in_height, params.in_width, params.n_outputs);
-            }
-            else
-            {
-                k(wei_ocl_buf, bot_ocl_buf, top_ocl_buf, params.negative_slope, params.n_inputs, params.in_height, params.in_width, params.n_outputs);
+                if (params.bias) {
+                    if (params.has_active) {
+                        k(bot_ocl_buf, wei_ocl_buf, bias_ocl_buf, top_ocl_buf, params.negative_slope);
+                    } else {
+                        k(bot_ocl_buf, wei_ocl_buf, bias_ocl_buf, top_ocl_buf);
+                    }
+                } else {
+                    if (params.has_active) {
+                        k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf, params.negative_slope);
+                    } else {
+                        k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf);
+                    }
+                }
+            } else {
+                auto k = profile_h->AddKernel("",
+                                          "",
+                                          kernel_params.kernel_file,
+                                          kernel_params.kernel_name,
+                                          kernel_params.l_wk,
+                                          kernel_params.g_wk,
+                                          "");
+
+                size_t slot_sz = 4096;
+
+                std::vector<float> slot_sys_buf(slot_sz);
+                auto slot_ocl_buf = profile_h->Write(slot_sys_buf); 
+
+                size_t bias_sz = params.n_outputs;
+
+                std::vector<float> bias_sys_buf(bias_sz);
+                auto tmp_bias_ocl_buf = profile_h->Write(bias_sys_buf);
+
+                if (params.has_active) {
+                    k(bot_ocl_buf, wei_ocl_buf, tmp_bias_ocl_buf.get(), top_ocl_buf, slot_ocl_buf.get(), params.negative_slope);
+                } else {
+                    k(bot_ocl_buf, wei_ocl_buf, tmp_bias_ocl_buf.get(), top_ocl_buf, slot_ocl_buf.get(), 1.0f);
+                }
             }
             processing_time = profile_h->GetKernelTime();
         }
