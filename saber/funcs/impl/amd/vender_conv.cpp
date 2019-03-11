@@ -182,19 +182,22 @@ SaberStatus VenderConv2D<AMD, OpDtype>::create(
                     _subgroup_input->re_alloc(Shape({inputs[0]->num(),
                                                      inputs[0]->channel() / param.group,
                                                      inputs[0]->height(),
-                                                     inputs[0]->width()}, Layout_NCHW));
+                                                     inputs[0]->width()
+                                                    }, Layout_NCHW));
 
                     _subgroup_weight->re_alloc(Shape({param.weight()->num() / param.group,
                                                       param.weight()->channel() / param.group,
                                                       param.weight()->height(),
-                                                      param.weight()->width()}, Layout_NCHW));
+                                                      param.weight()->width()
+                                                     }, Layout_NCHW));
 
                     _subgroup_bias->re_alloc(Shape({1, param.weight()->num() / param.group, 1, 1}, Layout_NCHW));
 
                     _subgroup_output->re_alloc(Shape({outputs[0]->num(),
                                                       outputs[0]->channel() / param.group,
                                                       outputs[0]->height(),
-                                                      outputs[0]->width()}, Layout_NCHW));
+                                                      outputs[0]->width()
+                                                     }, Layout_NCHW));
                 }
 
                 CreateKernelList(inputs[0]->device_id(), kernelInfo);
@@ -397,16 +400,17 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
 
                 list.push_back(_kernels_ptr[i]);
             } else {
-                for(int g = 0; g < param.group; g++)
-                {
+                for (int g = 0; g < param.group; g++) {
                     // copy input buffer
-                    int input_src_offset = g * _subgroup_input->count(1,4) * sizeof(OpDataType);
-                    for (int n=0; n<inputs[0]->num(); n++) {
-                        int input_dst_offset = n * _subgroup_input->count(1,4) * sizeof(OpDataType);
-                        AMD_API::async_memcpy(_subgroup_input->mutable_data(), input_dst_offset, _subgroup_input->device_id(),
+                    int input_src_offset = g * _subgroup_input->count(1, 4) * sizeof(OpDataType);
+
+                    for (int n = 0; n < inputs[0]->num(); n++) {
+                        int input_dst_offset = n * _subgroup_input->count(1, 4) * sizeof(OpDataType);
+                        AMD_API::async_memcpy(_subgroup_input->mutable_data(), input_dst_offset,
+                                              _subgroup_input->device_id(),
                                               inputs[0]->data(), input_src_offset, inputs[0]->device_id(),
-                                              _subgroup_input->count(1,4) * sizeof(OpDataType), cm, __DtoD());
-                        input_src_offset += inputs[0]->count(1,4) * sizeof(OpDataType);
+                                              _subgroup_input->count(1, 4) * sizeof(OpDataType), cm, __DtoD());
+                        input_src_offset += inputs[0]->count(1, 4) * sizeof(OpDataType);
                     }
 
                     // copy weight buffer
@@ -446,6 +450,7 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
 
                     // launch winogard kernel
                     local_list.push_back(_kernels_ptr[i]);
+
                     if (local_list.size() > 0) {
                         err = LaunchKernel(cm, local_list);
 
@@ -456,76 +461,17 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
                     }
 
                     // copy output buffer
-                    int output_dst_offset = g * _subgroup_output->count(1,4) * sizeof(OpDataType);
-                    for (int n=0; n<inputs[0]->num(); n++) {
-                        int output_src_offset = n * _subgroup_output->count(1,4) * sizeof(OpDataType);
+                    int output_dst_offset = g * _subgroup_output->count(1, 4) * sizeof(OpDataType);
+
+                    for (int n = 0; n < inputs[0]->num(); n++) {
+                        int output_src_offset = n * _subgroup_output->count(1, 4) * sizeof(OpDataType);
                         AMD_API::async_memcpy(outputs[0]->mutable_data(), output_dst_offset, outputs[0]->device_id(),
                                               _subgroup_output->data(), output_src_offset, _subgroup_output->device_id(),
-                                              _subgroup_output->count(1,4) * sizeof(OpDataType), cm, __DtoD());
-                        output_dst_offset += outputs[0]->count(1,4) * sizeof(OpDataType);
+                                              _subgroup_output->count(1, 4) * sizeof(OpDataType), cm, __DtoD());
+                        output_dst_offset += outputs[0]->count(1, 4) * sizeof(OpDataType);
                     }
                 }
             }
-        } else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConvRxSU") {
-            int d_n_groups = 64, d_flags = 0;
-            err = _kernels_ptr[i].get()->SetKernelArgs(
-                      (unsigned int)inputs[0]->num(),
-                      (unsigned int)inputs[0]->channel(),
-                      (unsigned int)inputs[0]->height(),
-                      (unsigned int)inputs[0]->width(),
-                      (unsigned int)param.weight()->num(),
-                      (unsigned int)d_n_groups,
-                      (unsigned int)d_flags,
-                      (unsigned int)0,
-                      (PtrDtype)inputs[0]->data(),
-                      (PtrDtype)param.weight()->data(),
-                      (PtrDtype)outputs[0]->mutable_data(),
-                      (PtrDtype)nullptr,
-                      (unsigned int)param.weight()->height(),
-                      (unsigned int)param.weight()->width(),
-                      (unsigned int)param.pad_h,
-                      (unsigned int)param.pad_w,
-                      (unsigned int)outputs[0]->height(),
-                      (unsigned int)outputs[0]->width()
-                  );
-
-            if (!err) {
-                LOG(ERROR) << "Fail to set kernel args :" << err;
-                return SaberInvalidValue;
-            }
-
-            list.push_back(_kernels_ptr[i]);
-        } else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConvRxSU_CBA") {
-            int d_n_groups = 64, d_flags = 0;
-            err = _kernels_ptr[i].get()->SetKernelArgs(
-                      (unsigned int)inputs[0]->num(),
-                      (unsigned int)inputs[0]->channel(),
-                      (unsigned int)inputs[0]->height(),
-                      (unsigned int)inputs[0]->width(),
-                      (unsigned int)param.weight()->num(),
-                      (unsigned int)d_n_groups,
-                      (unsigned int)d_flags,
-                      (unsigned int)0,
-                      (PtrDtype)inputs[0]->data(),
-                      (PtrDtype)param.weight()->data(),
-                      (PtrDtype)outputs[0]->mutable_data(),
-                      (PtrDtype)nullptr,
-                      (unsigned int)param.weight()->height(),
-                      (unsigned int)param.weight()->width(),
-                      (unsigned int)param.pad_h,
-                      (unsigned int)param.pad_w,
-                      (unsigned int)outputs[0]->height(),
-                      (unsigned int)outputs[0]->width(),
-                      (PtrDtype)param.bias()->data(),
-                      negative_slope
-                  );
-
-            if (!err) {
-                LOG(ERROR) << "Fail to set kernel args :" << err;
-                return SaberInvalidValue;
-            }
-
-            list.push_back(_kernels_ptr[i]);
         }  else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConvRxSU") {
             int d_n_groups = 64, d_flags = 0;
             err = _kernels_ptr[i].get()->SetKernelArgs(
@@ -557,10 +503,15 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
             list.push_back(_kernels_ptr[i]);
         } else if (_kernels_ptr[i].get()->GetName() == "sp3AsmConvRxSU_CBA") {
             int d_n_groups = 64, d_flags = 0;
-            if (isBias)
+
+            if (isBias) {
                 d_flags |= 128;
-            if (isActive)
+            }
+
+            if (isActive) {
                 d_flags |= 256;
+            }
+
             err = _kernels_ptr[i].get()->SetKernelArgs(
                       (unsigned int)inputs[0]->num(),
                       (unsigned int)inputs[0]->channel(),
