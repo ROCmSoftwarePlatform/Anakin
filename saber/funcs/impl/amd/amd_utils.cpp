@@ -591,6 +591,7 @@ std::vector<KernelInfo> FindSolution(
 #ifdef ENABLE_AMD_EXPAND_ALL_SEARCH
         auto candidate_solutions = miopen::solver::SearchForAllSolutions <
                                    miopen::solver::ConvBinWinograd3x3U,
+                                   miopen::solver::ConvOclDirectFwd1x1Tensile,
                                    miopen::solver::ConvOclDirectFwd1x1AMD,
                                    miopen::solver::ConvOclDirectFwd1x1Gemm,
                                    //miopen::solver::ConvAsm3x3U,
@@ -618,6 +619,7 @@ std::vector<KernelInfo> FindSolution(
                 && param.weight()->height() == 1) {
             auto candidate_solutions = miopen::solver::SearchForAllSolutions <
                                        miopen::solver::ConvBinWinograd3x3U,
+                                       miopen::solver::ConvOclDirectFwd1x1Tensile,
                                        miopen::solver::ConvOclDirectFwd1x1AMD,
                                        miopen::solver::ConvOclDirectFwd1x1Gemm,
                                        //miopen::solver::ConvAsm3x3U,
@@ -791,6 +793,7 @@ std::vector<KernelInfo> FindSolutionWithPooling(
 #ifdef ENABLE_AMD_EXPAND_ALL_SEARCH
         auto candidate_solutions = miopen::solver::SearchForAllSolutions <
                                    miopen::solver::ConvBinWinograd3x3U,
+                                   miopen::solver::ConvOclDirectFwd1x1Tensile,
                                    miopen::solver::ConvOclDirectFwd1x1AMD,
                                    miopen::solver::ConvOclDirectFwd1x1Gemm,
                                    //miopen::solver::ConvAsm3x3U,
@@ -818,6 +821,7 @@ std::vector<KernelInfo> FindSolutionWithPooling(
                 && param.conv_param.weight()->height() == 1) {
             auto candidate_solutions = miopen::solver::SearchForAllSolutions <
                                        miopen::solver::ConvBinWinograd3x3U,
+                                       miopen::solver::ConvOclDirectFwd1x1Tensile,
                                        miopen::solver::ConvOclDirectFwd1x1AMD,
                                        miopen::solver::ConvOclDirectFwd1x1Gemm,
                                        //miopen::solver::ConvAsm3x3U,

@@ -139,34 +139,21 @@ SaberStatus VenderConv2D<AMD, OpDtype>::create(
                 } else if (kernelInfo.kernel_name == "MIOpenGroupConvUni") {
                     kernelInfo.wk_dim      = 3;
                 } else if (kernelInfo.kernel_name == "ConvFwd1x1") {
-                    int slot_size = 1;
-                    kernelInfo.kernel_type = MIOPEN;
-
-                    if (inputs[0]->num() == 1) {
-                        if (inputs[0]->height() == 7 || (inputs[0]->height() == 14 && inputs[0]->channel() == 1024)) {
-                            slot_size = 1024;
-                        } else if (inputs[0]->height() == 28 || (inputs[0]->height() == 14
-                                   && inputs[0]->channel() == 256)) {
-                            slot_size = 2048;
-                        } else {
-                            slot_size = 1664;
-
-                            if (param.weight()->num() == 256) {
-                                slot_size = 1600;
-                            }
-                        }
-                    }
-
-                    else if (inputs[0]->height() == 7 && inputs[0]->channel() == 2048 && param.weight()->num() == 512) {
-                        slot_size = 32761;
-                    } else if (inputs[0]->height() == 14 && inputs[0]->channel() == 1024 && inputs[0]->num() == 2
-                               && param.weight()->num() == 256) {
-                        slot_size = 32584;
-                    }
+                    int slot_size = kernelInfo.tensile_slot_size == 0 ? 1 : kernelInfo.tensile_slot_size;
+                    int l2_size = kernelInfo.tensile_l2_size == 0 ? 1 : kernelInfo.tensile_l2_size;
+                    int dbg_size = kernelInfo.tensile_dbg_size == 0 ? 1 : kernelInfo.tensile_dbg_size;
 
                     _slot = new Tensor<AMD>();
                     _slot->re_alloc(
-                        Shape({slot_size}, Layout_W));
+                        Shape({slot_size}, Layout_W), AK_FLOAT);
+
+                    _l2 = new Tensor<AMD>();
+                    _l2->re_alloc(
+                        Shape({l2_size}, Layout_W), AK_FLOAT);
+
+                    _dbg = new Tensor<AMD>();
+                    _dbg->re_alloc(
+                        Shape({dbg_size}, Layout_W), AK_FLOAT);
 
                     int out_channels = param.weight()->num();
                     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
@@ -547,36 +534,44 @@ SaberStatus VenderConv2D<AMD, OpDtype>::dispatch(
                     err = _kernels_ptr[i].get()->SetKernelArgs(
                               (PtrDtype)inputs[0]->data(),
                               (PtrDtype)param.weight()->data(),
-                              (PtrDtype)param.bias()->data(),
                               (PtrDtype)outputs[0]->mutable_data(),
+                              (PtrDtype)param.bias()->data(),
                               (PtrDtype)_slot->mutable_data(),
-                              negative_slope);
+                              (PtrDtype)_l2->mutable_data(),
+                              negative_slope,
+                              (PtrDtype)_dbg->mutable_data());
                 } else {
                     err = _kernels_ptr[i].get()->SetKernelArgs(
                               (PtrDtype)inputs[0]->data(),
                               (PtrDtype)param.weight()->data(),
-                              (PtrDtype)param.bias()->data(),
                               (PtrDtype)outputs[0]->mutable_data(),
+                              (PtrDtype)param.bias()->data(),
                               (PtrDtype)_slot->mutable_data(),
-                              1.0f);
+                              (PtrDtype)_l2->mutable_data(),
+                              1.0f,
+                              (PtrDtype)_dbg->mutable_data());
                 }
             } else {
                 if (isActive) {
                     err = _kernels_ptr[i].get()->SetKernelArgs(
                               (PtrDtype)inputs[0]->data(),
                               (PtrDtype)param.weight()->data(),
-                              (PtrDtype)_tensile_bias.data(),
                               (PtrDtype)outputs[0]->mutable_data(),
+                              (PtrDtype)_tensile_bias.data(),
                               (PtrDtype)_slot->mutable_data(),
-                              negative_slope);
+                              (PtrDtype)_l2->mutable_data(),
+                              negative_slope,
+                              (PtrDtype)_dbg->mutable_data());
                 } else {
                     err = _kernels_ptr[i].get()->SetKernelArgs(
                               (PtrDtype)inputs[0]->data(),
                               (PtrDtype)param.weight()->data(),
-                              (PtrDtype)_tensile_bias.data(),
                               (PtrDtype)outputs[0]->mutable_data(),
+                              (PtrDtype)_tensile_bias.data(),
                               (PtrDtype)_slot->mutable_data(),
-                              1.0f);
+                              (PtrDtype)_l2->mutable_data(),
+                              1.0f,
+                              (PtrDtype)_dbg->mutable_data());
                 }
             }
 

@@ -33,6 +33,10 @@ public:
     typedef AMD_API::TPtr PtrDtype;
 
     VenderConv2D() {
+        _outGemmWorkspace = nullptr;
+        _slot = nullptr;
+        _l2 = nullptr;
+        _dbg = nullptr;
         _kernels_ptr.clear();
         vkernel.clear();
     }
@@ -70,6 +74,16 @@ public:
             delete _subgroup_output;
             _subgroup_output = nullptr;
         }
+
+        if (_l2) {
+            delete _l2;
+            _l2 = nullptr;
+        }
+
+        if (_dbg) {
+            delete _dbg;
+            _dbg = nullptr;
+        }
     }
 
     virtual SaberStatus init(const std::vector<Tensor<AMD> *>& inputs,
@@ -99,11 +113,13 @@ public:
 private:
     std::vector<AMDKernelPtr> _kernels_ptr;
     Tensor<AMD>* _outGemmWorkspace {nullptr};
-    Tensor<AMD>* _slot {nullptr};
     Tensor<AMD>* _subgroup_input {nullptr};
     Tensor<AMD>* _subgroup_weight {nullptr};
     Tensor<AMD>* _subgroup_bias {nullptr};
     Tensor<AMD>* _subgroup_output {nullptr};
+    Tensor<AMD>* _slot {nullptr};
+    Tensor<AMD>* _l2 {nullptr};
+    Tensor<AMD>* _dbg {nullptr};
     Tensor<AMD> _tensile_bias;
     void CreateKernelList(int device_id, KernelInfo& kernelInfo);
     std::vector<KernelInfo> vkernel;

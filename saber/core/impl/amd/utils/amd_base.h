@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 #ifndef ANAKIN_SABER_FUNCS_IMPL_AMD_UTILS_AMDBASE_H
 #define ANAKIN_SABER_FUNCS_IMPL_AMD_UTILS_AMDBASE_H
 #include <vector>
+#include <iostream>
 #include <string>
 #include "amd_logger.h"
 #include <miopen/kernel_info.hpp>
@@ -41,6 +42,7 @@ enum KernelType {
     SABER   = DEFAULT,
     SOURCE,
     MIOPEN,
+    TENSILE,
 };
 
 struct KernelInfo {
@@ -52,6 +54,9 @@ struct KernelInfo {
     std::string kernel_file;
     std::string kernel_name;
     KernelType kernel_type = DEFAULT;
+    int tensile_slot_size                  = 0;
+    int tensile_l2_size                    = 0;
+    int tensile_dbg_size                   = 0;
     friend std::ostream& operator<<(std::ostream& os, const KernelInfo& k);
 
     KernelInfo& operator=(KernelInfo right) {
@@ -124,6 +129,13 @@ private:
         kernel_file.assign(ki->kernel_file);
         kernel_name.assign(ki->kernel_name);
         kernel_type = ki->kernel_type;
+
+        if (kernel_name == "ConvFwd1x1") {
+            kernel_type = TENSILE;
+            tensile_slot_size = ki->tensile_slot_size;
+            tensile_l2_size = ki->tensile_l2_size;
+            tensile_dbg_size = ki->tensile_dbg_size;
+        }
     }
 
     void clone(miopen::solver::KernelInfo* ki) {
@@ -135,6 +147,13 @@ private:
         kernel_file.assign(ki->kernel_file);
         kernel_name.assign(ki->kernel_name);
         kernel_type = ki->isMIOpenKernel ? MIOPEN : SABER;
+
+        if (kernel_name == "ConvFwd1x1") {
+            kernel_type = TENSILE;
+            tensile_slot_size = ki->tensile_slot_size;
+            tensile_l2_size = ki->tensile_l2_size;
+            tensile_dbg_size = ki->tensile_dbg_size;
+        }
     }
 };
 
