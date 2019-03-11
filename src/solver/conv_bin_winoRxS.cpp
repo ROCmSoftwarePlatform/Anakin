@@ -199,13 +199,8 @@ ConvSolution ConvBinWinogradRxS::GetSolution(const ConvolutionContext& params) c
     kernel.l_wk.push_back(1);
 
     if (params.direction.IsForward()) {
-        if (params.bias == 0) {
-            kernel.kernel_name = "sp3AsmConvRxSU";
-            kernel.kernel_file = "conv_3x3_wheel_alpha_v9_0_15";
-        } else {
-            kernel.kernel_name = "sp3AsmConvRxSU_CBA";
-            kernel.kernel_file = "conv_3x3_wheel_alpha_v9_2_7";
-        }
+        kernel.kernel_name = "sp3AsmConvRxSU_CBA";
+        kernel.kernel_file = "conv_3x3_wheel_alpha_v9_2_7";
     } else {
         // WA: MIOpen didn't release the v9_2_7 stride 2 version for transpose convolution.
         // Using fake fusion instead of it.
@@ -254,13 +249,11 @@ ConvSolution ConvBinWinogradRxS::GetSolution(const ConvolutionContext& params) c
         kernel.isMIOpenKernel = false;
 
         result.construction_params.push_back(kernel);
-    } else if (params.direction.IsForward() && params.bias == 0 && params.has_active) {
-        kernel.g_wk = {params.batch_sz* params.n_outputs* params.out_height * params.out_width, 1, 1};
-        kernel.l_wk = {256, 1, 1};
-        kernel.kernel_name = "ReluOnly";
-        kernel.kernel_file = "BiasReLuUni.cl";
-        kernel.isMIOpenKernel = false;
     }
+
+// Start to do pooling...
+    if (params.has_pooling)
+        addPoolingKernel(params, result);
 
     return result;
 }

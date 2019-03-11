@@ -224,6 +224,7 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_sw.so
         kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_stride2.so
         kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_md10_prelu_stride2.so
+        kernels/conv_3x3_wheel_alpha_v9_2_7_gfx803_md10.so
         kernels/conv_3x3_wheel_alpha_v9_2_7_stride_2_dec_gfx803_md10.so
         kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_m30.so
         kernels/conv_3x3_wheel_alpha_v3_0b_gfx803_m21.so
