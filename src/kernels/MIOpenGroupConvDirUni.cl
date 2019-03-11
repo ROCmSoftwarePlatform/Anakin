@@ -392,6 +392,8 @@ static inline void Conv(uint o_map_base,
             // load filter in reverse order
             k_act = MLO_FILTER_SIZE1 - 1 - k;
 #endif
+
+#if MLO_DIR_FORWARD == 1
             int refresh_line = MLO_FILTER_DILATION1;
             if (MLO_FILTER_DILATION1 > MLO_PVT_IN_HEIGHT)
             {
@@ -407,7 +409,14 @@ static inline void Conv(uint o_map_base,
                 }
                 in_stg_off2 += MLO_IN_LCL_WIDTH;
             }
+#else
 
+            // load next input row
+            for (uint i_pvt = 0; i_pvt < MLO_PVT_IN_WIDTH; ++i_pvt) {
+                pvt_in_stage[(MLO_PVT_IN_HEIGHT - 1) * MLO_PVT_IN_WIDTH + i_pvt] =
+                    lcl_indata[in_stg_off2 + i_pvt];
+            }
+#endif
             // over all outputs
             for (uint o_c = 0; o_c < MLO_N_OUT_TILES; ++o_c) {
                 uint wei_stg_off = wei_stg_base_off +
