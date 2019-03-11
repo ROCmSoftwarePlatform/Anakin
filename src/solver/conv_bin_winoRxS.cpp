@@ -216,7 +216,7 @@ ConvSolution ConvBinWinogradRxS::GetSolution(const ConvolutionContext& params) c
     if (params.kernel_stride0 == 2) {
         if (params.direction.IsForward()) {
             kernel.kernel_file += "_stride_2_dec";
-        else {
+        } else {
             kernel.kernel_file += "_stride_2_dil";
         }
     }
@@ -237,10 +237,11 @@ ConvSolution ConvBinWinogradRxS::GetSolution(const ConvolutionContext& params) c
 
     // WA: MIOpen didn't release the v9_2_7 stride 2 version for transpose convolution.
     // Using fake fusion instead of it.
-    if(/*!(params.kernel_stride0 == 1 && params.bias) &&*/ params.direction.IsBackwardData() && (params.bias || params.has_active))
-    {
-        kernel.g_wk = {params.batch_sz * params.n_outputs * params.out_height * params.out_width, 1, 1};
+    if (/*!(params.kernel_stride0 == 1 && params.bias) &&*/ params.direction.IsBackwardData()
+            && (params.bias || params.has_active)) {
+        kernel.g_wk = {params.batch_sz* params.n_outputs* params.out_height * params.out_width, 1, 1};
         kernel.l_wk = {256, 1, 1};
+
         if (params.bias && params.has_active) {
             kernel.kernel_name = "BiasReluBoth";
         } else if (params.bias) {
@@ -248,12 +249,13 @@ ConvSolution ConvBinWinogradRxS::GetSolution(const ConvolutionContext& params) c
         } else if (params.has_active) {
             kernel.kernel_name = "ReluOnly";
         }
+
         kernel.kernel_file = "BiasReLuUni.cl";
         kernel.isMIOpenKernel = false;
 
         result.construction_params.push_back(kernel);
     } else if (params.direction.IsForward() && params.bias == 0 && params.has_active) {
-        kernel.g_wk = {params.batch_sz * params.n_outputs * params.out_height * params.out_width, 1, 1};
+        kernel.g_wk = {params.batch_sz* params.n_outputs* params.out_height * params.out_width, 1, 1};
         kernel.l_wk = {256, 1, 1};
         kernel.kernel_name = "ReluOnly";
         kernel.kernel_file = "BiasReLuUni.cl";
@@ -264,8 +266,7 @@ ConvSolution ConvBinWinogradRxS::GetSolution(const ConvolutionContext& params) c
 }
 
 int ConvBinWinogradRxS::ExecuteAndMeasureSolution(const ConvolutionContext& params,
-                     ConvSolution& solution) const
-{
+        ConvSolution& solution) const {
     // Allocate buffers, init input buffers.
     size_t top_size  = params.top_sz / sizeof(float);
     size_t bot_size  = params.bot_sz / sizeof(float);
@@ -278,18 +279,27 @@ int ConvBinWinogradRxS::ExecuteAndMeasureSolution(const ConvolutionContext& para
     std::vector<float> bias(bias_size);
 
     float* p = bot.data();
-    for(int i = 0; i < bot.size(); ++i)
+
+    for (int i = 0; i < bot.size(); ++i) {
         *p++ = static_cast<float>(rand() * (1.0 / RAND_MAX));
-    if(!params.direction.IsBackwardWrW()) {
+    }
+
+    if (!params.direction.IsBackwardWrW()) {
         p = wei.data();
-        for(int i = 0; i < wei.size(); ++i)
+
+        for (int i = 0; i < wei.size(); ++i) {
             *p++ = static_cast<float>((rand() * (1.0 / RAND_MAX) + -0.5) * 0.001);
+        }
     }
-    if(params.bias) {
+
+    if (params.bias) {
         p = bias.data();
-        for(int i = 0; i < bias.size(); ++i)
+
+        for (int i = 0; i < bias.size(); ++i) {
             *p++ = static_cast<float>(rand() * (1.0 / RAND_MAX));
+        }
     }
+
     miopen::Handle profile_h;
     auto bot_ocl_buf  = profile_h.Write(bot);
     auto top_ocl_buf  = profile_h.Write(top);
@@ -297,6 +307,7 @@ int ConvBinWinogradRxS::ExecuteAndMeasureSolution(const ConvolutionContext& para
     auto bias_ocl_buf = params.bias ? profile_h.Write(bias) : nullptr;
     profile_h.EnableProfiling(false);
 #ifdef NDEBUG
+
     try
 #endif
     {
@@ -317,57 +328,59 @@ int ConvBinWinogradRxS::ExecuteAndMeasureSolution(const ConvolutionContext& para
 
         for (int i = 0; i < WARM_UP; i++) {
             kernel(params.batch_sz,
-                  params.n_inputs,
-                  params.in_height,
-                  params.in_width,
-                  params.n_outputs,
-                  64,
-                  flags,
-                  reserved,
-                  bot_ocl_buf.get(),
-                  wei_ocl_buf.get(),
-                  top_ocl_buf.get(),
-                  //bias_ocl_buf.get(),
-                  return_addr,
-                  params.kernel_size0,
-                  params.kernel_size1,
-                  params.kernel_size0 - params.pad0 - 1,
-                  params.kernel_size1 - params.pad1 - 1,
-                  params.out_height,
-                  params.out_width
-                );
+                   params.n_inputs,
+                   params.in_height,
+                   params.in_width,
+                   params.n_outputs,
+                   64,
+                   flags,
+                   reserved,
+                   bot_ocl_buf.get(),
+                   wei_ocl_buf.get(),
+                   top_ocl_buf.get(),
+                   //bias_ocl_buf.get(),
+                   return_addr,
+                   params.kernel_size0,
+                   params.kernel_size1,
+                   params.kernel_size0 - params.pad0 - 1,
+                   params.kernel_size1 - params.pad1 - 1,
+                   params.out_height,
+                   params.out_width
+                  );
         }
+
         profile_h.Finish();
 
         profile_h.EnableProfiling(true);
         //Real run here
         kernel(params.batch_sz,
-              params.n_inputs,
-              params.in_height,
-              params.in_width,
-              params.n_outputs,
-              64,
-              flags,
-              reserved,
-              bot_ocl_buf.get(),
-              wei_ocl_buf.get(),
-              top_ocl_buf.get(),
-              //bias_ocl_buf.get(),
-              return_addr,
-              params.kernel_size0,
-              params.kernel_size1,
-              params.kernel_size0 - params.pad0 - 1,
-              params.kernel_size1 - params.pad1 - 1,
-              params.out_height,
-              params.out_width
-            );
+               params.n_inputs,
+               params.in_height,
+               params.in_width,
+               params.n_outputs,
+               64,
+               flags,
+               reserved,
+               bot_ocl_buf.get(),
+               wei_ocl_buf.get(),
+               top_ocl_buf.get(),
+               //bias_ocl_buf.get(),
+               return_addr,
+               params.kernel_size0,
+               params.kernel_size1,
+               params.kernel_size0 - params.pad0 - 1,
+               params.kernel_size1 - params.pad1 - 1,
+               params.out_height,
+               params.out_width
+              );
         solution.min_proc_time = profile_h.GetKernelTime();
     }
+
 #ifdef NDEBUG
-    catch(miopen::Exception&)
-    {
+    catch (miopen::Exception&) {
         return -1;
     }
+
 #endif
     return 0;
 
