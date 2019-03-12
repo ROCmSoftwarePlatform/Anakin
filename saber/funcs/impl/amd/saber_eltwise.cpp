@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
         SABER_CHECK(_saber_activation.create(inputs, outputs, param.activation_param, ctx));
     }
 
-    const int count = outputs[0]->size();
+    const int count = outputs[0]->valid_size();
 
     int global_size = count;
     int local_size  = 256;
@@ -81,8 +81,19 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
     switch (param.operation) {
     case Eltwise_prod:
         if (_with_relu) {
+            kernelInfo.comp_options = kernelInfo.comp_options + " -DMLO_CONV_ACTIVE_RELU=" + std::to_string(
+                                          _with_relu);
+
             if (inputs.size() <= 2) {
-                kernelInfo.kernel_name = "ker_elt_production";
+                if ((count > 3) && (0 == count % 4)
+                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                    global_size = global_size / 4;
+                    kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
+                    kernelInfo.kernel_name = "ker_elt_production_f4";
+                } else {
+                    kernelInfo.kernel_name = "ker_elt_production";
+                }
+
                 kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
                 if (!kptr.get()->isInit()) {
@@ -93,7 +104,15 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
                 _kernels_ptr.push_back(kptr);
 
             } else {
-                kernelInfo.kernel_name = "ker_elt_production";
+                if ((count > 3) && (0 == count % 4)
+                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                    global_size = global_size / 4;
+                    kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
+                    kernelInfo.kernel_name = "ker_elt_production_f4";
+                } else {
+                    kernelInfo.kernel_name = "ker_elt_production";
+                }
+
                 kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
                 if (!kptr.get()->isInit()) {
@@ -128,7 +147,15 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
 
         } else {
 
-            kernelInfo.kernel_name = "ker_elt_production";
+            if ((count > 3) && (0 == count % 4)
+                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                global_size = global_size / 4;
+                kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
+                kernelInfo.kernel_name = "ker_elt_production_f4";
+            } else {
+                kernelInfo.kernel_name = "ker_elt_production";
+            }
+
             kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
             if (!kptr.get()->isInit()) {
@@ -156,7 +183,18 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
 
     case Eltwise_sum:
         if (_with_relu) {
-            kernelInfo.kernel_name = "ker_elt_sum";
+            kernelInfo.comp_options = kernelInfo.comp_options + " -DMLO_CONV_ACTIVE_RELU=" + std::to_string(
+                                          _with_relu);
+
+            if ((count > 3) && (0 == count % 4)
+                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                global_size = global_size / 4;
+                kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
+                kernelInfo.kernel_name = "ker_elt_sum_f4";
+            } else {
+                kernelInfo.kernel_name = "ker_elt_sum";
+            }
+
             kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
             if (!kptr.get()->isInit()) {
@@ -167,7 +205,15 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
             _kernels_ptr.push_back(kptr);
 
         } else {
-            kernelInfo.kernel_name = "ker_elt_sum";
+            if ((count > 3) && (0 == count % 4)
+                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                global_size = global_size / 4;
+                kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
+                kernelInfo.kernel_name = "ker_elt_sum_f4";
+            } else {
+                kernelInfo.kernel_name = "ker_elt_sum";
+            }
+
             kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
             if (!kptr.get()->isInit()) {
@@ -183,8 +229,19 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
     case Eltwise_max:
 
         if (_with_relu) {
+            kernelInfo.comp_options = kernelInfo.comp_options + " -DMLO_CONV_ACTIVE_RELU=" + std::to_string(
+                                          _with_relu);
+
             if (inputs.size() <= 2) {
-                kernelInfo.kernel_name = "ker_elt_max";
+                if ((count > 3) && (0 == count % 4)
+                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                    global_size = global_size / 4;
+                    kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
+                    kernelInfo.kernel_name = "ker_elt_max_f4";
+                } else {
+                    kernelInfo.kernel_name = "ker_elt_max";
+                }
+
                 kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
                 if (!kptr.get()->isInit()) {
@@ -195,7 +252,15 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
                 _kernels_ptr.push_back(kptr);
 
             } else {
-                kernelInfo.kernel_name = "ker_elt_max";
+                if ((count > 3) && (0 == count % 4)
+                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                    global_size = global_size / 4;
+                    kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
+                    kernelInfo.kernel_name = "ker_elt_max_f4";
+                } else {
+                    kernelInfo.kernel_name = "ker_elt_max";
+                }
+
                 kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
                 if (!kptr.get()->isInit()) {
@@ -229,7 +294,15 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
             }
         } else {
 
-            kernelInfo.kernel_name = "ker_elt_max";
+            if ((count > 3) && (0 == count % 4)
+                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                global_size = global_size / 4;
+                kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
+                kernelInfo.kernel_name = "ker_elt_max_f4";
+            } else {
+                kernelInfo.kernel_name = "ker_elt_max";
+            }
+
             kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
             if (!kptr.get()->isInit()) {
@@ -274,11 +347,16 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
     bool err      = false;
     int with_relu = 0;
 
-    const int count  = outputs[0]->valid_size();
+    int count  = outputs[0]->valid_size();
     int kernel_index = 0;
 
     switch (param.operation) {
     case Eltwise_prod:
+        if ((count > 3) && (0 == count % 4)
+                && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+            count = count / 4;
+        }
+
         if (_with_relu) {
             if (inputs.size() <= 2) {
                 with_relu = 1;
@@ -415,6 +493,11 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
         break;
 
     case Eltwise_sum:
+        if ((count > 3) && (0 == count % 4)
+                && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+            count = count / 4;
+        }
+
         if (_with_relu) {
             with_relu = 1;
 
@@ -467,6 +550,10 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
         break;
 
     case Eltwise_max:
+        if ((count > 3) && (0 == count % 4)
+                && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+            count = count / 4;
+        }
 
         if (_with_relu) {
             if (inputs.size() <= 2) {
