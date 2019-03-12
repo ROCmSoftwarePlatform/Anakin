@@ -489,14 +489,15 @@ rocm_export_targets(
 )
 
 ## Install db files
-#install(FILES
+install(FILES
+    kernels/gfx803_64.cd.pad.txt
 #    kernels/gfx803_36.cd.pdb.txt
 #    kernels/gfx803_64.cd.pdb.txt
 #    kernels/gfx900_64.cd.pdb.txt
 #    kernels/gfx900_56.cd.pdb.txt
 #    kernels/gfx906_64.cd.pdb.txt
 #    kernels/gfx906_56.cd.pdb.txt
-# DESTINATION ${DATA_INSTALL_DIR}/db)
+ DESTINATION ~/.cache/amd_saber/db)
 
 rocm_install_symlink_subdir(${MIOPEN_INSTALL_DIR})
 
