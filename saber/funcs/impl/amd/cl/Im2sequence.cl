@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -12,28 +12,31 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#define WIN_SIZE (WIN_H * WIN_W)
+#define KERNEL_EXTEN (KERNEL_EXTEN_H * KERNEL_EXTEN_W)
+
 __kernel void ker_im2sequence_fwd(
-        global float* out_data,
-        global const float* in_data,
-        const int in_n,
-        const int in_c,
-        const int in_h,
-        const int in_w,
-        const int out_h,
-        const int out_w,
-        const int col_height,
-        const int col_width,
-        const int window_h,
-        const int window_w,
-        const int pad_up,
-        const int pad_left,
-        const int stride_h,
-        const int stride_w,
-        const int dilation_h,
-        const int dilation_w,
-        const int kernel_exten_h,
-        const int kernel_exten_w,
-        const int num_threads) {
+    global float* out_data,
+    global const float* in_data,
+    const int in_n,
+    const int in_c,
+    const int in_h,
+    const int in_w,
+    const int out_h,
+    const int out_w,
+    const int col_height,
+    const int col_width,
+    const int window_h,
+    const int window_w,
+    const int pad_up,
+    const int pad_left,
+    const int stride_h,
+    const int stride_w,
+    const int dilation_h,
+    const int dilation_w,
+    const int kernel_exten_h,
+    const int kernel_exten_w,
+    const int num_threads) {
 
     int global_idx       = get_global_id(0);
     int out_size_per_img = out_h * out_w;
@@ -63,30 +66,30 @@ __kernel void ker_im2sequence_fwd(
 }
 
 __kernel void ker_im2sequence_fwd_shared(
-        global float* out_data,
-        global const float* in_data,
-        const int in_n,
-        const int in_c,
-        const int in_h,
-        const int in_w,
-        const int out_h,
-        const int out_w,
-        const int col_height,
-        const int col_width,
-        const int window_h,
-        const int window_w,
-        const int pad_up,
-        const int pad_left,
-        const int stride_h,
-        const int stride_w,
-        const int dilation_h,
-        const int dilation_w,
-        const int kernel_exten_h,
-        const int kernel_exten_w,
-        const int num_threads) {
+    global float* out_data,
+    global const float* in_data,
+    const int in_n,
+    const int in_c,
+    const int in_h,
+    const int in_w,
+    const int out_h,
+    const int out_w,
+    const int col_height,
+    const int col_width,
+    const int window_h,
+    const int window_w,
+    const int pad_up,
+    const int pad_left,
+    const int stride_h,
+    const int stride_w,
+    const int dilation_h,
+    const int dilation_w,
+    const int kernel_exten_h,
+    const int kernel_exten_w,
+    const int num_threads) {
     int local_idx  = get_local_id(0);
     int global_idx = get_global_id(0);
-    local float share_data[256 * 8 * 8];
+    local float share_data[256 * WIN_SIZE + KERNEL_EXTEN];
     int out_size_per_img = out_h * out_w;
     int w                = global_idx % out_w;
     int h                = (global_idx / out_w) % out_h;
@@ -102,9 +105,11 @@ __kernel void ker_im2sequence_fwd_shared(
     int window_size                 = window_h * window_w;
 
     int id = 0;
+
     for (int i = in_start_h; i < in_end_h; i += dilation_h) {
         for (int j = in_start_w; j < in_end_w; j += dilation_w) {
             float data = 0;
+
             if (i < 0 || i >= in_h || j < 0 || j >= in_w) {
                 data = 0.0f;
                 // share_data[id * blockDim.x + thread_id] = 0;
@@ -113,10 +118,12 @@ __kernel void ker_im2sequence_fwd_shared(
                 data = in_data_tmp[i * in_w + j];
                 // out_data_tmp[out_offset++] = in_data_tmp[i * in_w + j]
             }
+
             share_data[local_idx * window_size + id] = data;
             id++;
         }
     }
+
     barrier(CLK_LOCAL_MEM_FENCE);
     int valid_height = min(num_threads - get_group_id(0) * get_local_size(0), get_local_size(0));
     // if (threadIdx.x == 0) {

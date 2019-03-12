@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -36,6 +36,23 @@ SaberStatus SaberIm2Sequence<AMD, OpDtype>::create(
     std::vector<Tensor<AMD>*>& outputs,
     Im2SequenceParam<AMD>& param,
     Context<AMD>& ctx) {
+
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "create";
+
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
+            << "AMD Summary: input size N " << inputs[0]->num()
+            << " C " << inputs[0]->channel()
+            << " H " << inputs[0]->height()
+            << " W " << inputs[0]->width();
+
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
+            << "AMD Summary: op param "
+            << " window_h " << param.window_h << " window_w " << param.window_w
+            << " pad_up " << param.pad_up << " pad_down " << param.pad_down
+            << " pad_left " << param.pad_left << " pad_right " << param.pad_right
+            << " stride_h " << param.stride_h << " stride_w " << param.stride_w
+            << " dilation_h " << param.dilation_h << " dilation_w " << param.dilation_w;
+
     const int count  = outputs[0]->valid_size();
     int input_height = inputs[0]->height(); // P
     _kernel_exten_h  = param.dilation_h * (param.window_h - 1) + 1;
@@ -57,6 +74,11 @@ SaberStatus SaberIm2Sequence<AMD, OpDtype>::create(
     kernelInfo.g_wk        = {(num_threads + 256 - 1) / 256 * 256};
     kernelInfo.kernel_file = "Im2sequence.cl";
     kernelInfo.kernel_name = "ker_im2sequence_fwd_shared";
+    kernelInfo.comp_options =
+        std::string(" -DWIN_H=") + std::to_string(param.window_h)
+        + std::string(" -DWIN_W=") + std::to_string(param.window_w)
+        + std::string(" -DKERNEL_EXTEN_H=") + std::to_string(_kernel_exten_h)
+        + std::string(" -DKERNEL_EXTEN_W=") + std::to_string(_kernel_exten_w);
 
     AMDKernelPtr kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
