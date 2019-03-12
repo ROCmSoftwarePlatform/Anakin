@@ -12,6 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#pragma OPENCL EXTENSION cl_amd_printf : enable
 #define _FLOAT float
 #define _FLOAT2 float2
 #define _FLOAT4 float4
@@ -57,28 +58,36 @@ __kernel void GpuPowReverse(
     }
 }
 
+
+
 __kernel void ReduceAddAtomic(
-    int total_size,
-    int p,
     int inner_size,
+    int p,
+    int inner_group_num,
     __global const _FLOAT* __restrict src,
     __global _FLOAT* __restrict dst) {
+
     __local _FLOAT sdata[SHARE_MEMORY_DIM];
     int local_size = get_local_size(0);
+    int group_id = get_group_id(0);
+    int tid = get_local_id(0);
+    sdata[tid] = 0;
 
-    int batch_group_num = (inner_size + local_size - 1) / local_size;
-    int group_id   = get_group_id(0);
-    int batch_id   = group_id / batch_group_num;
-    int tid        = get_local_id(0);
-    int i          = batch_id * inner_size + (group_id % batch_group_num) * local_size + tid;
-    int idx_limit  = (batch_id + 1) * inner_size;
+    int batch_id = group_id / inner_group_num;
+    int count = inner_size / inner_group_num + 1;
+    int src_offset = batch_id * inner_size;
+    src = src + src_offset;
+    int src_idx = (group_id - batch_id * inner_group_num) * count + tid;
 
-    //! L1 norm
-    if (p == 1) {
-        sdata[tid] = i < idx_limit ? fabs(src[i]) : 0;
-    } else {
-        //! L2 norm
-        sdata[tid] = i < idx_limit ? src[i] * src[i] : 0;
+    for (int tid_count = tid; tid_count < count
+            && src_idx < inner_size; src_idx += local_size, tid_count += local_size) {
+        //! L1 norm
+        if (p == 1) {
+            sdata[tid] += fabs(src[src_idx]);
+        } else {
+            //! L2 norm
+            sdata[tid] += src[src_idx] * src[src_idx];
+        }
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
@@ -99,46 +108,59 @@ __kernel void ReduceAddAtomic(
         barrier(CLK_LOCAL_MEM_FENCE);
     }
 
-#if 1
-
-    if (tid < 32) {
-        if (local_size >= 64) {
+    if (local_size >= 64) {
+        if (tid < 32) {
             sdata[tid] += sdata[tid + 32];
-            barrier(CLK_LOCAL_MEM_FENCE);
         }
 
-        if (local_size >= 32) {
-            sdata[tid] += sdata[tid + 16];
-            barrier(CLK_LOCAL_MEM_FENCE);
-        }
-
-        if (local_size >= 16) {
-            sdata[tid] += sdata[tid + 8];
-            barrier(CLK_LOCAL_MEM_FENCE);
-        }
-
-        if (local_size >= 8) {
-            sdata[tid] += sdata[tid + 4];
-            barrier(CLK_LOCAL_MEM_FENCE);
-        }
-
-        if (local_size >= 4) {
-            sdata[tid] += sdata[tid + 2];
-            barrier(CLK_LOCAL_MEM_FENCE);
-        }
-
-        if (local_size >= 2) {
-            sdata[tid] += sdata[tid + 1];
-            barrier(CLK_LOCAL_MEM_FENCE);
-        }
-
-        //! write result for this block to global mem
-        if (tid == 0) {
-            AtomicAdd(dst + batch_id, *sdata);
-        }
+        barrier(CLK_LOCAL_MEM_FENCE);
     }
 
-#endif
+    if (local_size >= 32) {
+        if (tid < 16) {
+            sdata[tid] += sdata[tid + 16];
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (local_size >= 16) {
+        if (tid < 8) {
+            sdata[tid] += sdata[tid + 8];
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (local_size >= 8) {
+        if (tid < 4) {
+            sdata[tid] += sdata[tid + 4];
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (local_size >= 4) {
+        if (tid < 2) {
+            sdata[tid] += sdata[tid + 2];
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (local_size >= 2) {
+        if (tid < 1) {
+            sdata[tid] += sdata[tid + 1];
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    //! write result for this block to global mem
+    if (tid == 0) {
+        AtomicAdd(dst + batch_id, *sdata);
+    }
+
 };
 
 __kernel void NormalizeNoAcrossSpatial(
@@ -152,6 +174,7 @@ __kernel void NormalizeNoAcrossSpatial(
     int p,
     int has_scale,
     int shared) {
+
     int index             = get_global_id(0);
     const int global_size = get_global_size(0);
 
@@ -162,11 +185,12 @@ __kernel void NormalizeNoAcrossSpatial(
         int data_index       = num_index * channels * size_in_channel + index_in_channel;
 
         for (int i = 0; i < channels; ++i) {
+            //float src_val = fabs(bottom_data[data_index + i * size_in_channel]);
             if (p == 1) {
                 sqr_sum += fabs(bottom_data[data_index + i * size_in_channel]);
             } else {
-                sqr_sum += bottom_data[data_index + i * size_in_channel]
-                           * bottom_data[data_index + i * size_in_channel];
+                sqr_sum += bottom_data[data_index + i * size_in_channel] *
+                           bottom_data[data_index + i * size_in_channel];
             }
         }
 
@@ -177,6 +201,7 @@ __kernel void NormalizeNoAcrossSpatial(
         } else {
             norm = 1.f / (sqrt(sqr_sum) + eps);
         }
+
 
         for (int i = 0; i < channels; ++i) {
             if (has_scale) {

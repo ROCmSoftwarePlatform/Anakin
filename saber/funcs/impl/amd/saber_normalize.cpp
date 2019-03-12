@@ -17,6 +17,8 @@
 namespace anakin {
 namespace saber {
 
+#define MAX_GROUP_NUM 64
+
 typedef TargetWrapper<AMD> AMD_API;
 
 template <typename TargetType>
@@ -176,7 +178,11 @@ SaberStatus SaberNormalize<AMD, OpDtype>::create(
 
         _kernel_map[NORM_NO_ACROSS_SPATIAL] = kptr;
     } else {
-        globalSize             = (_compute_size + localSize - 1) / localSize * localSize * _norm_size;
+        _reduce_inner_group_num = (_compute_size + localSize - 1) / localSize;
+        _reduce_inner_group_num = (_reduce_inner_group_num > MAX_GROUP_NUM) ? MAX_GROUP_NUM :
+                                  _reduce_inner_group_num;
+
+        globalSize             = (_reduce_inner_group_num * _norm_size) * localSize;
         kernelInfo.g_wk        = { globalSize };
         kernelInfo.kernel_name = "ReduceAddAtomic";
         kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
@@ -234,7 +240,6 @@ SaberStatus SaberNormalize<AMD, OpDtype>::create(
         }
     }
 
-    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE CREATE KERNEL";
 
     return SaberSuccess;
 }
@@ -313,16 +318,13 @@ SaberStatus SaberNormalize<AMD, OpDtype>::dispatch(
             return SaberInvalidValue;
         }
 
-        LOG(INFO) << "Dispatch _size = " << _size << " param.p = " << param.p << " _compute_size = " <<
-                  _compute_size;
         kernel = kptr.get();
         err    = kernel->SetKernelArgs(
-                     (int)_size,
-                     (int)param.p,
                      (int)_compute_size,
+                     (int)param.p,
+                     (int)_reduce_inner_group_num,
                      (PtrDtype)inputs[0]->data(),
                      (PtrDtype)_norm_reduce.mutable_data());
-
 
         if (!err) {
             LOG(ERROR) << "Failed to set kernel Args";
@@ -418,7 +420,6 @@ SaberStatus SaberNormalize<AMD, OpDtype>::dispatch(
         return SaberInvalidValue;
     }
 
-    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE EXECUTION";
     return SaberSuccess;
 }
 

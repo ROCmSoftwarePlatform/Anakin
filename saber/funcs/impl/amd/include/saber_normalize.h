@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -56,9 +56,9 @@ public:
            Context<AMD>& ctx) override;
 
     virtual SaberStatus dispatch(
-            const std::vector<Tensor<AMD>*>& inputs,
-            std::vector<Tensor<AMD>*>& outputs,
-            NormalizeParam<AMD>& param) override;
+        const std::vector<Tensor<AMD>*>& inputs,
+        std::vector<Tensor<AMD>*>& outputs,
+        NormalizeParam<AMD>& param) override;
 
 private:
     Tensor<AMD> _norm_reduce;
@@ -69,10 +69,11 @@ private:
     int _channels;
     int _dims;
     int _channel_stride;
+    int _reduce_inner_group_num;
     Tensor<AMD> _input_stride;
     Tensor<AMD> _output_stride;
     Tensor<AMD> _valid_shape;
-    bool _is_continue_buf{true};
+    bool _is_continue_buf {true};
     std::unordered_map<int, AMDKernelPtr> _kernel_map;
 };
 
