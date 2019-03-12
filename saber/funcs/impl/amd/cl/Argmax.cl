@@ -71,9 +71,7 @@ void adjust_small_heap_with_index_device_stride(
         }
     }
 }
-
-__kernel void
-top1(__global const float* __restrict in_data,
+__kernel void top1(__global const float* __restrict in_data,
      int height,
      int width,
      int out_max_val,
@@ -582,7 +580,6 @@ __kernel void topk_channel(
         adjust_small_heap_with_index_device(small_heap_tree, tree_index, zero, top_k);
     }
 }
-
 __kernel void topk_heap_shared(
     __global float* __restrict out_data,
     int n,
@@ -617,6 +614,212 @@ __kernel void topk_heap_shared(
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
+    if (local_size >= 256) {
+        if (tid < 128) {
+            __local float* next_tree       = cur_tree + 128 * top_k;
+            __local float* next_tree_index = cur_tree_index + 128 * top_k;
+
+            for (int i = 0; i < top_k; i++) {
+                if (next_tree[i] > cur_tree[0]) {
+                    cur_tree[0]       = next_tree[i];
+                    cur_tree_index[0] = next_tree_index[i];
+                    adjust_small_heap_with_index_device(cur_tree, cur_tree_index, zero, top_k);
+                }
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (local_size >= 128) {
+        if (tid < 64) {
+            __local float* next_tree       = cur_tree + 64 * top_k;
+            __local float* next_tree_index = cur_tree_index + 64 * top_k;
+
+            for (int i = 0; i < top_k; i++) {
+                if (next_tree[i] > cur_tree[0]) {
+                    cur_tree[0]       = next_tree[i];
+                    cur_tree_index[0] = next_tree_index[i];
+                    adjust_small_heap_with_index_device(cur_tree, cur_tree_index, zero, top_k);
+                }
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (local_size >= 64) {
+        if (tid < 32) {
+            __local float* next_tree       = cur_tree + 32 * top_k;
+            __local float* next_tree_index = cur_tree_index + 32 * top_k;
+
+            for (int i = 0; i < top_k; i++) {
+                if (next_tree[i] > cur_tree[0]) {
+                    cur_tree[0]       = next_tree[i];
+                    cur_tree_index[0] = next_tree_index[i];
+                    adjust_small_heap_with_index_device(cur_tree, cur_tree_index, zero, top_k);
+                }
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (local_size >= 32) {
+        if (tid < 16) {
+            __local float* next_tree       = cur_tree + 16 * top_k;
+            __local float* next_tree_index = cur_tree_index + 16 * top_k;
+
+            for (int i = 0; i < top_k; i++) {
+                if (next_tree[i] > cur_tree[0]) {
+                    cur_tree[0]       = next_tree[i];
+                    cur_tree_index[0] = next_tree_index[i];
+                    adjust_small_heap_with_index_device(cur_tree, cur_tree_index, zero, top_k);
+                }
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (local_size >= 16) {
+        if (tid < 8) {
+            __local float* next_tree       = cur_tree + 8 * top_k;
+            __local float* next_tree_index = cur_tree_index + 8 * top_k;
+
+            for (int i = 0; i < top_k; i++) {
+                if (next_tree[i] > cur_tree[0]) {
+                    cur_tree[0]       = next_tree[i];
+                    cur_tree_index[0] = next_tree_index[i];
+                    adjust_small_heap_with_index_device(cur_tree, cur_tree_index, zero, top_k);
+                }
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (local_size >= 8) {
+        if (tid < 4) {
+            __local float* next_tree       = cur_tree + 4 * top_k;
+            __local float* next_tree_index = cur_tree_index + 4 * top_k;
+
+            for (int i = 0; i < top_k; i++) {
+                if (next_tree[i] > cur_tree[0]) {
+                    cur_tree[0]       = next_tree[i];
+                    cur_tree_index[0] = next_tree_index[i];
+                    adjust_small_heap_with_index_device(cur_tree, cur_tree_index, zero, top_k);
+                }
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (local_size >= 4) {
+        if (tid < 2) {
+            __local float* next_tree       = cur_tree + 2 * top_k;
+            __local float* next_tree_index = cur_tree_index + 2 * top_k;
+
+            for (int i = 0; i < top_k; i++) {
+                if (next_tree[i] > cur_tree[0]) {
+                    cur_tree[0]       = next_tree[i];
+                    cur_tree_index[0] = next_tree_index[i];
+                    adjust_small_heap_with_index_device(cur_tree, cur_tree_index, zero, top_k);
+                }
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (local_size >= 2) {
+        if (tid < 1) {
+            __local float* next_tree       = cur_tree + 1 * top_k;
+            __local float* next_tree_index = cur_tree_index + 1 * top_k;
+
+            for (int i = 0; i < top_k; i++) {
+                if (next_tree[i] > cur_tree[0]) {
+                    cur_tree[0]       = next_tree[i];
+                    cur_tree_index[0] = next_tree_index[i];
+                    adjust_small_heap_with_index_device(cur_tree, cur_tree_index, zero, top_k);
+                }
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (tid == 0) {
+        int stride = out_max_val ? group_id * top_k * 2 : group_id * top_k;
+        out_data   = out_data + stride;
+
+        for (int i = top_k - 1; i >= 0; i--) {
+            if (!out_max_val) {
+                out_data[i] = cur_tree_index[0];
+            } else {
+                out_data[i + top_k]         = cur_tree[0];
+                out_data[i] = cur_tree_index[0];
+            }
+
+            cur_tree[0]       = FLT_MAX;
+            cur_tree_index[0] = -1;
+            adjust_small_heap_with_index_device(cur_tree, cur_tree_index, zero, top_k);
+        }
+    }
+}
+__attribute__((reqd_work_group_size(512,1,1)))
+__kernel void topk_heap_shared_512(
+    __global float* __restrict out_data,
+    int n,
+    int inner_dim,
+    int top_k,
+    int out_max_val,
+    __global const float* __restrict in_data) {
+
+    int zero = 0;
+    __local float trees[TREE_MEM_SIZE];
+    const int group_id            = get_group_id(0);
+    const int tid                 = get_local_id(0);
+    const int local_size          = get_local_size(0);
+    __local float* cur_tree       = trees + tid * top_k;
+    __local float* cur_tree_index = cur_tree + top_k * local_size;
+
+    for (int i = 0; i < top_k; i++) {
+        cur_tree[i]       = -FLT_MAX;
+        cur_tree_index[i] = -1;
+    }
+
+    /*build small heap for every thread in one picture*/
+    in_data = in_data + group_id * inner_dim;
+    int ttt = 0;
+
+    for (int i = tid; i < inner_dim; i += local_size) {
+        if (in_data[i] > cur_tree[0]) {
+            cur_tree[0]       = in_data[i];
+            cur_tree_index[0] = i;
+            adjust_small_heap_with_index_device(cur_tree, cur_tree_index, zero, top_k);
+        }
+    }
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    if (local_size >= 512) {
+        if (tid < 256) {
+            __local float* next_tree       = cur_tree + 256 * top_k;
+            __local float* next_tree_index = cur_tree_index + 256 * top_k;
+
+            for (int i = 0; i < top_k; i++) {
+                if (next_tree[i] > cur_tree[0]) {
+                    cur_tree[0]       = next_tree[i];
+                    cur_tree_index[0] = next_tree_index[i];
+                    adjust_small_heap_with_index_device(cur_tree, cur_tree_index, zero, top_k);
+                }
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
 
     if (local_size >= 256) {
         if (tid < 128) {

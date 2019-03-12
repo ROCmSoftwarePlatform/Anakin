@@ -31,6 +31,7 @@
 #define TOP_1_CHANNEL 3
 #define TOPK_CHANNEL 4
 #define TOPK_HEAP_SHARED 5
+#define TOPK_HEAP_SHARED_512 6
 
 namespace anakin {
 namespace saber {
@@ -79,10 +80,14 @@ private:
 
     radix_sort_paramter _radix_params;
 
+    std::unordered_map<int, size_t> _globalWorkSize;
+    std::unordered_map<int, size_t> _localWorkSize_map;
     std::unordered_map<int, AMDKernelPtr> _kernel_map;
     std::unordered_map<int, AMDKernelPtr> _radix_sort_kernel_map;
+
 };
 
 } // namespace saber
 } // namespace anakin
 #endif
+
