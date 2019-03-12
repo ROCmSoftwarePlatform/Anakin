@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -36,6 +36,20 @@ SaberStatus SaberPower<AMD, OpDtype>::create(
     std::vector<Tensor<AMD>*>& outputs,
     PowerParam<AMD>& param,
     Context<AMD>& ctx) {
+
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "create";
+
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
+            << "AMD Summary: input size N " << inputs[0]->num()
+            << " C " << inputs[0]->channel()
+            << " H " << inputs[0]->height()
+            << " W " << inputs[0]->width();
+
+    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
+            << "AMD Summary: op param power " << param.power
+            << " scale " << param.scale
+            << " shift " << param.shift;
+
     const int count = outputs[0]->valid_size();
     Shape shape({inputs[0]->dims(), 1, 1, 1});
     _in_steps.re_alloc(shape);
@@ -83,9 +97,19 @@ SaberStatus SaberPower<AMD, OpDtype>::create(
 
     if (inputs[0]->is_continue_mem() && outputs[0]->is_continue_mem()) {
         if (power == 1) {
-            kernelInfo.kernel_name = "ker_scale_fwd";
+            if ((count > 3) && (0 == count % 4)) {
+                kernelInfo.g_wk        = {(count / 4 + 256 - 1) / 256 * 256};
+                kernelInfo.kernel_name = "ker_scale_fwd_f4";
+            } else {
+                kernelInfo.kernel_name = "ker_scale_fwd";
+            }
         } else {
-            kernelInfo.kernel_name = "ker_power_fwd";
+            if ((count > 3) && (0 == count % 4)) {
+                kernelInfo.g_wk        = {(count / 4 + 256 - 1) / 256 * 256};
+                kernelInfo.kernel_name = "ker_power_fwd_f4";
+            } else {
+                kernelInfo.kernel_name = "ker_power_fwd";
+            }
         }
     } else {
         if (power == 1) {
@@ -137,22 +161,41 @@ SaberStatus SaberPower<AMD, OpDtype>::dispatch(
 
     if (inputs[0]->is_continue_mem() && outputs[0]->is_continue_mem()) {
         if (power == 1) {
-            // To set the argument
-            err = kernel->SetKernelArgs(
-                      (PtrDtype)outputs[0]->mutable_data(),
-                      (int)count,
-                      (float)scale,
-                      (float)shift,
-                      (PtrDtype)inputs[0]->data());
+            if ((count > 3) && (0 == count % 4)) {
+                err = kernel->SetKernelArgs(
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (int)(count / 4),
+                          (float)scale,
+                          (float)shift,
+                          (PtrDtype)inputs[0]->data());
+            } else {
+                // To set the argument
+                err = kernel->SetKernelArgs(
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (int)count,
+                          (float)scale,
+                          (float)shift,
+                          (PtrDtype)inputs[0]->data());
+            }
         } else {
-            // To set the argument
-            err = kernel->SetKernelArgs(
-                      (PtrDtype)outputs[0]->mutable_data(),
-                      (int)count,
-                      (float)scale,
-                      (float)shift,
-                      (float)power,
-                      (PtrDtype)inputs[0]->data());
+            if ((count > 3) && (0 == count % 4)) {
+                err = kernel->SetKernelArgs(
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (int)(count / 4),
+                          (float)scale,
+                          (float)shift,
+                          (float)power,
+                          (PtrDtype)inputs[0]->data());
+            } else {
+                // To set the argument
+                err = kernel->SetKernelArgs(
+                          (PtrDtype)outputs[0]->mutable_data(),
+                          (int)count,
+                          (float)scale,
+                          (float)shift,
+                          (float)power,
+                          (PtrDtype)inputs[0]->data());
+            }
         }
     } else {
         if (power == 1) {
