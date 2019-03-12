@@ -375,7 +375,7 @@ SaberStatus VenderConv2DPooling<AMD, OpDtype>::dispatch(
             int d_n_groups = 64, d_flags = 0;
             PtrDtype biasMemObject = isBias ? param.conv_param.bias()->data() : 0;
 
-            if (isBias && isActive
+            if (isBias
                     && param.pooling_param.pooling_type == Pooling_max
                     && param.pooling_param.window_h == 2
                     && param.pooling_param.window_w == 2
