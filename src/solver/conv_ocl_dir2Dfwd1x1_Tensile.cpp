@@ -191,7 +191,7 @@ ConvSolution ConvOclDirectFwd1x1Tensile::GetSolution(
         ALOGE("can NOT get solution");
     }
 
-    result.min_proc_time = elapsed_time * 1000;
+    result.min_proc_time = elapsed_time;
     return result;
 }
 
