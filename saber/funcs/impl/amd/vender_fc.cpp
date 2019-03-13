@@ -89,18 +89,18 @@ enum FCType {
 
 
 
-
 #define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS1 (64)
-#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS1 (64 * ((param.weights->height() + 1023) / 1024 * 1024))
+#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS1 (64 * ((param.weights->height() + 63) / 64 * 64))
 #define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS2 (64)
-#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS2 (64 * ((param.weights->height() + 1023) / 1024 * 1024))
+#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS2 (64 * ((param.weights->height() + 63) / 64 * 64))
 #define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS4 (64)
-#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS4 (64 * ((param.weights->height() + 1023) / 1024 * 1024))
+#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS4 (64 * ((param.weights->height() + 63) / 64 * 64))
 #define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS8 (64)
-#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS8 (64 * ((param.weights->height() + 1023) / 1024 * 1024))
+#define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS8 (64 * ((param.weights->height() + 63) / 64 * 64))
 #define YOLO_FC26_NT_LOCAL_WORK_SIZE_BS32 (64)
 #define YOLO_FC26_NT_GLOBAL_WORK_SIZE_BS32 (4096 * 24)
 
+#define WAVE_SIZE   64
 
 
 
@@ -143,6 +143,9 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
 
     this->_ctx   = &ctx;
     this->_param = &param;
+
+    int atomic = 0;
+    int local_size = 64;
 
     KernelInfo kernelInfo;
     int batch_size_index = 0;
@@ -274,56 +277,59 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
     }
 
     if (inputs[0]->num() <= 8) {
-        switch (param.weights->width() * param.weights->height()) {
-        case 25088 * 4096:
-        case 4096 * 4096:
-        case 50176 * 4096:
+        if ((param.weights->width() == 25088 && param.weights->height() == 4096)
+                || (param.weights->width() == 4096 && param.weights->height() == 4096)
+                || (param.weights->width() == 50176 && param.weights->height() == 4096)) {
             fc_index = FC6;
-            break;
-
-        case 4096 * 1000:
-        case 2048 * 1000:
+        } else if ((param.weights->width() == 4096 && param.weights->height() == 1000)
+                   || (param.weights->width() == 2048 && param.weights->height() == 1000)) {
             fc_index = FC7;
             _branch = 2;
-            break;
-
-        case 4096 * 1470:
-        case 1024 * 21841:
-        default:
+        } else {
             fc_index = FC;
-            _branch = (param.weights->width() % 64 == 0 ? 1 : 0);
-            break;
-        }
-    } else if (inputs[0]->num() == 32) {
-        switch (param.weights->width() * param.weights->height()) {
-        case 25088 * 4096:
 
-            // case 4096 * 4096:
-        case 50176 * 4096:
-            fc_index = FC6;
-            _branch = 7;
-            break;
+            if (param.weights->width() % 64 == 0) {
+                if (outputs[0]->channel() <= 32) {
+                    int align = 1;
 
-        case 4096 * 4096:
-        case 4096 * 1000:
-        case 2048 * 1000:
+                    for (; outputs[0]->channel() > align; align *= 2) {
+                    }
 
-            /*
-                        fc_index = FC7;
-                        _branch = 8;
-                        break;
-            */
-        case 4096 * 1470:
+                    atomic = 64 / align;
 
-            /*
-                        fc_index = FC;
-                        _branch = 9;
-                        break;
-            */
-        case 1024 * 21841:
-        default:
-            _branch = 0;
-            break;
+                    for (; param.weights->width() > local_size && local_size < 1024; local_size *= 2) {
+                    }
+
+                    _branch = 10;
+                } else if (outputs[0]->channel() <= 1024) {
+                    for (; param.weights->width() > local_size && local_size < 1024; local_size *= 2) {
+                    }
+
+                    _branch = 11;
+                } else {
+                    local_size = 64;
+                    _branch = 1;
+                }
+            } else {
+                if (outputs[0]->channel() <= 32) {
+                    int align = 1;
+
+                    for (; outputs[0]->channel() > align; align *= 2) {
+                    }
+
+                    atomic = 64 / align;
+
+                    for (; param.weights->width() > local_size && local_size < 1024; local_size *= 2) {
+                    }
+
+                    _branch = 10;
+                } else {
+                    for (; param.weights->width() > local_size && local_size < 1024; local_size *= 2) {
+                    }
+
+                    _branch = 11;
+                }
+            }
         }
     } else {
         _branch = 0;
@@ -333,14 +339,30 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
         if (_branch) {
             if (batch_size_index == BATCH_SIZE_GE_INDEX) {
                 kernelInfo.l_wk        = {64, 1, 1};
-                kernelInfo.g_wk        = {(64 * ((outputs[0]->channel() + 1023) / 1024 * 1024)), 1, 1};
+                kernelInfo.g_wk        = {(64 * ((outputs[0]->channel() + 63) / 64 * 64)), 1, 1};
                 kernelInfo.kernel_file = "Conv1x1FC.cl";
                 kernelInfo.kernel_name = "InnerProduct";
             } else {
-                kernelInfo.l_wk        = {lwk[batch_size_index][fc_index], 1, 1};
-                kernelInfo.g_wk        = {gwk[batch_size_index][fc_index], 1, 1};
-                kernelInfo.kernel_file = kfn[batch_size_index][fc_index];
-                kernelInfo.kernel_name = "InnerProduct";
+                if (_branch < 10) {
+                    kernelInfo.l_wk        = {lwk[batch_size_index][fc_index], 1, 1};
+                    kernelInfo.g_wk        = {gwk[batch_size_index][fc_index], 1, 1};
+                    kernelInfo.kernel_file = kfn[batch_size_index][fc_index];
+                    kernelInfo.kernel_name = "InnerProduct";
+                } else {
+                    if (outputs[0]->channel() <= 32) {
+                        int align = (WAVE_SIZE / atomic);
+                        kernelInfo.l_wk        = {local_size, 1, 1};
+                        kernelInfo.g_wk        = {(local_size* atomic * ((param.weights->height() + align - 1) / align * align)), 1, 1};
+                        kernelInfo.kernel_file = "Conv1x1FC.cl";
+                        kernelInfo.kernel_name = "InnerProduct";
+                    } else {
+                        int multiple = 2048 / local_size;
+                        kernelInfo.l_wk        = {local_size, 1, 1};
+                        kernelInfo.g_wk        = {(local_size* multiple * ((param.weights->height() + WAVE_SIZE - 1) / WAVE_SIZE * WAVE_SIZE)), 1, 1};
+                        kernelInfo.kernel_file = "Conv1x1FC.cl";
+                        kernelInfo.kernel_name = "InnerProduct";
+                    }
+                }
             }
         } else { // gemm
             _outGemmWorkspace = new Tensor<AMD>();
@@ -540,6 +562,8 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
         if (_usemacro) {
             kernelInfo.comp_options = std::string(" -DSTRIDE=") + std::to_string(inputs[0]->channel()) +
                                       std::string(" -DMACRO") +
+                                      std::string(" -DATOMIC=") + std::to_string(atomic) +
+                                      std::string(" -DLOCAL_SIZE=") + std::to_string(local_size) +
                                       std::string(" -DN=") + std::to_string(inputs[0]->num()) +
                                       std::string(" -DWIDTH=") + std::to_string(param.weights->width()) +
                                       std::string(" -DOUTPUT=") + std::to_string(outputs[0]->channel()) +
@@ -547,6 +571,8 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
                                       std::string(" -DNO_SLOPE");
         } else {
             kernelInfo.comp_options = std::string(" -DSTRIDE=") + std::to_string(inputs[0]->channel()) +
+                                      std::string(" -DATOMIC=") + std::to_string(atomic) +
+                                      std::string(" -DLOCAL_SIZE=") + std::to_string(local_size) +
                                       std::string(" -DKERNEL_METHOD=") + std::to_string(_branch) +
                                       std::string(" -DNO_SLOPE");
         }
