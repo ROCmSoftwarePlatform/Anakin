@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 namespace anakin {
 namespace saber {
 
+#define MAX_FLOAT4_NUM_PER_GROUP 15000
 typedef TargetWrapper<AMD> AMD_API;
 
 template <DataType OpDtype>
@@ -59,12 +60,14 @@ SaberStatus SaberLrn<AMD, OpDtype>::create(
 
     int globalSize = outputs[0]->valid_size() / outputs[0]->channel();
     int localSize  = 256;
+
     KernelInfo kernelInfo;
     kernelInfo.kernel_file = "Lrn.cl";
     kernelInfo.wk_dim      = 1;
-    kernelInfo.l_wk        = {256};
+    kernelInfo.l_wk        = {localSize};
     kernelInfo.g_wk        = {(globalSize + localSize - 1) / localSize * localSize};
     kernelInfo.kernel_name = "Lrn";
+    kernelInfo.comp_options = std::string("-DCHANNEL_DIM=") + std::to_string(inputs[0]->channel());
 
     AMDKernelPtr kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
