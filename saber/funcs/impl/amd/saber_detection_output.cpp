@@ -67,9 +67,9 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::create(
 
 
     CHECK_EQ(_num_priors * _num_loc_classes * 4, sh_loc.count() / sh_loc.num()) <<
-        "Number of priors must match number of location predictions.";
+            "Number of priors must match number of location predictions.";
     CHECK_EQ(_num_priors * _num_classes, sh_conf.count() / sh_conf.num()) <<
-        "Number of priors must match number of confidence predictions.";
+            "Number of priors must match number of confidence predictions.";
 
     if (_conf_cpu_data != nullptr) {
         fast_free(_conf_cpu_data);
@@ -127,8 +127,13 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::create(
     _kernels_ptr.push_back(kptr);
 
     if (!param.share_location) {
-        kernelInfo.kernel_name = "permute_data_kernel";
-        kernelInfo.g_wk        = {(loc_count + 256 - 1) / 256 * 256};
+        if ((loc_count > 3) && (loc_count % 4 == 0) && (inputs[0]->num() > 4)) {
+            kernelInfo.kernel_name = "permute_data_kernel_f4";
+            kernelInfo.g_wk        = {(loc_count / 4 + 256 - 1) / 256 * 256};
+        } else {
+            kernelInfo.kernel_name = "permute_data_kernel";
+            kernelInfo.g_wk        = {(loc_count + 256 - 1) / 256 * 256};
+        }
 
         kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
@@ -140,8 +145,14 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::create(
         _kernels_ptr.push_back(kptr);
     }
 
-    kernelInfo.kernel_name = "permute_data_kernel";
-    kernelInfo.g_wk = {(inputs[1]->valid_size() + 256 - 1) / 256 * 256};
+    if ((inputs[1]->valid_size() > 3) && (inputs[1]->valid_size() % 4 == 0) && (inputs[0]->num() > 4)) {
+        kernelInfo.kernel_name = "permute_data_kernel_f4";
+        kernelInfo.g_wk = {(inputs[1]->valid_size() / 4 + 256 - 1) / 256 * 256};
+    } else {
+        kernelInfo.kernel_name = "permute_data_kernel";
+        kernelInfo.g_wk = {(inputs[1]->valid_size() + 256 - 1) / 256 * 256};
+    }
+
     kptr            = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
     if (!kptr.get()->isInit()) {
@@ -202,26 +213,50 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::dispatch(
     // Retrieve all decoded location predictions.
     if (!param.share_location) {
         int new_dim = 4;
-        err         = _kernels_ptr[j].get()->SetKernelArgs(
-                          (PtrDtype)_bbox_preds.mutable_data(),
-                          (int)loc_count,
-                          (int)_num_loc_classes,
-                          (int)_num_priors,
-                          (int)new_dim,
-                          (PtrDtype)_bbox_permute.mutable_data());
+
+        if ((loc_count > 3) && (loc_count % 4 == 0) && (inputs[0]->num() > 4)) {
+            err         = _kernels_ptr[j].get()->SetKernelArgs(
+                              (PtrDtype)_bbox_preds.mutable_data(),
+                              (int)(loc_count / 4),
+                              (int)_num_loc_classes,
+                              (int)_num_priors,
+                              (int)new_dim,
+                              (PtrDtype)_bbox_permute.mutable_data());
+        } else {
+            err         = _kernels_ptr[j].get()->SetKernelArgs(
+                              (PtrDtype)_bbox_preds.mutable_data(),
+                              (int)loc_count,
+                              (int)_num_loc_classes,
+                              (int)_num_priors,
+                              (int)new_dim,
+                              (PtrDtype)_bbox_permute.mutable_data());
+        }
+
         list.push_back(_kernels_ptr[j]);
         j++;
     }
 
     // Retrieve all confidences.
     int new_dim = 1;
-    err         = _kernels_ptr[j].get()->SetKernelArgs(
-                      (PtrDtype)inputs[1]->data(),
-                      (int)inputs[1]->valid_size(),
-                      (int)this->_num_classes,
-                      (int)_num_priors,
-                      (int)new_dim,
-                      (PtrDtype)_conf_permute.mutable_data());
+
+    if ((inputs[1]->valid_size() > 3) && (inputs[1]->valid_size() % 4 == 0) && (inputs[0]->num() > 4)) {
+        err         = _kernels_ptr[j].get()->SetKernelArgs(
+                          (PtrDtype)inputs[1]->data(),
+                          (int)(inputs[1]->valid_size() / 4),
+                          (int)this->_num_classes,
+                          (int)_num_priors,
+                          (int)new_dim,
+                          (PtrDtype)_conf_permute.mutable_data());
+    } else {
+        err         = _kernels_ptr[j].get()->SetKernelArgs(
+                          (PtrDtype)inputs[1]->data(),
+                          (int)inputs[1]->valid_size(),
+                          (int)this->_num_classes,
+                          (int)_num_priors,
+                          (int)new_dim,
+                          (PtrDtype)_conf_permute.mutable_data());
+    }
+
     list.push_back(_kernels_ptr[j]);
     j++;
 
@@ -231,13 +266,13 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::dispatch(
     }
 
     err = LaunchKernel(cm, list);
+
     if (!err) {
         LOG(ERROR) << "Failed to set execution";
         return SaberInvalidValue;
     }
 
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE EXECUTION";
-
     AMD_API::async_memcpy(
         _bbox_cpu_data,
         0,
@@ -248,7 +283,7 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::dispatch(
         _bbox_preds.valid_size() * sizeof(dtype),
         cm,
         __DtoH());
-
+    LOG(INFO) << "COMPLETE _bbox_preds";
     AMD_API::async_memcpy(
         _conf_cpu_data,
         0,
@@ -260,13 +295,14 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::dispatch(
         cm,
         __DtoH());
     AMD_API::sync_stream(NULL, cm);
-
+    LOG(INFO) << "COMPLETE _conf_permute";
     std::vector<dtype> result;
 
     nms_detect(_bbox_cpu_data, _conf_cpu_data, result, num, this->_num_classes, _num_priors,
                param.background_id,
                param.keep_top_k, param.nms_top_k, param.conf_thresh, param.nms_thresh, param.nms_eta,
                param.share_location);
+    LOG(INFO) << "COMPLETE nms_detect";
 
     if (result.size() == 0) {
         result.resize(7);
@@ -291,7 +327,7 @@ SaberStatus SaberDetectionOutput<AMD, OpDtype>::dispatch(
         cm,
         __HtoD());
     AMD_API::sync_stream(NULL, cm);
-
+    LOG(INFO) << "COMPLETE result";
     return SaberSuccess;
 }
 template class SaberDetectionOutput<AMD, AK_FLOAT>;
