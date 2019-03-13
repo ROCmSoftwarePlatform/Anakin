@@ -634,6 +634,259 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
         c[out_offset] = bias[((grid_x & 127) << 3) + (lid_x & 7)] + result[(lid_x << 1)];
     }
 }
+#elif KERNEL_METHOD == 10
+#ifndef ATOMIC
+#define ATOMIC  32
+#endif
+
+//#define ROW_ALIGN (64 / ATOMIC)
+
+#ifndef LOCAL_SIZE
+#define LOCAL_SIZE  64
+#endif
+
+#define LOCAL_MEMORY    (LOCAL_SIZE + (LOCAL_SIZE >> 5))
+
+#ifndef N
+#define N   1
+#endif
+
+#ifndef WIDTH
+#define WIDTH (1024)
+#endif
+
+#define WORKLOAD    (LOCAL_SIZE * ATOMIC)
+#define ITER ((WIDTH + WORKLOAD - 1) / WORKLOAD)
+
+
+#ifndef OUTPUT
+#define OUTPUT 21841
+#endif
+
+
+
+__attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProduct(
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c) {
+    uint lid_x = get_local_id(0);
+    uint grid_x = get_group_id(0);
+    uint col_id = grid_x / ATOMIC;
+    uint atomic_id = grid_x % ATOMIC;
+
+    __local float result[2][LOCAL_MEMORY];
+
+    __global const float* pB;
+    __global float* pC;
+
+    volatile __global uint* pCounter = (volatile __global uint*)(c + OUTPUT * N);
+
+    uint wave_stride = ITER * WORKLOAD / (WORKLOAD >> 6);
+    uint offset = (grid_x >> 2 << 6) % wave_stride;
+    uint wave_id = (atomic_id << 4) + (lid_x >> 6);
+
+    float sum = 0.0f;
+
+    float previous_value;
+    uint prevVal;
+    uint newVal;
+
+    if (grid_x % ATOMIC == 0) {
+        for (uint n = 0; n < N; n++)
+            if (lid_x == 0) {
+                *(pCounter + col_id + n * OUTPUT) = 0;
+            }
+    }
+
+    if (col_id < OUTPUT) {
+        for (uint n = 0; n < N; n++) {
+
+            pC = (__global float*)(c + col_id);
+
+            sum = 0.0f;
+
+            for (uint i = 0; i < ITER; i++, offset = (offset + 64) % wave_stride) {
+                //result[n % 2][lid_x + (lid_x >> 5)] = (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ? a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH] : 0.0f);
+                result[n % 2][lid_x + (lid_x >> 5)] = a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH];
+
+                pB = (__global const float*)(b + col_id * WIDTH + offset + wave_id * wave_stride + (lid_x & 63));
+
+                sum += (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ?
+                        result[n % 2][lid_x + (lid_x >> 5)] * pB[0] : 0.0f);
+            }
+
+            result[n % 2][lid_x + (lid_x >> 5)] = sum;
+            barrier(CLK_LOCAL_MEM_FENCE);
+
+            for (uint i = LOCAL_SIZE >> 1; i >= 64; i >>= 1) {
+                if (lid_x < i) {
+                    result[n % 2][lid_x + (lid_x >> 5)] += result[n % 2][lid_x + i + ((lid_x + i) >> 5)];
+                }
+
+                barrier(CLK_LOCAL_MEM_FENCE);
+            }
+
+            if (lid_x < 32) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 33];
+            }
+
+            if (lid_x < 16) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 16];
+            }
+
+            if (lid_x < 8) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 8];
+            }
+
+            if (lid_x < 4) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 4];
+            }
+
+            if (lid_x < 2) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 2];
+            }
+
+            if (lid_x < 1) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 1];
+            }
+
+            if (grid_x % ATOMIC == 0) {
+#ifdef BIAS
+                pC[n * OUTPUT] = bias[col_id] + result[n % 2][0];
+#else
+                pC[n * OUTPUT] = result[n % 2][0];
+#endif
+
+                barrier(CLK_GLOBAL_MEM_FENCE);
+
+                if (lid_x == 0) {
+                    atomic_inc(pCounter + col_id + n * OUTPUT);
+                }
+            } else {
+                if (lid_x == 0) {
+                    do {
+                    } while (atomic_cmpxchg((volatile __global uint*)(pCounter + col_id + n * OUTPUT), 1, 1) == 0);
+                }
+
+                barrier(CLK_LOCAL_MEM_FENCE);
+
+
+                if (lid_x == 0) {
+                    do {
+                        previous_value = pC[n * OUTPUT];
+                        prevVal = as_uint(previous_value);
+                        newVal = as_uint(result[n % 2][0] + previous_value);
+                    } while (atomic_cmpxchg((__global uint*)(pC + n * OUTPUT), prevVal, newVal) != prevVal);
+                }
+            }
+        }
+    }
+}
+#elif KERNEL_METHOD == 11
+#ifndef LOCAL_SIZE
+#define LOCAL_SIZE  64
+#endif
+
+#define LOCAL_MEMORY    (LOCAL_SIZE + (LOCAL_SIZE >> 5))
+
+#ifndef N
+#define N   1
+#endif
+
+#ifndef WIDTH
+#define WIDTH (1024)
+#endif
+
+
+#define ITER ((WIDTH + LOCAL_SIZE - 1) / LOCAL_SIZE)
+
+#ifndef OUTPUT
+#define OUTPUT 21841
+#endif
+
+__attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProduct(
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c) {
+    uint lid_x = get_local_id(0);
+    uint grid_x = get_group_id(0);
+
+    __local float result[2][LOCAL_MEMORY];
+
+    __global const float* pB; // correct
+    __global float* pC;
+
+    uint wave_stride = ITER * LOCAL_SIZE / (LOCAL_SIZE >> 6);
+    uint offset = (grid_x >> 2 << 6) % wave_stride;
+    uint wave_id = (lid_x >> 6);
+
+    float sum = 0.0f;
+
+    if (grid_x < OUTPUT) {
+        for (uint n = 0; n < N; n++) {
+            sum = 0.0f;
+
+            for (uint i = 0; i < ITER; i++, offset = (offset + 64) % wave_stride) {
+                //result[n % 2][lid_x + (lid_x >> 5)] = (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ? a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH] : 0.0f);
+                result[n % 2][lid_x + (lid_x >> 5)] = a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH];
+
+                pB = (__global const float*)(b + grid_x * WIDTH + offset + wave_id * wave_stride + (lid_x & 63));
+                pC = (__global float*)(c + grid_x);
+
+                sum += (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ?
+                        result[n % 2][lid_x + (lid_x >> 5)] * pB[0] : 0.0f);
+            }
+
+            result[n % 2][lid_x + (lid_x >> 5)] = sum;
+            barrier(CLK_LOCAL_MEM_FENCE);
+
+            for (uint i = LOCAL_SIZE >> 1; i >= 64; i >>= 1) {
+                if (lid_x < i) {
+                    result[n % 2][lid_x + (lid_x >> 5)] += result[n % 2][lid_x + i + ((lid_x + i) >> 5)];
+                }
+
+                barrier(CLK_LOCAL_MEM_FENCE);
+            }
+
+
+            if (lid_x < 32) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 33];
+            }
+
+            if (lid_x < 16) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 16];
+            }
+
+            if (lid_x < 8) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 8];
+            }
+
+            if (lid_x < 4) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 4];
+            }
+
+            if (lid_x < 2) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 2];
+            }
+
+            if (lid_x < 1) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 1];
+            }
+
+            if (lid_x == 0) {
+#ifdef BIAS
+                pC[n * OUTPUT] = bias[grid_x] + result[n % 2][0];
+#else
+                pC[n * OUTPUT] = result[n % 2][0];
+#endif
+            }
+        }
+    }
+}
 #endif
 
 #else //#ifndef MACRO
@@ -1237,6 +1490,231 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
         int out_offset =
             ((grid_x >> 7 << 2) + (lid_x >> 3)) * OUTPUT + ((grid_x & 127) << 3) + (lid_x & 7);
         c[out_offset] = bias[((grid_x & 127) << 3) + (lid_x & 7)] + result[(lid_x << 1)];
+    }
+}
+#elif KERNEL_METHOD == 10
+#ifndef ATOMIC
+#define ATOMIC  32
+#endif
+
+#ifndef LOCAL_SIZE
+#define LOCAL_SIZE  64
+#endif
+
+#define LOCAL_MEMORY    (LOCAL_SIZE + (LOCAL_SIZE >> 5))
+
+#define WORKLOAD    (LOCAL_SIZE * ATOMIC)
+#define ITER ((WIDTH + WORKLOAD - 1) / WORKLOAD)
+
+
+__attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProduct(
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c, uint N, uint WIDTH, uint OUTPUT) {
+    uint lid_x = get_local_id(0);
+    uint grid_x = get_group_id(0);
+    uint col_id = grid_x / ATOMIC;
+    uint atomic_id = grid_x % ATOMIC;
+
+    __local float result[2][LOCAL_MEMORY];
+
+    __global const float* pB;
+    __global float* pC;
+
+    volatile __global uint* pCounter = (volatile __global uint*)(c + OUTPUT * N);
+
+    uint wave_stride = ITER * WORKLOAD / (WORKLOAD >> 6);
+    uint offset = (grid_x >> 2 << 6) % wave_stride;
+    uint wave_id = (atomic_id << 4) + (lid_x >> 6);
+
+    float sum = 0.0f;
+
+    float previous_value;
+    uint prevVal;
+    uint newVal;
+
+    if (grid_x % ATOMIC == 0) {
+        for (uint n = 0; n < N; n++) {
+            if (lid_x == 0) {
+                *(pCounter + col_id + n * OUTPUT) = 0;
+            }
+        }
+    }
+
+    if (col_id < OUTPUT) {
+        for (uint n = 0; n < N; n++) {
+
+            pC = (__global float*)(c + col_id);
+
+            sum = 0.0f;
+
+            for (uint i = 0; i < ITER; i++, offset = (offset + 64) % wave_stride) {
+                //result[n % 2][lid_x + (lid_x >> 5)] = (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ? a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH] : 0.0f);
+                result[n % 2][lid_x + (lid_x >> 5)] = a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH];
+
+                pB = (__global const float*)(b + col_id * WIDTH + offset + wave_id * wave_stride + (lid_x & 63));
+
+                sum += (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ?
+                        result[n % 2][lid_x + (lid_x >> 5)] * pB[0] : 0.0f);
+            }
+
+            result[n % 2][lid_x + (lid_x >> 5)] = sum;
+            barrier(CLK_LOCAL_MEM_FENCE);
+
+            for (uint i = LOCAL_SIZE >> 1; i >= 64; i >>= 1) {
+                if (lid_x < i) {
+                    result[n % 2][lid_x + (lid_x >> 5)] += result[n % 2][lid_x + i + ((lid_x + i) >> 5)];
+                }
+
+                barrier(CLK_LOCAL_MEM_FENCE);
+            }
+
+            if (lid_x < 32) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 33];
+            }
+
+            if (lid_x < 16) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 16];
+            }
+
+            if (lid_x < 8) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 8];
+            }
+
+            if (lid_x < 4) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 4];
+            }
+
+            if (lid_x < 2) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 2];
+            }
+
+            if (lid_x < 1) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 1];
+            }
+
+            if (grid_x % ATOMIC == 0) {
+#ifdef BIAS
+                pC[n * OUTPUT] = bias[col_id] + result[n % 2][0];
+#else
+                pC[n * OUTPUT] = result[n % 2][0];
+#endif
+
+                barrier(CLK_GLOBAL_MEM_FENCE);
+
+                if (lid_x == 0) {
+                    atomic_inc(pCounter + col_id + n * OUTPUT);
+                }
+            } else {
+                if (lid_x == 0) {
+                    do {
+                    } while (atomic_cmpxchg((volatile __global uint*)(pCounter + col_id + n * OUTPUT), 1, 1) == 0);
+                }
+
+                barrier(CLK_LOCAL_MEM_FENCE);
+
+
+                if (lid_x == 0) {
+                    do {
+                        previous_value = pC[n * OUTPUT];
+                        prevVal = as_uint(previous_value);
+                        newVal = as_uint(result[n % 2][0] + previous_value);
+                    } while (atomic_cmpxchg((__global uint*)(pC + n * OUTPUT), prevVal, newVal) != prevVal);
+                }
+            }
+        }
+    }
+}
+#elif KERNEL_METHOD == 11
+#ifndef LOCAL_SIZE
+#define LOCAL_SIZE  64
+#endif
+
+#define LOCAL_MEMORY    (LOCAL_SIZE + (LOCAL_SIZE >> 5))
+
+#define ITER ((WIDTH + LOCAL_SIZE - 1) / LOCAL_SIZE)
+
+__attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProduct(
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c, uint N, uint WIDTH, uint OUTPUT) {
+    uint lid_x = get_local_id(0);
+    uint grid_x = get_group_id(0);
+
+    __local float result[2][LOCAL_MEMORY];
+
+    __global const float* pB; // correct
+    __global float* pC;
+
+    uint wave_stride = ITER * LOCAL_SIZE / (LOCAL_SIZE >> 6);
+    uint offset = (grid_x >> 2 << 6) % wave_stride;
+    uint wave_id = (lid_x >> 6);
+
+    float sum = 0.0f;
+
+    if (grid_x < OUTPUT) {
+        for (uint n = 0; n < N; n++) {
+            sum = 0.0f;
+
+            for (uint i = 0; i < ITER; i++, offset = (offset + 64) % wave_stride) {
+                //result[n % 2][lid_x + (lid_x >> 5)] = (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ? a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH] : 0.0f);
+                result[n % 2][lid_x + (lid_x >> 5)] = a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH];
+
+                pB = (__global const float*)(b + grid_x * WIDTH + offset + wave_id * wave_stride + (lid_x & 63));
+                pC = (__global float*)(c + grid_x);
+
+                sum += (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ?
+                        result[n % 2][lid_x + (lid_x >> 5)] * pB[0] : 0.0f);
+            }
+
+            result[n % 2][lid_x + (lid_x >> 5)] = sum;
+            barrier(CLK_LOCAL_MEM_FENCE);
+
+            for (uint i = LOCAL_SIZE >> 1; i >= 64; i >>= 1) {
+                if (lid_x < i) {
+                    result[n % 2][lid_x + (lid_x >> 5)] += result[n % 2][lid_x + i + ((lid_x + i) >> 5)];
+                }
+
+                barrier(CLK_LOCAL_MEM_FENCE);
+            }
+
+
+            if (lid_x < 32) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 33];
+            }
+
+            if (lid_x < 16) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 16];
+            }
+
+            if (lid_x < 8) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 8];
+            }
+
+            if (lid_x < 4) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 4];
+            }
+
+            if (lid_x < 2) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 2];
+            }
+
+            if (lid_x < 1) {
+                result[n % 2][lid_x] += result[n % 2][lid_x + 1];
+            }
+
+            if (lid_x == 0) {
+#ifdef BIAS
+                pC[n * OUTPUT] = bias[grid_x] + result[n % 2][0];
+#else
+                pC[n * OUTPUT] = result[n % 2][0];
+#endif
+            }
+        }
     }
 }
 #endif
