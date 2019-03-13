@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -26,11 +26,27 @@ __kernel void ker_permute_fwd(
     int global_idx = get_global_id(0);
     int org_idx    = global_idx;
     int in_idx     = 0;
+    int4 permute_order_private_4;
+    int4 new_steps_private_4;
+    int permute_order_private[4];
+    int new_steps_private[4];
 
     if (global_idx < count) {
+        permute_order_private_4 = *((__global const int4*)(&permute_order[0]));
+        new_steps_private_4 = *((__global const int4*)(&new_steps[0]));
+        permute_order_private[0] = permute_order_private_4.x;
+        permute_order_private[1] = permute_order_private_4.y;
+        permute_order_private[2] = permute_order_private_4.z;
+        permute_order_private[3] = permute_order_private_4.w;
+        new_steps_private[0] = new_steps_private_4.x;
+        new_steps_private[1] = new_steps_private_4.y;
+        new_steps_private[2] = new_steps_private_4.z;
+        new_steps_private[3] = new_steps_private_4.w;
+#pragma unroll
+
         for (int i = 0; i < num_axes; i++) {
-            int order    = permute_order[i];
-            int new_step = new_steps[i];
+            int order    = permute_order_private[i];
+            int new_step = new_steps_private[i];
             int old_step = old_steps[order];
             in_idx += (org_idx / new_step) * old_step;
             org_idx %= new_step;
@@ -45,27 +61,67 @@ __kernel void ker_permute_fwd_new_shape(
     const int num_axes,
     const int count,
     global const int* permute_order,
+    //const int permute_order_size,
     global const int* new_steps,
+    //const int new_steps_size,
     global const int* old_steps,
+    //const int old_steps_size,
     global const int* new_valid_shape,
+    //const int new_valid_shape_size,
     global const float* in_data) {
     int global_idx = get_global_id(0);
 
     int in_idx           = 0;
     int out_idx          = 0;
     int new_valid_stride = 1;
+    //int * new_steps_private;//[new_steps_size];
+    //int * old_steps_private;//[old_steps_size];
+    //int * permute_order_private;//[permute_order_size];
+    //int * new_valid_shape_private;//[new_valid_shape_size];
+    //int index;
+#if 0
+#pragma unroll
 
-    for (int i = num_axes - 1; i >= 0; --i) {
-        int order    = permute_order[i];
-        int new_step = new_steps[i];
-        int old_step = old_steps[order];
-        int id       = (global_idx / new_valid_stride) % new_valid_shape[i];
-        in_idx += id * old_step;
-        out_idx += id * new_step;
-        new_valid_stride *= new_valid_shape[i];
+    for (index = 0; index < new_steps_size; index++) {
+        new_steps_private[index] = new_steps[index];
     }
 
-    out_data[out_idx] = in_data[in_idx];
+#pragma unroll
+
+    for (index = 0; index < old_steps_size; index++) {
+        old_steps_private[index] = old_steps[index];
+    }
+
+#pragma unroll
+
+    for (index = 0; index < permute_order_size; index++) {
+        permute_order_private[index] = permute_order[index];
+    }
+
+#pragma unroll
+
+    for (index = 0; index < new_valid_shape_size; index++) {
+        new_valid_shape_private[index] = new_valid_shape[index];
+    }
+
+#endif
+
+    if (global_idx < count) {
+#pragma unroll
+
+        for (int i = num_axes - 1; i >= 0; --i) {
+            int order    = permute_order[i];
+            int new_step = new_steps[i];
+            int old_step = old_steps[order];
+            int id       = (global_idx / new_valid_stride) % new_valid_shape[i];
+            in_idx += id * old_step;
+            out_idx += id * new_step;
+            new_valid_stride *= new_valid_shape[i];
+        }
+
+        out_data[out_idx] = in_data[in_idx];
+    }
+
 }
 /*in this kernel, we suppose img with format (1, h, w, c) tranform to (1, c, h, w),
 and c = 3. out_h = c, out_w = h * w. each thread process one pixel*/
