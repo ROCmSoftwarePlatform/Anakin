@@ -233,6 +233,7 @@ struct PoolingContext
     int out_height;
     int out_width;
     int pooling_type;
+    int pooling_global;
     int pad1;
     int pad0;
     int kernel_size1;
