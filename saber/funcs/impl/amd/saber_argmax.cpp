@@ -41,7 +41,6 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
     Context<AMD>& ctx) {
     int localSize  = 256;
     int globalSize = 0;
-
     // _localWorkSize = localSize;
 
     if (!param.has_axis) {
@@ -178,7 +177,7 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
 
             _radix_sort_kernel_map[RADIX_SORT_OUTPUT_COMBINE] = kptr;
         } else {
-
+#if 0
             globalSize             = outer_dim * kernelInfo.l_wk[0];
             kernelInfo.g_wk        = {globalSize};
             kernelInfo.kernel_name = "topk_heap_shared";
@@ -190,6 +189,69 @@ SaberStatus SaberArgmax<AMD, OpDtype>::create(
             }
 
             _kernel_map[TOPK_HEAP_SHARED]     = kptr;
+#else
+            int localSize_t = 512;
+
+            while (localSize_t > 1) {
+                if (2 * localSize_t * param.top_k > LDS_MAX_FLOAT4_NUM) {
+                    localSize_t >>= 1;
+                } else {
+                    break;
+                }
+            }
+
+            if (inputs[0]->num() < 64) {
+                _localWorkSize = localSize_t ;
+            } else if (inputs[0]->num() > 64 && (2 * (2 * localSize_t * param.top_k) < LDS_MAX_FLOAT4_NUM)) {
+                _localWorkSize = localSize_t ;
+            } else {
+                _localWorkSize = localSize >>= 1 ;
+            }
+
+            if (_localWorkSize == 512) {
+                kernelInfo.l_wk        = {512};
+                globalSize             = outer_dim * kernelInfo.l_wk[0];
+                kernelInfo.g_wk        = {globalSize};
+                kernelInfo.kernel_name = "topk_heap_shared_512";
+
+                std::string strLocalSize = std::to_string(kernelInfo.l_wk[0]);
+                std::string strTreeMemSize =
+                    std::to_string(2 * kernelInfo.l_wk[0] * param.top_k);
+                kernelInfo.comp_options = std::string(" -DLOCAL_WORK_SIZE=") + strLocalSize
+                                          + std::string(" -DTREE_MEM_SIZE=") + strTreeMemSize;
+                kptr                   = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+
+                if (NULL == kptr) {
+                    LOG(ERROR) << "Failed to load program";
+                    return SaberInvalidValue;
+                }
+
+                _kernel_map[TOPK_HEAP_SHARED_512]     = kptr;
+                _globalWorkSize[TOPK_HEAP_SHARED_512] = kernelInfo.g_wk[0];
+                _localWorkSize_map[TOPK_HEAP_SHARED_512] = kernelInfo.l_wk[0];
+            } else {
+                kernelInfo.l_wk        = {_localWorkSize};
+                globalSize             = outer_dim * kernelInfo.l_wk[0];
+                kernelInfo.g_wk        = {globalSize};
+                kernelInfo.kernel_name = "topk_heap_shared";
+
+                std::string strLocalSize = std::to_string(kernelInfo.l_wk[0]);
+                std::string strTreeMemSize = std::to_string(2 * kernelInfo.l_wk[0] * param.top_k);
+                kernelInfo.comp_options = std::string(" -DLOCAL_WORK_SIZE=") + strLocalSize +
+                                          std::string(" -DTREE_MEM_SIZE=") + strTreeMemSize;
+                kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
+
+                if (NULL == kptr) {
+                    LOG(ERROR) << "Failed to load program";
+                    return SaberInvalidValue;
+                }
+
+                _kernel_map[TOPK_HEAP_SHARED]     = kptr;
+                _globalWorkSize[TOPK_HEAP_SHARED] = kernelInfo.g_wk[0];
+                _localWorkSize_map[TOPK_HEAP_SHARED] = kernelInfo.l_wk[0];
+            }
+
+#endif
         }
     }
 
@@ -407,6 +469,7 @@ SaberStatus SaberArgmax<AMD, OpDtype>::dispatch(
             LOG(INFO) << "COMPLETE EXECUTION";
             return SaberSuccess;
         } else {
+#if 0
             kernel = _kernel_map[TOPK_HEAP_SHARED].get();
             err    = kernel->SetKernelArgs(
                          (PtrDtype)outputs[0]->mutable_data(),
@@ -422,8 +485,46 @@ SaberStatus SaberArgmax<AMD, OpDtype>::dispatch(
             }
 
             list.push_back(_kernel_map[TOPK_HEAP_SHARED]);
+#else
+
+            if (_localWorkSize == 512) {
+                kernel = _kernel_map[TOPK_HEAP_SHARED_512].get();
+                err    = kernel->SetKernelArgs(
+                             (PtrDtype)outputs[0]->mutable_data(),
+                             (int)outer_dim,
+                             (int)inner_dim,
+                             (int)param.top_k,
+                             (int)param.out_max_val,
+                             (PtrDtype)inputs[0]->data());
+
+                if (!err) {
+                    LOG(ERROR) << "Failed to set kernel args";
+                    return SaberInvalidValue;
+                }
+
+                list.push_back(_kernel_map[TOPK_HEAP_SHARED_512]);
+            } else {
+                kernel = _kernel_map[TOPK_HEAP_SHARED].get();
+                err    = kernel->SetKernelArgs(
+                             (PtrDtype)outputs[0]->mutable_data(),
+                             (int)outer_dim,
+                             (int)inner_dim,
+                             (int)param.top_k,
+                             (int)param.out_max_val,
+                             (PtrDtype)inputs[0]->data());
+
+                if (!err) {
+                    LOG(ERROR) << "Failed to set kernel args";
+                    return SaberInvalidValue;
+                }
+
+                list.push_back(_kernel_map[TOPK_HEAP_SHARED]);
+            }
+
+#endif
         }
     }
+
     err = LaunchKernel(cm, list);
 
     if (!err) {
