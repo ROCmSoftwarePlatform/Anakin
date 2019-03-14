@@ -86,7 +86,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
 
             if (inputs.size() <= 2) {
                 if ((count > 3) && (0 == count % 4)
-                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width() > 16384)) {
                     global_size = global_size / 4;
                     kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
                     kernelInfo.kernel_name = "ker_elt_production_f4";
@@ -105,7 +105,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
 
             } else {
                 if ((count > 3) && (0 == count % 4)
-                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width() > 16384)) {
                     global_size = global_size / 4;
                     kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
                     kernelInfo.kernel_name = "ker_elt_production_f4";
@@ -148,7 +148,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
         } else {
 
             if ((count > 3) && (0 == count % 4)
-                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width() > 16384)) {
                 global_size = global_size / 4;
                 kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
                 kernelInfo.kernel_name = "ker_elt_production_f4";
@@ -187,7 +187,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
                                           _with_relu);
 
             if ((count > 3) && (0 == count % 4)
-                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width() > 16384)) {
                 global_size = global_size / 4;
                 kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
                 kernelInfo.kernel_name = "ker_elt_sum_f4";
@@ -206,7 +206,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
 
         } else {
             if ((count > 3) && (0 == count % 4)
-                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width() > 16384)) {
                 global_size = global_size / 4;
                 kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
                 kernelInfo.kernel_name = "ker_elt_sum_f4";
@@ -234,7 +234,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
 
             if (inputs.size() <= 2) {
                 if ((count > 3) && (0 == count % 4)
-                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width() > 16384)) {
                     global_size = global_size / 4;
                     kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
                     kernelInfo.kernel_name = "ker_elt_max_f4";
@@ -253,7 +253,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
 
             } else {
                 if ((count > 3) && (0 == count % 4)
-                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                        && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width() > 16384)) {
                     global_size = global_size / 4;
                     kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
                     kernelInfo.kernel_name = "ker_elt_max_f4";
@@ -295,7 +295,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::create(
         } else {
 
             if ((count > 3) && (0 == count % 4)
-                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                    && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width() > 16384)) {
                 global_size = global_size / 4;
                 kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
                 kernelInfo.kernel_name = "ker_elt_max_f4";
@@ -353,7 +353,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
     switch (param.operation) {
     case Eltwise_prod:
         if ((count > 3) && (0 == count % 4)
-                && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width() > 16384)) {
             count = count / 4;
         }
 
@@ -494,7 +494,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
 
     case Eltwise_sum:
         if ((count > 3) && (0 == count % 4)
-                && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width() > 16384)) {
             count = count / 4;
         }
 
@@ -551,7 +551,7 @@ SaberStatus SaberEltwise<AMD, OpDtype>::dispatch(
 
     case Eltwise_max:
         if ((count > 3) && (0 == count % 4)
-                && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->channel() * inputs[0]->width() > 16384)) {
+                && (inputs[0]->num() * inputs[0]->channel() * inputs[0]->height() * inputs[0]->width() > 16384)) {
             count = count / 4;
         }
 
