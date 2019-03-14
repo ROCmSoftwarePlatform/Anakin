@@ -101,6 +101,7 @@ void BiasReluPool(
     int pooling_p_h,
     int pooling_p_w,
     int pooling_type,
+    int pooling_global,
     bool isBias,
     bool isActive);
 

@@ -171,6 +171,7 @@ SaberStatus VenderConv2DPooling<AMD, OpDtype>::create(
                     param.pooling_param.pad_h,
                     param.pooling_param.pad_w,
                     param.pooling_param.pooling_type,
+                    param.pooling_param.global_pooling,
                     bias,
                     relu);
 
@@ -235,6 +236,7 @@ SaberStatus VenderConv2DPooling<AMD, OpDtype>::create(
             param.pooling_param.pad_h,
             param.pooling_param.pad_w,
             param.pooling_param.pooling_type,
+            param.pooling_param.global_pooling,
             isBias,
             param.conv_param.activation_param.has_active);
 
@@ -569,6 +571,70 @@ SaberStatus VenderConv2DPooling<AMD, OpDtype>::dispatch(
                           (PtrDtype)_outConvRelu->data(),
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype) nullptr);
+            }
+
+            if (!err) {
+                LOG(ERROR) << "Fail to set kernel args :" << err;
+                return SaberInvalidValue;
+            }
+
+            list.push_back(_kernels_ptr[i]);
+        } else if (_kernels_ptr[i].get()->GetName() == "PoolingGlobal") {
+            if (needBias) {
+                if (isBias) {
+                    if (isActive) {
+                        err = _kernels_ptr[i].get()->SetKernelArgs((PtrDtype)_outConvRelu->data(),
+                                                                   (PtrDtype)outputs[0]->mutable_data(),
+                                                                   (PtrDtype)param.conv_param.bias()->data(),
+                                                                   negative_slope,
+                                                                   (int)_outConvRelu->num(),
+                                                                   (int)_outConvRelu->channel(),
+                                                                   (int)_outConvRelu->height(),
+                                                                   (int)_outConvRelu->width(),
+                                                                   (int)param.pooling_param.pad_h,
+                                                                   (int)param.pooling_param.pad_w);
+                    } else {
+                        err = _kernels_ptr[i].get()->SetKernelArgs((PtrDtype)_outConvRelu->data(),
+                                                                   (PtrDtype)outputs[0]->mutable_data(),
+                                                                   (PtrDtype)param.conv_param.bias()->data(),
+                                                                   (int)_outConvRelu->num(),
+                                                                   (int)_outConvRelu->channel(),
+                                                                   (int)_outConvRelu->height(),
+                                                                   (int)_outConvRelu->width(),
+                                                                   (int)param.pooling_param.pad_h,
+                                                                   (int)param.pooling_param.pad_w);
+                    }
+                } else {
+                    if (isActive) {
+                        err = _kernels_ptr[i].get()->SetKernelArgs((PtrDtype)_outConvRelu->data(),
+                                                                   (PtrDtype)outputs[0]->mutable_data(),
+                                                                   negative_slope,
+                                                                   (int)_outConvRelu->num(),
+                                                                   (int)_outConvRelu->channel(),
+                                                                   (int)_outConvRelu->height(),
+                                                                   (int)_outConvRelu->width(),
+                                                                   (int)param.pooling_param.pad_h,
+                                                                   (int)param.pooling_param.pad_w);
+                    } else {
+                        err = _kernels_ptr[i].get()->SetKernelArgs((PtrDtype)_outConvRelu->data(),
+                                                                   (PtrDtype)outputs[0]->mutable_data(),
+                                                                   (int)_outConvRelu->num(),
+                                                                   (int)_outConvRelu->channel(),
+                                                                   (int)_outConvRelu->height(),
+                                                                   (int)_outConvRelu->width(),
+                                                                   (int)param.pooling_param.pad_h,
+                                                                   (int)param.pooling_param.pad_w);
+                    }
+                }
+            } else {
+                err = _kernels_ptr[i].get()->SetKernelArgs((PtrDtype)_outConvRelu->data(),
+                                                           (PtrDtype)outputs[0]->mutable_data(),
+                                                           (int)_outConvRelu->num(),
+                                                           (int)_outConvRelu->channel(),
+                                                           (int)_outConvRelu->height(),
+                                                           (int)_outConvRelu->width(),
+                                                           (int)param.pooling_param.pad_h,
+                                                           (int)param.pooling_param.pad_w);
             }
 
             if (!err) {

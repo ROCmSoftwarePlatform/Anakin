@@ -123,6 +123,7 @@ SaberStatus VenderConv2D<AMD, OpDtype>::create(
                         0,
                         0,
                         0,
+                        0,
                         isBias,
                         param.activation_param.has_active);
                 }
@@ -226,6 +227,7 @@ SaberStatus VenderConv2D<AMD, OpDtype>::create(
                 outputs[0]->height(),
                 outputs[0]->width(),
                 outputs[0]->channel(),
+                0,
                 0,
                 0,
                 0,

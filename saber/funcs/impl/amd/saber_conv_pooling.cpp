@@ -294,6 +294,70 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
             }
 
             list.push_back(_kernels_ptr[i]);
+        } else if (_kernels_ptr[i].get()->GetName() == "PoolingGlobal") {
+            if (needBias) {
+                if (isBias) {
+                    if (isActive) {
+                        err = _kernels_ptr[i].get()->SetKernelArgs((PtrDtype)_outConvRelu->data(),
+                                                                   (PtrDtype)outputs[0]->mutable_data(),
+                                                                   (PtrDtype)param.conv_param.bias()->data(),
+                                                                   negative_slope,
+                                                                   (int)_outConvRelu->num(),
+                                                                   (int)_outConvRelu->channel(),
+                                                                   (int)_outConvRelu->height(),
+                                                                   (int)_outConvRelu->width(),
+                                                                   (int)param.pooling_param.pad_h,
+                                                                   (int)param.pooling_param.pad_w);
+                    } else {
+                        err = _kernels_ptr[i].get()->SetKernelArgs((PtrDtype)_outConvRelu->data(),
+                                                                   (PtrDtype)outputs[0]->mutable_data(),
+                                                                   (PtrDtype)param.conv_param.bias()->data(),
+                                                                   (int)_outConvRelu->num(),
+                                                                   (int)_outConvRelu->channel(),
+                                                                   (int)_outConvRelu->height(),
+                                                                   (int)_outConvRelu->width(),
+                                                                   (int)param.pooling_param.pad_h,
+                                                                   (int)param.pooling_param.pad_w);
+                    }
+                } else {
+                    if (isActive) {
+                        err = _kernels_ptr[i].get()->SetKernelArgs((PtrDtype)_outConvRelu->data(),
+                                                                   (PtrDtype)outputs[0]->mutable_data(),
+                                                                   negative_slope,
+                                                                   (int)_outConvRelu->num(),
+                                                                   (int)_outConvRelu->channel(),
+                                                                   (int)_outConvRelu->height(),
+                                                                   (int)_outConvRelu->width(),
+                                                                   (int)param.pooling_param.pad_h,
+                                                                   (int)param.pooling_param.pad_w);
+                    } else {
+                        err = _kernels_ptr[i].get()->SetKernelArgs((PtrDtype)_outConvRelu->data(),
+                                                                   (PtrDtype)outputs[0]->mutable_data(),
+                                                                   (int)_outConvRelu->num(),
+                                                                   (int)_outConvRelu->channel(),
+                                                                   (int)_outConvRelu->height(),
+                                                                   (int)_outConvRelu->width(),
+                                                                   (int)param.pooling_param.pad_h,
+                                                                   (int)param.pooling_param.pad_w);
+                    }
+                }
+            } else {
+                err = _kernels_ptr[i].get()->SetKernelArgs((PtrDtype)_outConvRelu->data(),
+                                                           (PtrDtype)outputs[0]->mutable_data(),
+                                                           (int)_outConvRelu->num(),
+                                                           (int)_outConvRelu->channel(),
+                                                           (int)_outConvRelu->height(),
+                                                           (int)_outConvRelu->width(),
+                                                           (int)param.pooling_param.pad_h,
+                                                           (int)param.pooling_param.pad_w);
+            }
+
+            if (!err) {
+                LOG(ERROR) << "Fail to set kernel args :" << err;
+                return SaberInvalidValue;
+            }
+
+            list.push_back(_kernels_ptr[i]);
         } else {
             LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "disptach non-implementation kernel: " <<
                                                  _kernels_ptr[i].get()->GetName();

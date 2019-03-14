@@ -396,22 +396,11 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
                   int n_wei, int in_h, int in_w, int in_c, int out_h, int out_w,
                   int out_c, int pooling_w_h, int pooling_w_w, int pooling_s_h,
                   int pooling_s_w, int pooling_p_h, int pooling_p_w,
-                  int pooling_type, bool isBias, bool isActive) {
+                  int pooling_type, int pooling_global, bool isBias, bool isActive) {
     AMDKernelPtr kptr;
     KernelInfo kernelInfo;
 
     if (pooling_w_h != 0 || pooling_w_w != 0) {
-        int _grp_tile0 = 8;
-        int _grp_tile1 = 8;
-
-        int _out_pix_tile0 = std::max(1, 8 / pooling_s_w);
-        int _out_pix_tile1 = std::max(1, 8 / pooling_s_h);
-
-        kernelInfo.l_wk        = {256, 1, 1};
-        kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
-        kernelInfo.kernel_file = "PoolingGen.cl";
-        kernelInfo.kernel_name = "mloPooling";
-        kernelInfo.kernel_type = SABER;
 
         int ptype = MLO_POOLING_OP_MAX;
         int average_include = 0;
@@ -439,36 +428,72 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
         break;
         }
 
-        kernelInfo.comp_options =
-            std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(ptype) +
-            std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(pooling_w_w) +
-            std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(pooling_w_h) +
-            std::string(" -DMLO_POOLING_PAD0=") + std::to_string(pooling_p_w) +
-            std::string(" -DMLO_POOLING_PAD1=") + std::to_string(pooling_p_h) +
-            std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(pooling_s_w) +
-            std::string(" -DMLO_POOLING_STRIDE1=") + std::to_string(pooling_s_h) +
-            std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(out_c) +
-            std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(in_c) +
-            std::string(" -DMLO_POOLING_N_HORIZ_OUT_PIX=") + std::to_string(_out_pix_tile0) +
-            std::string(" -DMLO_POOLING_N_VERT_OUT_PIX=") + std::to_string(_out_pix_tile1) +
-            std::string(" -DMLO_POOLING_GROUP_SZ0=") + std::to_string(_grp_tile0) +
-            std::string(" -DMLO_POOLING_GROUP_SZ1=") + std::to_string(_grp_tile1) +
-            std::string(" -DMLO_POOLING_BOT_WIDTH=") + std::to_string(in_w) +
-            std::string(" -DMLO_POOLING_BOT_HEIGHT=") + std::to_string(in_h) +
-            std::string(" -DMLO_POOLING_BOT_STRIDE=") + std::to_string(in_w) +
-            std::string(" -DMLO_POOLING_BOT_CHANNEL_STRIDE=") + std::to_string(in_w * in_h) +
-            std::string(" -DMLO_POOLING_BOT_BATCH_STRIDE=") + std::to_string(in_w * in_h * in_c) +
-            std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(out_w) +
-            std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(out_h) +
-            std::string(" -DMLO_POOLING_TOP_STRIDE=") + std::to_string(out_w) +
-            std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(out_w * out_h) +
-            std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") + std::to_string(out_w * out_h * out_c) +
-            std::string(" -DBATCH_NUM=") + std::to_string(bt_size) +
-            std::string(" -DAVERAGE_INCLUDE=") + std::to_string(average_include) +
-            std::string(" -DCU_NUM=64") +
-            std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias) +
-            std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive) +
-            std::string(" -DMIOPEN_USE_FP32=1");
+        if (pooling_global == 1 && in_h * in_w >= 64)
+        {
+            int windows_size       = in_h * in_w;
+            int group_size         = 1024;
+
+            while (group_size > windows_size && group_size > 64)
+            {
+                group_size = group_size >> 1;
+            }
+
+            kernelInfo.wk_dim      = 3;
+            kernelInfo.l_wk        = {group_size, 1, 1};
+            kernelInfo.g_wk        = {group_size, in_c, bt_size};
+            kernelInfo.kernel_file = "PoolingGlobal.cl";
+            kernelInfo.kernel_name = "PoolingGlobal";
+
+            kernelInfo.comp_options = std::string(" -DGROUP_SIZE=") + std::to_string(group_size)
+                                      + std::string(" -DPOOLING_TYPE=") + std::to_string(pooling_type)
+                                      + std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias)
+                                      + std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive);
+        }
+        else
+        {
+            int _grp_tile0 = 8;
+            int _grp_tile1 = 8;
+
+            int _out_pix_tile0 = std::max(1, 8 / pooling_s_w);
+            int _out_pix_tile1 = std::max(1, 8 / pooling_s_h);
+
+            kernelInfo.l_wk        = {256, 1, 1};
+            kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
+            kernelInfo.kernel_file = "PoolingGen.cl";
+            kernelInfo.kernel_name = "mloPooling";
+            kernelInfo.kernel_type = SABER;
+
+            kernelInfo.comp_options =
+                std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(ptype) +
+                std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(pooling_w_w) +
+                std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(pooling_w_h) +
+                std::string(" -DMLO_POOLING_PAD0=") + std::to_string(pooling_p_w) +
+                std::string(" -DMLO_POOLING_PAD1=") + std::to_string(pooling_p_h) +
+                std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(pooling_s_w) +
+                std::string(" -DMLO_POOLING_STRIDE1=") + std::to_string(pooling_s_h) +
+                std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(out_c) +
+                std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(in_c) +
+                std::string(" -DMLO_POOLING_N_HORIZ_OUT_PIX=") + std::to_string(_out_pix_tile0) +
+                std::string(" -DMLO_POOLING_N_VERT_OUT_PIX=") + std::to_string(_out_pix_tile1) +
+                std::string(" -DMLO_POOLING_GROUP_SZ0=") + std::to_string(_grp_tile0) +
+                std::string(" -DMLO_POOLING_GROUP_SZ1=") + std::to_string(_grp_tile1) +
+                std::string(" -DMLO_POOLING_BOT_WIDTH=") + std::to_string(in_w) +
+                std::string(" -DMLO_POOLING_BOT_HEIGHT=") + std::to_string(in_h) +
+                std::string(" -DMLO_POOLING_BOT_STRIDE=") + std::to_string(in_w) +
+                std::string(" -DMLO_POOLING_BOT_CHANNEL_STRIDE=") + std::to_string(in_w * in_h) +
+                std::string(" -DMLO_POOLING_BOT_BATCH_STRIDE=") + std::to_string(in_w * in_h * in_c) +
+                std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(out_w) +
+                std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(out_h) +
+                std::string(" -DMLO_POOLING_TOP_STRIDE=") + std::to_string(out_w) +
+                std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(out_w * out_h) +
+                std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") + std::to_string(out_w * out_h * out_c) +
+                std::string(" -DBATCH_NUM=") + std::to_string(bt_size) +
+                std::string(" -DAVERAGE_INCLUDE=") + std::to_string(average_include) +
+                std::string(" -DCU_NUM=64") +
+                std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias) +
+                std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive) +
+                std::string(" -DMIOPEN_USE_FP32=1");
+        }
 
         // To create the program
         kptr = CreateKernel(device_id, &kernelInfo);
@@ -756,24 +781,8 @@ std::vector<KernelInfo> FindSolutionWithPooling(
     convContext.poolingContext.n_outputs  = outputs[0]->channel();
     convContext.poolingContext.out_height = outputs[0]->height();
     convContext.poolingContext.out_width  = outputs[0]->width();
-
-    switch (param.pooling_param.pooling_type) {
-    case Pooling_max:
-        convContext.poolingContext.pooling_type = (PoolingType)MLO_POOLING_OP_MAX;
-        break;
-
-    case Pooling_average_exclude_padding:
-    case Pooling_average_include_padding:
-        convContext.poolingContext.pooling_type = (PoolingType)MLO_POOLING_OP_AVE;
-        break;
-
-    case Pooling_unknow:
-    case Pooling_max_deterministic:
-    default:
-        LOG(ERROR) << "Unknown polling type";
-        return solution_vector;
-    }
-
+    convContext.poolingContext.pooling_type   = param.pooling_param.pooling_type;
+    convContext.poolingContext.pooling_global = param.pooling_param.global_pooling;
     convContext.poolingContext.pad1           = param.pooling_param.pad_h;
     convContext.poolingContext.pad0           = param.pooling_param.pad_w;
     convContext.poolingContext.kernel_size1   = param.pooling_param.window_h;

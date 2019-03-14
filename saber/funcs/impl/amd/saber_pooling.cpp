@@ -75,46 +75,68 @@ SaberStatus SaberPooling<AMD, OpDtype>::create(
     break;
     }
 
-    kernelInfo.wk_dim = 3;
-    kernelInfo.l_wk        = {256, 1, 1};
-    kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
-    kernelInfo.kernel_file = "PoolingGen.cl";
-    kernelInfo.kernel_name = "mloPooling";
+    if (param.global_pooling == 1 && inputs[0]->count(2,4) >= 64)
+    {
+        int windows_size       = inputs[0]->count(2,4);
+        int group_size         = 1024;
 
-    int bot_batch_stride   = inputs[0]->width() * inputs[0]->height() * inputs[0]->channel();
-    int bot_channel_stride = inputs[0]->width() * inputs[0]->height();
+        while (group_size > windows_size && group_size > 64)
+        {
+            group_size = group_size >> 1;
+        }
 
-    int top_batch_stride   = outputs[0]->width() * outputs[0]->height() * outputs[0]->channel();
-    int top_channel_stride = outputs[0]->width() * outputs[0]->height();
+        kernelInfo.wk_dim      = 3;
+        kernelInfo.l_wk        = {group_size, 1, 1};
+        kernelInfo.g_wk        = {group_size, outputs[0]->channel(), outputs[0]->num()};
+        kernelInfo.kernel_file = "PoolingGlobal.cl";
+        kernelInfo.kernel_name = "PoolingGlobal";
 
-    // set comp_options...
-    kernelInfo.comp_options =
-        std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(pooling_type)
-        + std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(param.window_w)
-        + std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(param.window_h)
-        + std::string(" -DMLO_POOLING_PAD0=") + std::to_string(param.pad_w)
-        + std::string(" -DMLO_POOLING_PAD1=") + std::to_string(param.pad_h)
-        + std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(param.stride_w)
-        + std::string(" -DMLO_POOLING_STRIDE1=") + std::to_string(param.stride_h)
-        + std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(outputs[0]->channel())
-        + std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(inputs[0]->channel())
-        + std::string(" -DMLO_POOLING_GROUP_SZ0=8")
-        + std::string(" -DMLO_POOLING_GROUP_SZ1=8")
-        + std::string(" -DMLO_POOLING_BOT_BATCH_STRIDE=") + std::to_string(bot_batch_stride)
-        + std::string(" -DMLO_POOLING_BOT_CHANNEL_STRIDE=") + std::to_string(bot_channel_stride)
-        + std::string(" -DMLO_POOLING_BOT_STRIDE=") + std::to_string(inputs[0]->width())
-        + std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") + std::to_string(top_batch_stride)
-        + std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(top_channel_stride)
-        + std::string(" -DMLO_POOLING_TOP_STRIDE=") + std::to_string(outputs[0]->width())
-        + std::string(" -DMLO_POOLING_BOT_WIDTH=") + std::to_string(inputs[0]->width())
-        + std::string(" -DMLO_POOLING_BOT_HEIGHT=") + std::to_string(inputs[0]->height())
-        + std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(outputs[0]->width())
-        + std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(outputs[0]->height())
-        + std::string(" -DBATCH_NUM=") + std::to_string(inputs[0]->num())
-        + std::string(" -DAVERAGE_INCLUDE=") + std::to_string(average_include)
-        + std::string(" -DCU_NUM=64")
-        + std::string(" -DMIOPEN_USE_FP32=1")
-        + std::string(" -DMIOPEN_USE_FP16=0");
+        kernelInfo.comp_options = std::string(" -DGROUP_SIZE=") + std::to_string(group_size)
+                                  + std::string(" -DPOOLING_TYPE=") + std::to_string(param.pooling_type);
+    }
+    else
+    {
+        kernelInfo.wk_dim = 3;
+        kernelInfo.l_wk        = {256, 1, 1};
+        kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
+        kernelInfo.kernel_file = "PoolingGen.cl";
+        kernelInfo.kernel_name = "mloPooling";
+
+        int bot_batch_stride   = inputs[0]->width() * inputs[0]->height() * inputs[0]->channel();
+        int bot_channel_stride = inputs[0]->width() * inputs[0]->height();
+
+        int top_batch_stride   = outputs[0]->width() * outputs[0]->height() * outputs[0]->channel();
+        int top_channel_stride = outputs[0]->width() * outputs[0]->height();
+
+        // set comp_options...
+        kernelInfo.comp_options =
+            std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(pooling_type)
+            + std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(param.window_w)
+            + std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(param.window_h)
+            + std::string(" -DMLO_POOLING_PAD0=") + std::to_string(param.pad_w)
+            + std::string(" -DMLO_POOLING_PAD1=") + std::to_string(param.pad_h)
+            + std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(param.stride_w)
+            + std::string(" -DMLO_POOLING_STRIDE1=") + std::to_string(param.stride_h)
+            + std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(outputs[0]->channel())
+            + std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(inputs[0]->channel())
+            + std::string(" -DMLO_POOLING_GROUP_SZ0=8")
+            + std::string(" -DMLO_POOLING_GROUP_SZ1=8")
+            + std::string(" -DMLO_POOLING_BOT_BATCH_STRIDE=") + std::to_string(bot_batch_stride)
+            + std::string(" -DMLO_POOLING_BOT_CHANNEL_STRIDE=") + std::to_string(bot_channel_stride)
+            + std::string(" -DMLO_POOLING_BOT_STRIDE=") + std::to_string(inputs[0]->width())
+            + std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") + std::to_string(top_batch_stride)
+            + std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(top_channel_stride)
+            + std::string(" -DMLO_POOLING_TOP_STRIDE=") + std::to_string(outputs[0]->width())
+            + std::string(" -DMLO_POOLING_BOT_WIDTH=") + std::to_string(inputs[0]->width())
+            + std::string(" -DMLO_POOLING_BOT_HEIGHT=") + std::to_string(inputs[0]->height())
+            + std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(outputs[0]->width())
+            + std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(outputs[0]->height())
+            + std::string(" -DBATCH_NUM=") + std::to_string(inputs[0]->num())
+            + std::string(" -DAVERAGE_INCLUDE=") + std::to_string(average_include)
+            + std::string(" -DCU_NUM=64")
+            + std::string(" -DMIOPEN_USE_FP32=1")
+            + std::string(" -DMIOPEN_USE_FP16=0");
+    }
 
     AMDKernelPtr kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
 
@@ -151,8 +173,21 @@ SaberStatus SaberPooling<AMD, OpDtype>::dispatch(
     // To get the commpute command queue
     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
 
-    err = kernel->SetKernelArgs(
-              (PtrDtype)inputs[0]->data(), (PtrDtype)outputs[0]->mutable_data(), (PtrDtype)0);
+    if (param.global_pooling == 1)
+    {
+        err = kernel->SetKernelArgs((PtrDtype)inputs[0]->data(),
+                                    (PtrDtype)outputs[0]->mutable_data(),
+                                    (int)inputs[0]->num(),
+                                    (int)inputs[0]->channel(),
+                                    (int)inputs[0]->height(),
+                                    (int)inputs[0]->width(),
+                                    (int)param.pad_h,
+                                    (int)param.pad_w);
+    }
+    else
+    {
+        err = kernel->SetKernelArgs((PtrDtype)inputs[0]->data(), (PtrDtype)outputs[0]->mutable_data(), (PtrDtype)0);
+    }
 
     amd_kernel_list list;
     list.push_back(_kernel_ptr);
