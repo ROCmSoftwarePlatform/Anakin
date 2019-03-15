@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@
 #include "saber/saber_funcs_param.h"
 #include "saber/core/impl/amd/utils/amd_kernel.h"
 
-#define AMD_NUM_THREADS 256
+#define AMD_NUM_THREADS 512
 namespace anakin {
 
 namespace saber {
@@ -37,8 +37,12 @@ public:
     typedef typename DataTrait<AMD, OpDtype>::Dtype OpDataType;
     typedef AMD_API::TPtr PtrDtype;
 
-    SaberSlice() = default;
-    ~SaberSlice() {}
+    SaberSlice(){
+        _kernels_ptr.clear();
+    }
+    ~SaberSlice() {
+        _kernels_ptr.clear();
+    }
 
     virtual SaberStatus
     init(const std::vector<Tensor<AMD>*>& inputs,
@@ -61,6 +65,7 @@ private:
     int _slice_num;
     int _slice_size;
     AMDKernelPtr _kernel_Slice_normal;
+    std::vector<AMDKernelPtr> _kernels_ptr;
 };
 template class SaberSlice<AMD, AK_FLOAT>;
 } // namespace saber
