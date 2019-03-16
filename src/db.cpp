@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2018 Advanced Micro Devices, Inc.
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -59,13 +59,14 @@ struct RecordPositions {
 };
 
 auto genMD5(std::string s) {
-    std::array<unsigned char, MD5_DIGEST_LENGTH> result{};
+    std::array<unsigned char, MD5_DIGEST_LENGTH> result {};
     MD5(reinterpret_cast<const unsigned char*>(s.data()), s.length(), result.data());
 
     std::ostringstream sout;
     sout << std::hex << std::setfill('0');
+
     for (auto c : result)
-        sout << std::setw(2) << int{c};
+        sout << std::setw(2) << int {c};
 
     return sout.str();
 }
@@ -73,6 +74,7 @@ auto genMD5(std::string s) {
 std::string LockFilePath(const std::string& filename_) {
     auto directory = temp_directory_path() + "/" + "miopen-lockfiles";
     MIOPEN_LOG_I("LockFilePath() , filename : " << filename_ << "  ,directory: " << directory);
+
     if (!exists(directory)) {
         create_directories(directory);
         permissions(directory, S_IRWXU | S_IRWXG | S_IRWXO);
@@ -85,14 +87,16 @@ std::string LockFilePath(const std::string& filename_) {
 }
 
 Db::Db(const std::string& filename_, bool is_system) :
-        filename(filename_), /*
+    filename(filename_), /*
          lock_file(LockFile::Get(LockFilePath(filename_).c_str())),*/
-        warn_if_unreadable(is_system) {
+    warn_if_unreadable(is_system) {
 
     if (!is_system) {
         auto directory = remove_filename(filename_);
-        if (!(exists(directory)) && !create_directories(directory))
+
+        if (!(exists(directory)) && !create_directories(directory)) {
             MIOPEN_LOG_W("Unable to create a directory: " << directory);
+        }
     }
 }
 
@@ -103,7 +107,7 @@ Db::Db(const std::string& filename_, bool is_system) :
     } while (false)
 
 static std::chrono::seconds GetLockTimeout() {
-    return std::chrono::seconds{60};
+    return std::chrono::seconds {60};
 }
 /*
 using exclusive_lock = std::unique_lock<LockFile>;
@@ -158,11 +162,16 @@ bool Db::Remove(const std::string& key, const std::string& id) {
 
     auto record = FindRecordUnsafe(key, nullptr);
 
-    if (!record.availableDb)
+    if (!record.availableDb) {
         return false;
+    }
+
     bool erased = record.EraseValues(id);
-    if (!erased)
+
+    if (!erased) {
         return false;
+    }
+
     return StoreRecordUnsafe(record);
 }
 
@@ -178,46 +187,56 @@ DbRecord Db::FindRecordUnsafe(const std::string& key, RecordPositions* pos) {
     std::ifstream file(filename); // open db file. file name. example: "gfx900_64.cd.pad"
 
     if (!file) {
-        if (warn_if_unreadable)
+        if (warn_if_unreadable) {
             MIOPEN_LOG_W("File is unreadable: " << filename);
-        else
+        } else {
             MIOPEN_LOG_I("File is unreadable: " << filename);
+        }
+
         empty_record.availableDb = false;
         return empty_record;
     }
 
     int n_line = 0;
+
     while (true) {
         std::string line;
         const auto line_begin = file.tellg();
-        if (!std::getline(file, line))
+
+        if (!std::getline(file, line)) {
             break;
+        }
+
         ++n_line;
         const auto next_line_begin = file.tellg();
 
         const auto key_size = line.find('=');
         const bool is_key   = (key_size != std::string::npos && key_size != 0);
+
         if (!is_key) {
-            if (!line.empty()) // Do not blame empty lines.
+            /*if (!line.empty()) // Do not blame empty lines.
             {
                 MIOPEN_LOG_E("Ill-formed record: key not found: " << filename << "#" << n_line);
-            }
+            }*/
             continue;
         }
+
         const auto current_key = line.substr(0, key_size);
 
         if (current_key != key) {
             continue;
         }
+
         MIOPEN_LOG_I("Key match: " << current_key);
         const auto contents = line.substr(key_size + 1);
 
         if (contents.empty()) {
             MIOPEN_LOG_E(
-                    "None contents under the key: " << current_key << " form file " << filename
-                                                    << "#" << n_line);
+                "None contents under the key: " << current_key << " form file " << filename
+                << "#" << n_line);
             continue;
         }
+
         MIOPEN_LOG_I("Contents found: " << contents);
 
         DbRecord record(key);
@@ -225,18 +244,21 @@ DbRecord Db::FindRecordUnsafe(const std::string& key, RecordPositions* pos) {
 
         if (!is_parse_ok) {
             MIOPEN_LOG_E(
-                    "Error parsing payload under the key: " << current_key << " form file "
-                                                            << filename << "#" << n_line);
+                "Error parsing payload under the key: " << current_key << " form file "
+                << filename << "#" << n_line);
             MIOPEN_LOG_E("Contents: " << contents);
         }
+
         // A record with matching key have been found.
         if (pos != nullptr) {
             pos->begin = line_begin;
             pos->end   = next_line_begin;
         }
+
         record.availableDb = true;
         return record;
     }
+
     // Record was not found
     empty_record.availableDb = false;
     return empty_record;
@@ -300,6 +322,7 @@ bool Db::FlushUnsafe(const DbRecord& record, const RecordPositions* pos) {
         std::rename(temp_name.c_str(), filename.c_str());
         /// \todo What if rename fails? Thou shalt not loose the original file.
     }
+
     return true;
 }
 
@@ -307,8 +330,11 @@ bool Db::StoreRecordUnsafe(const DbRecord& record) {
     MIOPEN_LOG_I("Storing record: " << record.key);
     RecordPositions pos;
     const auto old_record = FindRecordUnsafe(record.key, &pos);
-    if (!old_record.availableDb)
+
+    if (!old_record.availableDb) {
         return false;
+    }
+
     return FlushUnsafe(record, &pos);
 }
 
@@ -316,15 +342,20 @@ bool Db::UpdateRecordUnsafe(DbRecord& record) {
     RecordPositions pos;
     const auto old_record = FindRecordUnsafe(record.key, &pos);
     DbRecord new_record(record);
+
     if (old_record.availableDb) { // ethan wu
         new_record.Merge(old_record);
         MIOPEN_LOG_I("Updating record: " << record.key);
     } else {
         MIOPEN_LOG_I("Storing record: " << record.key);
     }
+
     bool result = FlushUnsafe(new_record, &pos);
-    if (result)
+
+    if (result) {
         record = std::move(new_record);
+    }
+
     return result;
 }
 

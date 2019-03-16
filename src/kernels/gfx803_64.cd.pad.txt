@@ -1,3 +1,14 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Trade secret of Advanced Micro Devices, Inc.
+ *  Copyright (c) 2014-2019, Advanced Micro Devices, Inc., (unpublished)
+ *
+ *  All rights reserved. This notice is intended as a precaution against inadvertent publication and does not imply
+ *  publication or any waiver of confidentiality. The year included in the foregoing notice is the year of creation of
+ *  the work.
+ *
+ **********************************************************************************************************************/
 48-6-6-1x1-8-6-6-1-0x0-1x1-1x1-1-0-NCHW-FP32-F=ConvOclDirectFwd1x1AMD:0,0,0,0,0,0,0,0,0,0.057918;ConvOclDirectFwd1x1Gemm:0,0,0,0,0,0,0,0,0,0.054558
 48-6-6-1x1-8-6-6-1-0x0-1x1-1x1-1-1-NCHW-FP32-F=ConvOclDirectFwd1x1AMD:0,0,0,0,0,0,0,0,0,0.036318;ConvOclDirectFwd1x1Gemm:0,0,0,0,0,0,0,0,0,0.054558;ConvOclDirectFwd1x1:1,128,1,1,0,1,4,8,0,0.032639
 48-6-6-1x1-8-6-6-2-0x0-1x1-1x1-1-1-NCHW-FP32-F=ConvOclDirectFwd1x1AMD:0,0,0,0,0,0,0,0,0,0.050078;ConvOclDirectFwd1x1Gemm:0,0,0,0,0,0,0,0,0,0.074077;ConvOclDirectFwd1x1:1,64,1,1,0,1,4,8,0,0.032159

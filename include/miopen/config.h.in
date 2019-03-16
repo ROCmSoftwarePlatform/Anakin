@@ -37,5 +37,6 @@
 #cmakedefine HIP_OC_COMPILER "@HIP_OC_COMPILER@"
 #cmakedefine MIOPEN_CACHE_DIR "@MIOPEN_CACHE_DIR@"
 #cmakedefine TENSILE_KERNEL_DIR "@TENSILE_KERNEL_DIR@"
+#cmakedefine TENSILE_DB_DIR "@TENSILE_DB_DIR@"
 
 #endif

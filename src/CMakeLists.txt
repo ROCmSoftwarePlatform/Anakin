@@ -503,6 +503,19 @@ install(FILES
 #    kernels/gfx906_56.cd.pdb.txt
  DESTINATION ~/.cache/amd_saber/db)
 
+install(FILES
+#    kernels/gfx803_36.cd.pdb.txt
+     tensile/db/conv1x1_fwd_dir_gfx803
+#    kernels/gfx900_64.cd.pdb.txt
+#    kernels/gfx900_56.cd.pdb.txt
+#    kernels/gfx906_64.cd.pdb.txt
+#    kernels/gfx906_56.cd.pdb.txt
+ DESTINATION ${TENSILE_DB_DIR})
+
+#install(PROGRAMS
+#    tensile/Tensile
+#DESTINATION ${MIOPEN_INSTALL_DIR}/tensile)
+
 rocm_install_symlink_subdir(${MIOPEN_INSTALL_DIR})
 
 

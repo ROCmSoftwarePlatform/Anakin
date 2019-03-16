@@ -163,6 +163,11 @@ ConvSolution ConvOclDirectFwd1x1Tensile::GetSolution(
     const TensilePerformanceConfig& searched_params) const {
     ConvSolution result;
 
+    if (TensileConv::DirConv1x1Fwd::GetDbFilePath() == "./db/") {
+        std::string db_path = TENSILE_DB_DIR;
+        TensileConv::DirConv1x1Fwd::SetDbFilePath(db_path);
+    }
+
     std::vector<int> localNum_v(3);
     std::vector<int> globalNum_v(3);
     std::vector<int> paramSize_v(3);
