@@ -173,7 +173,7 @@ SaberStatus SaberPooling<AMD, OpDtype>::dispatch(
     // To get the commpute command queue
     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
 
-    if (param.global_pooling == 1)
+    if (kernel->GetName() == "PoolingGlobal")
     {
         err = kernel->SetKernelArgs((PtrDtype)inputs[0]->data(),
                                     (PtrDtype)outputs[0]->mutable_data(),
@@ -184,9 +184,13 @@ SaberStatus SaberPooling<AMD, OpDtype>::dispatch(
                                     (int)param.pad_h,
                                     (int)param.pad_w);
     }
-    else
+    else if (kernel->GetName() == "mloPooling")
     {
         err = kernel->SetKernelArgs((PtrDtype)inputs[0]->data(), (PtrDtype)outputs[0]->mutable_data(), (PtrDtype)0);
+    }
+    else
+    {
+        LOG(ERROR) << "kernel name is not exist";
     }
 
     amd_kernel_list list;
