@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -39,13 +39,16 @@ SaberStatus SaberActivation<AMD, OpDtype>::create(
     this->_ctx = &ctx;
 
     KernelInfo kernelInfo;
+    int data_width = 4;
     int global_size =
         inputs[0]->num() * inputs[0]->channel() * inputs[0]->width() * inputs[0]->height();
-
+    global_size = (global_size + data_width - 1) / data_width;
+    int local_size = 512;
     kernelInfo.kernel_file = "Activation.cl";
     kernelInfo.wk_dim      = 1;
-    kernelInfo.l_wk        = {256};
-    kernelInfo.g_wk        = {(global_size + 255) / 256 * 256};
+    kernelInfo.l_wk        = {local_size};
+    kernelInfo.g_wk        = {(global_size + local_size - 1) / local_size * local_size};
+    kernelInfo.comp_options = std::string("-DWIDTH=") + std::to_string(data_width);
 
     switch (param.active) {
     case Active_relu:
@@ -86,8 +89,6 @@ SaberStatus SaberActivation<AMD, OpDtype>::create(
     }
 
     _kernel_ptr = kptr;
-
-    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE CREATE KERNEL";
 
     return SaberSuccess;
 }
@@ -235,7 +236,6 @@ SaberStatus SaberActivation<AMD, OpDtype>::dispatch(
         return SaberInvalidValue;
     }
 
-    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE EXECUTION";
     return SaberSuccess;
 }
 

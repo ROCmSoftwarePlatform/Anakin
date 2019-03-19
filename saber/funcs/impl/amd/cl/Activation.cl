@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -12,11 +12,20 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#define _FLOAT float
-#define _FLOAT2 float2
-#define _FLOAT4 float4
-#define _FLOAT8 float8
+#pragma OPENCL EXTENSION cl_amd_printf : enable
+#if WIDTH == 1
+typedef float _FLOAT;
+#elif WIDTH == 2
+typedef float2 _FLOAT;
+#elif WIDTH == 4
+typedef float4 _FLOAT;
+#elif WIDTH == 8
+typedef float8 _FLOAT;
+#endif
 
+#define CEILING(dividen, divisor) ((dividen + divisor - 1) / divisor)
+
+__attribute__((reqd_work_group_size(512, 1, 1)))
 __kernel void
 Relu(const __global _FLOAT* __restrict in,
      __global _FLOAT* __restrict out,
@@ -32,8 +41,8 @@ Relu(const __global _FLOAT* __restrict in,
      int out_c_stride,
      int out_h_stride,
      int out_w_stride,
-     _FLOAT neg_slope) {
-    int count = in_n * in_c * in_h * in_w;
+     float neg_slope) {
+    int count = CEILING(in_n * in_c * in_h * in_w, WIDTH);
 
     int global_size = get_global_size(0);
     int tid         = get_global_id(0);
@@ -53,6 +62,7 @@ Relu(const __global _FLOAT* __restrict in,
     }
 }
 
+__attribute__((reqd_work_group_size(512, 1, 1)))
 __kernel void
 Sigmoid(const __global _FLOAT* __restrict in,
         __global _FLOAT* __restrict out,
@@ -68,7 +78,7 @@ Sigmoid(const __global _FLOAT* __restrict in,
         int out_c_stride,
         int out_h_stride,
         int out_w_stride) {
-    int count = in_n * in_c * in_h * in_w;
+    int count = CEILING(in_n * in_c * in_h * in_w, WIDTH);
 
     int global_size = get_global_size(0);
     int tid         = get_global_id(0);
@@ -82,12 +92,12 @@ Sigmoid(const __global _FLOAT* __restrict in,
         int in_idx = n * in_n_stride + c * in_c_stride + h * in_h_stride + w * in_w_stride;
 
         int out_idx = n * out_n_stride + c * out_c_stride + h * out_h_stride + w * out_w_stride;
-
         _FLOAT in_var = in[in_idx];
         out[out_idx]  = (_FLOAT)(1 / (1 + exp(-in_var)));
     }
 }
 
+__attribute__((reqd_work_group_size(512, 1, 1)))
 __kernel void
 Tanh(const __global _FLOAT* __restrict in,
      __global _FLOAT* __restrict out,
@@ -103,7 +113,7 @@ Tanh(const __global _FLOAT* __restrict in,
      int out_c_stride,
      int out_h_stride,
      int out_w_stride) {
-    int count = in_n * in_c * in_h * in_w;
+    int count = CEILING(in_n * in_c * in_h * in_w, WIDTH);
 
     int global_size = get_global_size(0);
     int tid         = get_global_id(0);
@@ -119,11 +129,11 @@ Tanh(const __global _FLOAT* __restrict in,
         int out_idx = n * out_n_stride + c * out_c_stride + h * out_h_stride + w * out_w_stride;
 
         _FLOAT in_var = in[in_idx];
-        // out[out_idx]  = (_FLOAT)((exp(in_var) - exp(-in_var)) / (exp(in_var) + exp(-in_var)));
-        out[out_idx] = (_FLOAT)(1) - ((_FLOAT)(2) / ((_FLOAT)(1) + exp(in_var * 2)));
+        out[out_idx] = (float)(1) - ((float)(2) / ((float)(1) + exp(in_var * 2)));
     }
 }
 
+__attribute__((reqd_work_group_size(512, 1, 1)))
 __kernel void
 Stanh(const __global _FLOAT* __restrict in,
       __global _FLOAT* __restrict out,
@@ -139,9 +149,9 @@ Stanh(const __global _FLOAT* __restrict in,
       int out_c_stride,
       int out_h_stride,
       int out_w_stride,
-      _FLOAT slope,
-      _FLOAT coef) {
-    int count = in_n * in_c * in_h * in_w;
+      float slope,
+      float coef) {
+    int count = CEILING(in_n * in_c * in_h * in_w, WIDTH);
 
     int global_size = get_global_size(0);
     int tid         = get_global_id(0);
@@ -160,10 +170,11 @@ Stanh(const __global _FLOAT* __restrict in,
         _FLOAT var    = in_var * slope;
         // output_data[j] = param.coef * tanh(param.negative_slope * in[j]);
         out[out_idx] =
-            (_FLOAT)(coef * ((_FLOAT)(1) - ((_FLOAT)(2) / ((_FLOAT)(1) + exp(var * 2)))));
+            (_FLOAT)(coef * ((float)(1) - ((float)(2) / ((float)(1) + exp(var * 2)))));
     }
 }
 
+__attribute__((reqd_work_group_size(512, 1, 1)))
 __kernel void Clipped_Relu(
     const __global _FLOAT* __restrict in,
     __global _FLOAT* __restrict out,
@@ -179,8 +190,8 @@ __kernel void Clipped_Relu(
     int out_c_stride,
     int out_h_stride,
     int out_w_stride,
-    _FLOAT clipped_threadhold) {
-    int count = in_n * in_c * in_h * in_w;
+    float clipped_threadhold) {
+    int count = CEILING(in_n * in_c * in_h * in_w, WIDTH);
 
     int global_size = get_global_size(0);
     int tid         = get_global_id(0);
@@ -201,6 +212,7 @@ __kernel void Clipped_Relu(
     }
 }
 
+__attribute__((reqd_work_group_size(512, 1, 1)))
 __kernel void
 Elu(const __global _FLOAT* __restrict in,
     __global _FLOAT* __restrict out,
@@ -216,8 +228,8 @@ Elu(const __global _FLOAT* __restrict in,
     int out_c_stride,
     int out_h_stride,
     int out_w_stride,
-    _FLOAT coef) {
-    int count = in_n * in_c * in_h * in_w;
+    float coef) {
+    int count = CEILING(in_n * in_c * in_h * in_w, WIDTH);
 
     int global_size = get_global_size(0);
     int tid         = get_global_id(0);
@@ -237,6 +249,7 @@ Elu(const __global _FLOAT* __restrict in,
     }
 }
 
+__attribute__((reqd_work_group_size(512, 1, 1)))
 __kernel void
 Prelu(const __global _FLOAT* __restrict in,
       __global _FLOAT* __restrict out,
@@ -252,9 +265,9 @@ Prelu(const __global _FLOAT* __restrict in,
       int out_c_stride,
       int out_h_stride,
       int out_w_stride,
-      const __global _FLOAT* __restrict slope,
+      const __global float* __restrict slope,
       int is_channel_shared) {
-    int count = in_n * in_c * in_h * in_w;
+    int count = CEILING(in_n * in_c * in_h * in_w, WIDTH);
 
     int global_size = get_global_size(0);
     int tid         = get_global_id(0);
@@ -272,9 +285,19 @@ Prelu(const __global _FLOAT* __restrict in,
         _FLOAT in_var = in[in_idx];
 
         if (is_channel_shared) {
-            out[out_idx] = (in_var > 0) ? in_var : slope[0] * in_var;
+            out[out_idx] = (in_var > 0) ? in_var : (_FLOAT)(slope[0]) * in_var;
         } else {
-            out[out_idx] = (in_var > 0) ? in_var : slope[c] * in_var;
+            union {
+                float slope[WIDTH];
+                _FLOAT vec_slope;
+            } transform;
+
+            for (int i = 0; i < WIDTH; ++i) {
+                int c_index = ((tid * WIDTH + i) / (in_h * in_w)) % in_c;
+                transform.slope[i] = slope[c_index];
+            }
+
+            out[out_idx] = (in_var > 0) ? in_var : transform.vec_slope * in_var;
         }
     }
 }
