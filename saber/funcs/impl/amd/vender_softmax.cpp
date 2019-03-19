@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -32,11 +32,11 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::init(
     status = create(inputs, outputs, param, ctx);
 
     // saber impl help to handle vender un-impl case.
-    if (!(inputs[0]->height() == 1 && inputs[0]->width() == 1 && param.axis == 1)) {
-        if (this->_saber_impl == nullptr)
-        {
-            this->_saber_impl = new SaberSoftmax<AMD, OpDtype>{};
+    if (!(param.axis == 1)) {
+        if (this->_saber_impl == nullptr) {
+            this->_saber_impl = new SaberSoftmax<AMD, OpDtype> {};
         }
+
         this->_saber_impl->init(inputs, outputs, param, ctx);
     }
 
@@ -81,7 +81,7 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::create(
     _kernels.clear();
     KernelInfo kernelInfo;
 
-    if (inputs[0]->height() == 1 && inputs[0]->width() == 1 && param.axis == 1) {
+    if (param.axis == 1) {
         // To set local work size
         kernelInfo.wk_dim = 3;
         kernelInfo.l_wk   = {256, 1, 1};
@@ -135,7 +135,7 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::dispatch(
     bool err                     = false;
     amd_kernel_list::iterator it = _kernels.begin();
 
-    if (inputs[0]->height() == 1 && inputs[0]->width() == 1 && param.axis == 1) {
+    if (param.axis == 1) {
         // To set the argument
         outputs[0]->copy_from(*inputs[0]);
         err = it->get()->SetKernelArgs(

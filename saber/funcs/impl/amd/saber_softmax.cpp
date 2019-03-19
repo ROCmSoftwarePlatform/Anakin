@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -64,6 +64,7 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::create(
     std::vector<Tensor<AMD>*>& outputs,
     SoftmaxParam<AMD>& param,
     Context<AMD>& ctx) {
+
     _kernels.clear();
     KernelInfo kernelInfo;
 
@@ -75,7 +76,7 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::create(
     _inner_num = inputs[0]->count_valid(param.axis + 1, inputs[0]->dims());
     _axis_size = shape_in[param.axis];
 
-    size_t sharedmem_size = 32768;
+    size_t sharedmem_size = 49152;
     _max_dimsize          = sharedmem_size / sizeof(OpDtype) / AMD_NUM_THREADS;
 
     Shape sh_tmp({1, 1, 1, _outer_num * _inner_num});
@@ -133,7 +134,8 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::create(
     kernelInfo.wk_dim      = 1;
     kernelInfo.l_wk        = {256};
     kernelInfo.g_wk = {(_inner_num * _outer_num + kernelInfo.l_wk[0] - 1)
-        / kernelInfo.l_wk[0] * kernelInfo.l_wk[0]};
+                       / kernelInfo.l_wk[0]* kernelInfo.l_wk[0]
+                      };
 
     if (_is_continue_buf) {
         //! softmax kernel without roi
@@ -196,12 +198,12 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::dispatch(
         //! softmax kernel without roi
         if (this->_axis_size <= _max_dimsize) {
             err = it->get()->SetKernelArgs(
-                (int)total_threads,
-                (PtrDtype)data_in,
-                (PtrDtype)data_out,
-                (int)this->_inner_num,
-                (int)this->_outer_num,
-                (int)this->_axis_size);
+                      (int)total_threads,
+                      (PtrDtype)data_in,
+                      (PtrDtype)data_out,
+                      (int)this->_inner_num,
+                      (int)this->_outer_num,
+                      (int)this->_axis_size);
 
             if (!err) {
                 LOG(ERROR) << "Fail to set execution";
@@ -211,13 +213,13 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::dispatch(
             //! firstly, get maximum data
             OpDataType min_data = std::numeric_limits<OpDataType>::min();
             err                 = it++->get()->SetKernelArgs(
-                (int)total_threads,
-                (PtrDtype)data_in,
-                (PtrDtype)max_data,
-                (float)min_data,
-                (int)this->_inner_num,
-                (int)this->_outer_num,
-                (int)this->_axis_size);
+                                      (int)total_threads,
+                                      (PtrDtype)data_in,
+                                      (PtrDtype)max_data,
+                                      (float)min_data,
+                                      (int)this->_inner_num,
+                                      (int)this->_outer_num,
+                                      (int)this->_axis_size);
 
             if (!err) {
                 LOG(ERROR) << "Fail to set execution";
@@ -226,14 +228,14 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::dispatch(
 
             //! then, compute exp and sum data
             err = it++->get()->SetKernelArgs(
-                (int)total_threads,
-                (PtrDtype)data_in,
-                (PtrDtype)data_out,
-                (PtrDtype)max_data,
-                (PtrDtype)sum_data,
-                (int)this->_inner_num,
-                (int)this->_outer_num,
-                (int)this->_axis_size);
+                      (int)total_threads,
+                      (PtrDtype)data_in,
+                      (PtrDtype)data_out,
+                      (PtrDtype)max_data,
+                      (PtrDtype)sum_data,
+                      (int)this->_inner_num,
+                      (int)this->_outer_num,
+                      (int)this->_axis_size);
 
             if (!err) {
                 LOG(ERROR) << "Fail to set execution";
@@ -242,12 +244,12 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::dispatch(
 
             //! lastly, compute divided output
             err = it->get()->SetKernelArgs(
-                (int)total_threads,
-                (PtrDtype)data_out,
-                (PtrDtype)sum_data,
-                (int)this->_inner_num,
-                (int)this->_outer_num,
-                (int)this->_axis_size);
+                      (int)total_threads,
+                      (PtrDtype)data_out,
+                      (PtrDtype)sum_data,
+                      (int)this->_inner_num,
+                      (int)this->_outer_num,
+                      (int)this->_axis_size);
 
             if (!err) {
                 LOG(ERROR) << "Fail to set execution";
@@ -258,15 +260,15 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::dispatch(
         //! softmax kernel with roi
         if (this->_axis_size <= _max_dimsize) {
             err = it->get()->SetKernelArgs(
-                (int)total_threads,
-                (PtrDtype)data_in,
-                (PtrDtype)data_out,
-                (PtrDtype)input_stride,
-                (PtrDtype)output_stride,
-                (PtrDtype)valid_shape,
-                (int)param.axis,
-                (int)this->_axis_size,
-                (int)this->_dims);
+                      (int)total_threads,
+                      (PtrDtype)data_in,
+                      (PtrDtype)data_out,
+                      (PtrDtype)input_stride,
+                      (PtrDtype)output_stride,
+                      (PtrDtype)valid_shape,
+                      (int)param.axis,
+                      (int)this->_axis_size,
+                      (int)this->_dims);
 
             if (!err) {
                 LOG(ERROR) << "Fail to set execution";
@@ -276,16 +278,16 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::dispatch(
             //! firstly, get maximum data
             OpDataType min_data = std::numeric_limits<OpDataType>::min();
             err                 = it++->get()->SetKernelArgs(
-                                          (int)total_threads,
-                                          (PtrDtype)data_in,
-                                          (PtrDtype)max_data,
-                                          (float)min_data,
-                                          (PtrDtype)input_stride,
-                                          (PtrDtype)output_stride,
-                                          (PtrDtype)valid_shape,
-                                          (int)param.axis,
-                                          (int)this->_axis_size,
-                                          (int)this->_dims);
+                                      (int)total_threads,
+                                      (PtrDtype)data_in,
+                                      (PtrDtype)max_data,
+                                      (float)min_data,
+                                      (PtrDtype)input_stride,
+                                      (PtrDtype)output_stride,
+                                      (PtrDtype)valid_shape,
+                                      (int)param.axis,
+                                      (int)this->_axis_size,
+                                      (int)this->_dims);
 
             if (!err) {
                 LOG(ERROR) << "Fail to set execution";
@@ -294,17 +296,17 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::dispatch(
 
             //! then, compute exp and sum data
             err = it++->get()->SetKernelArgs(
-                          (int)total_threads,
-                          (PtrDtype)data_in,
-                          (PtrDtype)data_out,
-                          (PtrDtype)max_data,
-                          (PtrDtype)sum_data,
-                          (PtrDtype)input_stride,
-                          (PtrDtype)output_stride,
-                          (PtrDtype)valid_shape,
-                          (int)param.axis,
-                          (int)this->_axis_size,
-                          (int)this->_dims);
+                      (int)total_threads,
+                      (PtrDtype)data_in,
+                      (PtrDtype)data_out,
+                      (PtrDtype)max_data,
+                      (PtrDtype)sum_data,
+                      (PtrDtype)input_stride,
+                      (PtrDtype)output_stride,
+                      (PtrDtype)valid_shape,
+                      (int)param.axis,
+                      (int)this->_axis_size,
+                      (int)this->_dims);
 
             if (!err) {
                 LOG(ERROR) << "Fail to set execution";
@@ -313,15 +315,15 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::dispatch(
 
             //! lastly, compute divided output
             err = it->get()->SetKernelArgs(
-                (int)total_threads,
-                (PtrDtype)data_out,
-                (PtrDtype)sum_data,
-                (PtrDtype)input_stride,
-                (PtrDtype)output_stride,
-                (PtrDtype)valid_shape,
-                (int)param.axis,
-                (int)this->_axis_size,
-                (int)this->_dims);
+                      (int)total_threads,
+                      (PtrDtype)data_out,
+                      (PtrDtype)sum_data,
+                      (PtrDtype)input_stride,
+                      (PtrDtype)output_stride,
+                      (PtrDtype)valid_shape,
+                      (int)param.axis,
+                      (int)this->_axis_size,
+                      (int)this->_dims);
 
             if (!err) {
                 LOG(ERROR) << "Fail to set execution";
