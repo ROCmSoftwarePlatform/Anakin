@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -47,22 +47,11 @@ __kernel void BiasOnly(
     }
 }
 
-__kernel void ReluOnly(
-    __global float* in,
-    __global float* out,
-    __global float* bias,
-    float slope,
-    int N,
-    int C,
-    int H,
-    int W) {
-    int gid_x = get_global_id(0);
-
-    if (gid_x < N * C * H * W) {
-        float intermediate = in[gid_x];
-        out[gid_x]         = intermediate * (intermediate > 0.0f ? 1.0f : slope);
-    }
+__attribute__((reqd_work_group_size(256, 1, 1))) __kernel void
+ReluOnly(const __global float* __restrict in, __global float* __restrict out, float slope) {
+    out[get_global_id(0)] = in[get_global_id(0)] * (in[get_global_id(0)] > 0.0f ? 1.0f : slope);
 }
+
 __kernel void BiasReluBoth(
     __global float* in,
     __global float* out,

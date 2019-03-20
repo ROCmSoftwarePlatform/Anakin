@@ -778,7 +778,7 @@ SaberStatus VenderDeconv2D<AMD, OpDtype>::dispatch(
                 }
 
                 list.push_back(_kernels_ptr[i]);
-            } else if (_kernels_ptr[i].get()->GetName() == "ReluUni") {
+            } else if (_kernels_ptr[i].get()->GetName() == "ReluOnly") {
                 err = _kernels_ptr[i].get()->SetKernelArgs(
                           (PtrDtype)outputs[0]->mutable_data(),
                           (PtrDtype)outputs[0]->mutable_data(),
