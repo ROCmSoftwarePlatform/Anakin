@@ -31,15 +31,6 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::init(
     this->_ctx = &ctx;
     status = create(inputs, outputs, param, ctx);
 
-    // saber impl help to handle vender un-impl case.
-    if (!(param.axis == 1)) {
-        if (this->_saber_impl == nullptr) {
-            this->_saber_impl = new SaberSoftmax<AMD, OpDtype> {};
-        }
-
-        this->_saber_impl->init(inputs, outputs, param, ctx);
-    }
-
     return status;
 }
 
@@ -81,46 +72,58 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::create(
     _kernels.clear();
     KernelInfo kernelInfo;
 
+    // To set local work size
+    kernelInfo.wk_dim = 3;
+    kernelInfo.l_wk   = {256, 1, 1};
+    int count;
+    int grid_size;
+
     if (param.axis == 1) {
-        // To set local work size
-        kernelInfo.wk_dim = 3;
-        kernelInfo.l_wk   = {256, 1, 1};
-
-        int c         = inputs[0]->channel();
-        int num_batch = c < 256 ? nextPow2(256 / c) : 1;
-        int grid_size = inputs[0]->num() * inputs[0]->width() * inputs[0]->height();
-
-        // To set comp_options
-        kernelInfo.comp_options = std::string(" -DMIOPEN_USE_FP32=1")
-                                  + std::string(" -DMIOPEN_USE_FP16=0")
-                                  + std::string(" -DNUM_BATCH=") + std::to_string(num_batch);
-
-        if (num_batch == 1) { // CSR-Vector like approach
-
-            // Control the max. number of workgroups launched so that we do not
-            // start getting workgroup scheduling overheads
-            size_t workgroups = std::min(grid_size, 64 * 40 * 8);
-            kernelInfo.g_wk   = {workgroups* kernelInfo.l_wk[0], 1, 1};
-        } else { // CSR-Stream like approach
-
-            // num_threads iterating over channels for one spatial_dim
-            int batch_size = 256 / num_batch;
-            // num_channels each threads iterates over to cover all the channels
-            int u_batch_size = c > batch_size ? nextPow2(c / batch_size) : 1;
-
-            size_t workgroups =
-                grid_size % num_batch == 0 ? grid_size / num_batch : grid_size / num_batch + 1;
-            kernelInfo.g_wk = {workgroups* kernelInfo.l_wk[0], 1, 1};
-
-            kernelInfo.comp_options += " -DBATCH_SIZE=" + std::to_string(batch_size)
-                                       + " -DU_BATCH_SIZE=" + std::to_string(u_batch_size);
-        }
-
-        kernelInfo.kernel_file = "MIOpenSoftmax.cl";
-        kernelInfo.kernel_name = "SoftmaxForward";
-        kernelInfo.kernel_type = MIOPEN;
-        CreateKernelList(inputs[0]->device_id(), kernelInfo);
+        count = inputs[0]->channel();
+        grid_size = inputs[0]->num() * inputs[0]->height() * inputs[0]->width();
+    } else if (param.axis == 2) {
+        count = inputs[0]->height();
+        grid_size = inputs[0]->num() * inputs[0]->channel() * inputs[0]->width();
+    } else if (param.axis == 3) {
+        count = inputs[0]->width();
+        grid_size = inputs[0]->num() * inputs[0]->channel() * inputs[0]->height();
+    } else {
+        count = inputs[0]->num();
+        grid_size = inputs[0]->channel() * inputs[0]->height() * inputs[0]->width();
     }
+
+    int num_batch = count < 256 ? nextPow2(256 / count) : 1;
+
+    // To set comp_options
+    kernelInfo.comp_options = std::string(" -DMIOPEN_USE_FP32=1")
+                              + std::string(" -DMIOPEN_USE_FP16=0")
+                              + std::string(" -DNUM_BATCH=") + std::to_string(num_batch);
+
+    if (num_batch == 1) { // CSR-Vector like approach
+
+        // Control the max. number of workgroups launched so that we do not
+        // start getting workgroup scheduling overheads
+        size_t workgroups = std::min(grid_size, 64 * 40 * 8);
+        kernelInfo.g_wk   = {workgroups* kernelInfo.l_wk[0], 1, 1};
+    } else { // CSR-Stream like approach
+
+        // num_threads iterating over channels for one spatial_dim
+        int batch_size = 256 / num_batch;
+        // num_channels each threads iterates over to cover all the channels
+        int u_batch_size = count > batch_size ? nextPow2(count / batch_size) : 1;
+
+        size_t workgroups =
+            grid_size % num_batch == 0 ? grid_size / num_batch : grid_size / num_batch + 1;
+        kernelInfo.g_wk = {workgroups* kernelInfo.l_wk[0], 1, 1};
+
+        kernelInfo.comp_options += " -DBATCH_SIZE=" + std::to_string(batch_size)
+                                   + " -DU_BATCH_SIZE=" + std::to_string(u_batch_size);
+    }
+
+    kernelInfo.kernel_file = "MIOpenSoftmax.cl";
+    kernelInfo.kernel_name = "SoftmaxForward";
+    kernelInfo.kernel_type = MIOPEN;
+    CreateKernelList(inputs[0]->device_id(), kernelInfo);
 
     return SaberSuccess;
 }
@@ -135,21 +138,39 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::dispatch(
     bool err                     = false;
     amd_kernel_list::iterator it = _kernels.begin();
 
-    if (param.axis == 1) {
-        // To set the argument
-        outputs[0]->copy_from(*inputs[0]);
-        err = it->get()->SetKernelArgs(
-                  (PtrDtype)outputs[0]->mutable_data(),
-                  (int)inputs[0]->channel(),
-                  (int)inputs[0]->num() * inputs[0]->width() * inputs[0]->height(),
-                  (int)inputs[0]->width() * inputs[0]->height());
+    int count;
+    int grid_size;
+    int spatial_dim;
 
-        if (!err) {
-            LOG(ERROR) << "Fail to set execution";
-            return SaberInvalidValue;
-        }
+    if (param.axis == 1) {
+        count = inputs[0]->channel();
+        spatial_dim = inputs[0]->height() * inputs[0]->width();
+        grid_size = inputs[0]->num() * inputs[0]->height() * inputs[0]->width();
+    } else if (param.axis == 2) {
+        count = inputs[0]->height();
+        spatial_dim = inputs[0]->width();
+        grid_size = inputs[0]->num() * inputs[0]->channel() * inputs[0]->width();
+    } else if (param.axis == 3) {
+        count = inputs[0]->width();
+        spatial_dim = 1;
+        grid_size = inputs[0]->num() * inputs[0]->channel() * inputs[0]->height();
     } else {
-        return this->_saber_impl->dispatch(inputs, outputs, param);
+        count = inputs[0]->num();
+        spatial_dim = inputs[0]->channel() * inputs[0]->height() * inputs[0]->width();
+        grid_size = inputs[0]->channel() * inputs[0]->height() * inputs[0]->width();
+    }
+
+    // To set the argument
+    err = it->get()->SetKernelArgs(
+              (PtrDtype)inputs[0]->data(),
+              (PtrDtype)outputs[0]->mutable_data(),
+              count,
+              grid_size,
+              spatial_dim);
+
+    if (!err) {
+        LOG(ERROR) << "Fail to set execution";
+        return SaberInvalidValue;
     }
 
     err = LaunchKernel(cm, _kernels);

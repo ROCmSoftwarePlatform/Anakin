@@ -76,7 +76,7 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::create(
     _inner_num = inputs[0]->count_valid(param.axis + 1, inputs[0]->dims());
     _axis_size = shape_in[param.axis];
 
-    size_t sharedmem_size = 49152;
+    size_t sharedmem_size = 32768;
     _max_dimsize          = sharedmem_size / sizeof(OpDtype) / AMD_NUM_THREADS;
 
     Shape sh_tmp({1, 1, 1, _outer_num * _inner_num});
@@ -143,14 +143,7 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::create(
             kernelInfo.kernel_name = "sharemem_softmax_kernel";
             CreateKernelList(inputs[0]->device_id(), kernelInfo);
         } else {
-            //! firstly, get maximum data
-            kernelInfo.kernel_name = "softmax_max_kernel";
-            CreateKernelList(inputs[0]->device_id(), kernelInfo);
-            //! then, compute exp and sum data
-            kernelInfo.kernel_name = "softmax_sub_exp_sum_kernel";
-            CreateKernelList(inputs[0]->device_id(), kernelInfo);
-            //! lastly, compute divided output
-            kernelInfo.kernel_name = "softmax_divid_output_kernel";
+            kernelInfo.kernel_name = "softmax_kernel";
             CreateKernelList(inputs[0]->device_id(), kernelInfo);
         }
     } else {
@@ -159,14 +152,7 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::create(
             kernelInfo.kernel_name = "sharemem_softmax_roi_kernel";
             CreateKernelList(inputs[0]->device_id(), kernelInfo);
         } else {
-            //! firstly, get maximum data
-            kernelInfo.kernel_name = "softmax_max_roi_kernel";
-            CreateKernelList(inputs[0]->device_id(), kernelInfo);
-            //! then, compute exp and sum data
-            kernelInfo.kernel_name = "softmax_sub_exp_sum_roi_kernel";
-            CreateKernelList(inputs[0]->device_id(), kernelInfo);
-            //! lastly, compute divided output
-            kernelInfo.kernel_name = "softmax_divid_output_roi_kernel";
+            kernelInfo.kernel_name = "softmax_roi_kernel";
             CreateKernelList(inputs[0]->device_id(), kernelInfo);
         }
     }
@@ -210,46 +196,17 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::dispatch(
                 return SaberInvalidValue;
             }
         } else {
-            //! firstly, get maximum data
             OpDataType min_data = std::numeric_limits<OpDataType>::min();
             err                 = it++->get()->SetKernelArgs(
                                       (int)total_threads,
                                       (PtrDtype)data_in,
+                                      (PtrDtype)data_out,
                                       (PtrDtype)max_data,
+                                      (PtrDtype)sum_data,
                                       (float)min_data,
                                       (int)this->_inner_num,
                                       (int)this->_outer_num,
                                       (int)this->_axis_size);
-
-            if (!err) {
-                LOG(ERROR) << "Fail to set execution";
-                return SaberInvalidValue;
-            }
-
-            //! then, compute exp and sum data
-            err = it++->get()->SetKernelArgs(
-                      (int)total_threads,
-                      (PtrDtype)data_in,
-                      (PtrDtype)data_out,
-                      (PtrDtype)max_data,
-                      (PtrDtype)sum_data,
-                      (int)this->_inner_num,
-                      (int)this->_outer_num,
-                      (int)this->_axis_size);
-
-            if (!err) {
-                LOG(ERROR) << "Fail to set execution";
-                return SaberInvalidValue;
-            }
-
-            //! lastly, compute divided output
-            err = it->get()->SetKernelArgs(
-                      (int)total_threads,
-                      (PtrDtype)data_out,
-                      (PtrDtype)sum_data,
-                      (int)this->_inner_num,
-                      (int)this->_outer_num,
-                      (int)this->_axis_size);
 
             if (!err) {
                 LOG(ERROR) << "Fail to set execution";
@@ -275,12 +232,13 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::dispatch(
                 return SaberInvalidValue;
             }
         } else {
-            //! firstly, get maximum data
             OpDataType min_data = std::numeric_limits<OpDataType>::min();
             err                 = it++->get()->SetKernelArgs(
                                       (int)total_threads,
                                       (PtrDtype)data_in,
+                                      (PtrDtype)data_out,
                                       (PtrDtype)max_data,
+                                      (PtrDtype)sum_data,
                                       (float)min_data,
                                       (PtrDtype)input_stride,
                                       (PtrDtype)output_stride,
@@ -288,42 +246,6 @@ SaberStatus SaberSoftmax<AMD, OpDtype>::dispatch(
                                       (int)param.axis,
                                       (int)this->_axis_size,
                                       (int)this->_dims);
-
-            if (!err) {
-                LOG(ERROR) << "Fail to set execution";
-                return SaberInvalidValue;
-            }
-
-            //! then, compute exp and sum data
-            err = it++->get()->SetKernelArgs(
-                      (int)total_threads,
-                      (PtrDtype)data_in,
-                      (PtrDtype)data_out,
-                      (PtrDtype)max_data,
-                      (PtrDtype)sum_data,
-                      (PtrDtype)input_stride,
-                      (PtrDtype)output_stride,
-                      (PtrDtype)valid_shape,
-                      (int)param.axis,
-                      (int)this->_axis_size,
-                      (int)this->_dims);
-
-            if (!err) {
-                LOG(ERROR) << "Fail to set execution";
-                return SaberInvalidValue;
-            }
-
-            //! lastly, compute divided output
-            err = it->get()->SetKernelArgs(
-                      (int)total_threads,
-                      (PtrDtype)data_out,
-                      (PtrDtype)sum_data,
-                      (PtrDtype)input_stride,
-                      (PtrDtype)output_stride,
-                      (PtrDtype)valid_shape,
-                      (int)param.axis,
-                      (int)this->_axis_size,
-                      (int)this->_dims);
 
             if (!err) {
                 LOG(ERROR) << "Fail to set execution";

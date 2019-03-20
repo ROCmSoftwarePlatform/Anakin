@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -21,47 +21,52 @@
 
 //! general kernel for softmax
 __kernel void softmax_max_kernel(
-        int total_size,
-        __global const _FLOAT* in_data,
-        __global _FLOAT* out_data,
-        _FLOAT min_data,
-        int inner_num,
-        int outer_num,
-        int axis_size) {
+    int total_size,
+    __global const _FLOAT* in_data,
+    __global _FLOAT* out_data,
+    _FLOAT min_data,
+    int inner_num,
+    int outer_num,
+    int axis_size) {
 
     //! compute data index
     int idx = get_global_id(0);
+
     if (idx < total_size) {
         int idx_inner  = idx % inner_num;
         int idx_outer  = (idx / inner_num) * axis_size;
         int real_index = idx_outer * inner_num + idx_inner;
         //! get maximum data across softmax axis
         _FLOAT max_data = min_data;
+
         for (int i = 0; i < axis_size; ++i) {
             max_data = in_data[real_index] > max_data ? in_data[real_index] : max_data;
             real_index += inner_num;
         }
+
         out_data[idx] = max_data;
     }
 }
 
 __kernel void softmax_max_roi_kernel(
-        int total_size,
-        __global const _FLOAT* in_data,
-        __global _FLOAT* out_data,
-        _FLOAT min_data,
-        __global const int* input_stride_real,
-        __global const int* output_stride_real,
-        __global const int* shape_valid,
-        int softmax_axis,
-        int axis_size,
-        int dims) {
+    int total_size,
+    __global const _FLOAT* in_data,
+    __global _FLOAT* out_data,
+    _FLOAT min_data,
+    __global const int* input_stride_real,
+    __global const int* output_stride_real,
+    __global const int* shape_valid,
+    int softmax_axis,
+    int axis_size,
+    int dims) {
 
     int idx = get_global_id(0);
+
     if (idx < total_size) {
 
         //! compute real data index
         int input_real_index = 0;
+
         for (int i = dims - 1; i >= 0; i--) {
             if (i == softmax_axis) {
                 continue;
@@ -74,23 +79,25 @@ __kernel void softmax_max_roi_kernel(
 
         //! get maximum data across softmax axis
         _FLOAT max_data = min_data;
+
         for (int i = 0; i < axis_size; ++i) {
             max_data = in_data[input_real_index] > max_data ? in_data[input_real_index] : max_data;
             input_real_index += i * input_stride_real[softmax_axis];
         }
+
         out_data[idx] = max_data;
     }
 }
 
 __kernel void softmax_sub_exp_sum_kernel(
-        int total_size,
-        __global const _FLOAT* in_data,
-        __global _FLOAT* out_data,
-        __global const _FLOAT* max_data,
-        __global _FLOAT* sum_data,
-        int inner_num,
-        int outer_num,
-        int axis_size) {
+    int total_size,
+    __global const _FLOAT* in_data,
+    __global _FLOAT* out_data,
+    __global const _FLOAT* max_data,
+    __global _FLOAT* sum_data,
+    int inner_num,
+    int outer_num,
+    int axis_size) {
 
     //! compute data index
     int idx = get_global_id(0);
@@ -102,6 +109,7 @@ __kernel void softmax_sub_exp_sum_kernel(
         _FLOAT max_data_cur = max_data[idx];
         _FLOAT sum_data_cur = 0;
         int real_index      = idx_outer * inner_num + idx_inner;
+
         //! compute exp and summarize across the softmax axis
         for (int i = 0; i < axis_size; ++i) {
             _FLOAT sub_data = in_data[real_index] - max_data_cur;
@@ -110,22 +118,23 @@ __kernel void softmax_sub_exp_sum_kernel(
             out_data[real_index] = sub_data;
             real_index += inner_num;
         }
+
         sum_data[idx] = sum_data_cur;
     }
 }
 
 __kernel void softmax_sub_exp_sum_roi_kernel(
-        int total_size,
-        __global const _FLOAT* in_data,
-        __global _FLOAT* out_data,
-        __global const _FLOAT* max_data,
-        __global _FLOAT* sum_data,
-        __global const int* input_stride_real,
-        __global const int* output_stride_real,
-        __global const int* shape_valid,
-        int softmax_axis,
-        int axis_size,
-        int dims) {
+    int total_size,
+    __global const _FLOAT* in_data,
+    __global _FLOAT* out_data,
+    __global const _FLOAT* max_data,
+    __global _FLOAT* sum_data,
+    __global const int* input_stride_real,
+    __global const int* output_stride_real,
+    __global const int* shape_valid,
+    int softmax_axis,
+    int axis_size,
+    int dims) {
 
     //! compute data index
     int idx = get_global_id(0);
@@ -133,6 +142,7 @@ __kernel void softmax_sub_exp_sum_roi_kernel(
     if (idx < total_size) {
         //! compute real data index
         int output_real_index = 0;
+
         for (int i = dims - 1; i >= 0; i--) {
             if (i == softmax_axis) {
                 continue;
@@ -145,6 +155,7 @@ __kernel void softmax_sub_exp_sum_roi_kernel(
 
         _FLOAT max_data_cur = max_data[idx];
         _FLOAT sum_data_cur = 0;
+
         //! compute exp and summarize across the softmax axis
         for (int i = 0; i < axis_size; ++i) {
             _FLOAT sub_data = in_data[output_real_index] - max_data_cur;
@@ -153,17 +164,18 @@ __kernel void softmax_sub_exp_sum_roi_kernel(
             out_data[output_real_index] = sub_data;
             output_real_index += output_stride_real[softmax_axis];
         }
+
         sum_data[idx] = sum_data_cur;
     }
 }
 
 __kernel void softmax_divid_output_kernel(
-        int total_size,
-        __global _FLOAT* io_data,
-        __global const _FLOAT* sum_data,
-        int inner_num,
-        int outer_num,
-        int axis_size) {
+    int total_size,
+    __global _FLOAT* io_data,
+    __global const _FLOAT* sum_data,
+    int inner_num,
+    int outer_num,
+    int axis_size) {
     //! compute data index
     int idx = get_global_id(0);
 
@@ -172,6 +184,7 @@ __kernel void softmax_divid_output_kernel(
         int idx_outer       = (idx / inner_num) * axis_size;
         _FLOAT sum_data_cur = sum_data[idx];
         int real_index      = idx_outer * inner_num + idx_inner;
+
         //! compute final result
         for (int i = 0; i < axis_size; ++i) {
             io_data[real_index] = io_data[real_index] / sum_data_cur;
@@ -181,21 +194,22 @@ __kernel void softmax_divid_output_kernel(
 }
 
 __kernel void softmax_divid_output_roi_kernel(
-        int total_size,
-        __global _FLOAT* io_data,
-        __global const _FLOAT* sum_data,
-        __global const int* input_stride_real,
-        __global const int* output_stride_real,
-        __global const int* shape_valid,
-        int softmax_axis,
-        int axis_size,
-        int dims) {
+    int total_size,
+    __global _FLOAT* io_data,
+    __global const _FLOAT* sum_data,
+    __global const int* input_stride_real,
+    __global const int* output_stride_real,
+    __global const int* shape_valid,
+    int softmax_axis,
+    int axis_size,
+    int dims) {
     //! compute data index
     int idx = get_global_id(0);
 
     if (idx < total_size) {
         //! compute real data index
         int output_real_index = 0;
+
         for (int i = dims - 1; i >= 0; i--) {
             if (i == softmax_axis) {
                 continue;
@@ -207,6 +221,7 @@ __kernel void softmax_divid_output_roi_kernel(
         }
 
         _FLOAT sum_data_cur = sum_data[idx];
+
         //! compute final result
         for (int i = 0; i < axis_size; ++i) {
             io_data[output_real_index] = io_data[output_real_index] / sum_data_cur;
@@ -216,12 +231,12 @@ __kernel void softmax_divid_output_roi_kernel(
 }
 
 __kernel void sharemem_softmax_kernel(
-        int total_size,
-        __global const _FLOAT* in_data,
-        __global _FLOAT* out_data,
-        int inner_num,
-        int outer_num,
-        int axis_size) {
+    int total_size,
+    __global const _FLOAT* in_data,
+    __global _FLOAT* out_data,
+    int inner_num,
+    int outer_num,
+    int axis_size) {
 
     __local _FLOAT data[SHARE_MEMORY_DIM];
     int tid = get_local_id(0);
@@ -237,8 +252,9 @@ __kernel void sharemem_softmax_kernel(
 
         int real_index = idx_outer * inner_num + idx_inner;
         int loop_idx   = real_index;
-//! read all data to sharemem in softmax channel
+        //! read all data to sharemem in softmax channel
 #pragma unroll
+
         for (int i = 0; i < axis_size; ++i) {
             data[tid + i * blocksize] = in_data[loop_idx];
             loop_idx += inner_num;
@@ -247,8 +263,10 @@ __kernel void sharemem_softmax_kernel(
         //! get maximum value in softmax channel
         _FLOAT max_data = data[tid];
 #pragma unroll
+
         for (int i = 1; i < axis_size; ++i) {
             _FLOAT dt = data[tid + i * blocksize];
+
             if (max_data < dt) {
                 max_data = dt;
             }
@@ -257,6 +275,7 @@ __kernel void sharemem_softmax_kernel(
         //! subtract then summarize
         _FLOAT sum = 0;
 #pragma unroll
+
         for (int i = 0; i < axis_size; ++i) {
             __local _FLOAT* dt = data + tid + i * blocksize;
             *dt                = exp(*dt - max_data);
@@ -266,6 +285,7 @@ __kernel void sharemem_softmax_kernel(
         //! write back result
         loop_idx = real_index;
 #pragma unroll
+
         for (int i = 0; i < axis_size; ++i) {
             out_data[loop_idx] = data[tid + i * blocksize] / sum;
             loop_idx += inner_num;
@@ -274,15 +294,15 @@ __kernel void sharemem_softmax_kernel(
 }
 
 __kernel void sharemem_softmax_roi_kernel(
-        int total_size,
-        __global const _FLOAT* in_data,
-        __global _FLOAT* out_data,
-        __global const int* input_stride_real,
-        __global const int* output_stride_real,
-        __global const int* shape_valid,
-        int softmax_axis,
-        int axis_size,
-        int dims) {
+    int total_size,
+    __global const _FLOAT* in_data,
+    __global _FLOAT* out_data,
+    __global const int* input_stride_real,
+    __global const int* output_stride_real,
+    __global const int* shape_valid,
+    int softmax_axis,
+    int axis_size,
+    int dims) {
 
     __local _FLOAT data[SHARE_MEMORY_DIM];
     int tid = get_local_id(0);
@@ -298,6 +318,7 @@ __kernel void sharemem_softmax_roi_kernel(
         //! compute real data index
         int input_real_index  = 0;
         int output_real_index = 0;
+
         for (int i = dims - 1; i >= 0; i--) {
             if (i == softmax_axis) {
                 continue;
@@ -309,8 +330,9 @@ __kernel void sharemem_softmax_roi_kernel(
             }
         }
 
-//! read all data to sharemem in softmax channel
+        //! read all data to sharemem in softmax channel
 #pragma unroll
+
         for (int i = 0; i < axis_size; ++i) {
             data[tid + i * blocksize] = in_data[input_real_index];
             input_real_index += input_stride_real[softmax_axis];
@@ -319,8 +341,10 @@ __kernel void sharemem_softmax_roi_kernel(
         //! get maximum value in softmax channel
         _FLOAT max_data = data[tid];
 #pragma unroll
+
         for (int i = 1; i < axis_size; ++i) {
             _FLOAT dt = data[tid + i * blocksize];
+
             if (max_data < dt) {
                 max_data = dt;
             }
@@ -329,17 +353,56 @@ __kernel void sharemem_softmax_roi_kernel(
         //! subtract then summarize
         _FLOAT sum = 0;
 #pragma unroll
+
         for (int i = 0; i < axis_size; ++i) {
             __local _FLOAT* dt = data + tid + i * blocksize;
             *dt                = exp(*dt - max_data);
             sum += *dt;
         }
 
-//! write back result
+        //! write back result
 #pragma unroll
+
         for (int i = 0; i < axis_size; ++i) {
             out_data[output_real_index] = data[tid + i * blocksize] / sum;
             output_real_index += output_stride_real[softmax_axis];
         }
     }
+}
+
+__kernel void softmax_kernel(
+    int total_size,
+    __global const _FLOAT* in_data,
+    __global _FLOAT* out_data,
+    __global _FLOAT* max_data,
+    __global _FLOAT* sum_data,
+    _FLOAT min_data,
+    int inner_num,
+    int outer_num,
+    int axis_size) {
+    softmax_max_kernel(total_size, in_data, out_data, min_data, inner_num, outer_num, axis_size);
+    softmax_sub_exp_sum_kernel(total_size, in_data, out_data, max_data, sum_data, inner_num, outer_num,
+                               axis_size);
+    softmax_divid_output_kernel(total_size, out_data, sum_data, inner_num, outer_num, axis_size);
+}
+
+__kernel void softmax_roi_kernel(
+    int total_size,
+    __global const _FLOAT* in_data,
+    __global _FLOAT* out_data,
+    __global _FLOAT* max_data,
+    __global _FLOAT* sum_data,
+    _FLOAT min_data,
+    __global const int* input_stride_real,
+    __global const int* output_stride_real,
+    __global const int* shape_valid,
+    int softmax_axis,
+    int axis_size,
+    int dims) {
+    softmax_max_roi_kernel(total_size, in_data, out_data, min_data, input_stride_real,
+                           output_stride_real, shape_valid, softmax_axis, axis_size, dims);
+    softmax_sub_exp_sum_roi_kernel(total_size, in_data, out_data, max_data, sum_data, input_stride_real,
+                                   output_stride_real, shape_valid, softmax_axis, axis_size, dims);
+    softmax_divid_output_roi_kernel(total_size, out_data, sum_data, input_stride_real,
+                                    output_stride_real, shape_valid, softmax_axis, axis_size, dims);
 }
