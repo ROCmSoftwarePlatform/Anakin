@@ -428,13 +428,11 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
         break;
         }
 
-        if (pooling_global == 1 && in_h * in_w >= 64)
-        {
+        if (pooling_global == 1 && in_h * in_w >= 64) {
             int windows_size       = in_h * in_w;
             int group_size         = 1024;
 
-            while (group_size > windows_size && group_size > 64)
-            {
+            while (group_size > windows_size && group_size > 64) {
                 group_size = group_size >> 1;
             }
 
@@ -448,9 +446,7 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
                                       + std::string(" -DPOOLING_TYPE=") + std::to_string(pooling_type)
                                       + std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias)
                                       + std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive);
-        }
-        else
-        {
+        } else {
             int _grp_tile0 = 8;
             int _grp_tile1 = 8;
 
@@ -626,11 +622,15 @@ std::vector<KernelInfo> FindSolution(
                                    miopen::solver::ConvOclDirectFwd3x3,
                                    miopen::solver::ConvOclDirectFwd1x1,
                                    miopen::solver::ConvOclDirectFwd > (convContext, db);
-        solution = candidate_solutions[0];
+        //solution = candidate_solutions[0];
         double min_time = std::numeric_limits<float>::max();
 
         for (int i = 0; i < candidate_solutions.size(); i++) {
             auto tmp_solution = candidate_solutions[i];
+
+            if (i == 0) {
+                solution = tmp_solution;
+            }
 
             if (min_time > tmp_solution.min_proc_time) {
                 min_time = tmp_solution.min_proc_time;
@@ -654,11 +654,15 @@ std::vector<KernelInfo> FindSolution(
                                        miopen::solver::ConvOclDirectFwd3x3,
                                        miopen::solver::ConvOclDirectFwd1x1,
                                        miopen::solver::ConvOclDirectFwd > (convContext, db);
-            solution = candidate_solutions[0];
+            //solution = candidate_solutions[0];
             double min_time = std::numeric_limits<float>::max();
 
             for (int i = 0; i < candidate_solutions.size(); i++) {
                 auto tmp_solution = candidate_solutions[i];
+
+                if (i == 0) {
+                    solution = tmp_solution;
+                }
 
                 if (min_time > tmp_solution.min_proc_time) {
                     min_time = tmp_solution.min_proc_time;
@@ -812,11 +816,15 @@ std::vector<KernelInfo> FindSolutionWithPooling(
                                    miopen::solver::ConvOclDirectFwd3x3,
                                    miopen::solver::ConvOclDirectFwd1x1,
                                    miopen::solver::ConvOclDirectFwd > (convContext, db);
-        solution = candidate_solutions[0];
+        //solution = candidate_solutions[0];
         double min_time = std::numeric_limits<float>::max();
 
         for (int i = 0; i < candidate_solutions.size(); i++) {
             auto tmp_solution = candidate_solutions[i];
+
+            if (i == 0) {
+                solution = tmp_solution;
+            }
 
             if (min_time > tmp_solution.min_proc_time) {
                 min_time = tmp_solution.min_proc_time;
@@ -840,11 +848,15 @@ std::vector<KernelInfo> FindSolutionWithPooling(
                                        miopen::solver::ConvOclDirectFwd3x3,
                                        miopen::solver::ConvOclDirectFwd1x1,
                                        miopen::solver::ConvOclDirectFwd > (convContext, db);
-            solution = candidate_solutions[0];
+            //solution = candidate_solutions[0];
             double min_time = std::numeric_limits<float>::max();
 
             for (int i = 0; i < candidate_solutions.size(); i++) {
                 auto tmp_solution = candidate_solutions[i];
+
+                if (i == 0) {
+                    solution = tmp_solution;
+                }
 
                 if (min_time > tmp_solution.min_proc_time) {
                     min_time = tmp_solution.min_proc_time;
