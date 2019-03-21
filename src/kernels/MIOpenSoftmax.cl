@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -71,8 +71,8 @@ typedef union GPtr
  * Computing, Networking, Storage and Analysis (SC'14)
 */
 
-__kernel void
-SoftmaxForward(global _FLOAT* y, const int c, const int grid_size, const int spatial_dim)
+__attribute__((reqd_work_group_size(256, 1, 1))) __kernel void
+SoftmaxForward(const global _FLOAT* input, global _FLOAT* output, const int c, const int grid_size, const int spatial_dim)
 {
 #if NUM_BATCH == 1 // CSR-Vector like appraoch
 
@@ -105,7 +105,7 @@ SoftmaxForward(global _FLOAT* y, const int c, const int grid_size, const int spa
         // and compute max
         for(int i = lid; i < c; i += get_local_size(0))
         {
-            t_helper = max(y[mad24(n, c, i) * spatial_dim + s], t_helper);
+            t_helper = max(input[mad24(n, c, i) * spatial_dim + s], t_helper);
         }
 
         // Now we have to compute the max from 256 values (one per each thread)
@@ -128,7 +128,7 @@ SoftmaxForward(global _FLOAT* y, const int c, const int grid_size, const int spa
         // Subtract channel_max from each value
         for(int i = lid; i < c; i += get_local_size(0))
         {
-            _FLOAT value = y[mad24(n, c, i) * spatial_dim + s];
+            _FLOAT value = input[mad24(n, c, i) * spatial_dim + s];
 
             // Compute exponent of each value
             // Then sum all the values touched by this thread
@@ -154,14 +154,15 @@ SoftmaxForward(global _FLOAT* y, const int c, const int grid_size, const int spa
         // Normalize each value in the channel by the channel_sum
         for(int i = lid; i < c; i += get_local_size(0))
         {
-            _FLOAT value = y[mad24(n, c, i) * spatial_dim + s];
+            int index = mad24(n, c, i) * spatial_dim + s;
+            _FLOAT value = input[index];
 
             // Subtracting max again because we do not write the output of
             // value-max to DRAM above. Doing a subtraction again is much
             // faster than writing uncoalesced to DRAM
             value = exp(value - channel_max);
 
-            y[mad24(n, c, i) * spatial_dim + s] = value / channel_sum;
+            output[index] = value / channel_sum;
         }
     }
 
@@ -209,9 +210,10 @@ SoftmaxForward(global _FLOAT* y, const int c, const int grid_size, const int spa
     int index  = index0;
     for(int i = batch_lid; i < c; i += BATCH_SIZE, index++)
     {
-        if(mad24(batch_n, c, i) * spatial_dim + batch_s < c * grid_size)
+        int input_index = mad24(batch_n, c, i) * spatial_dim + batch_s;
+        if(input_index < c * grid_size)
         {
-            Uvalue.f[index] = y[mad24(batch_n, c, i) * spatial_dim + batch_s];
+            Uvalue.f[index] = input[input_index];
             t_helper        = max(Uvalue.f[index], t_helper);
         }
     }
@@ -265,9 +267,9 @@ SoftmaxForward(global _FLOAT* y, const int c, const int grid_size, const int spa
     index = index0;
     for(int i = batch_lid; i < c; i += BATCH_SIZE, index++)
     {
-
-        if(mad24(batch_n, c, i) * spatial_dim + batch_s < c * grid_size)
-            y[mad24(batch_n, c, i) * spatial_dim + batch_s] = Uvalue.f[index] / channel_sum;
+        int output_index = mad24(batch_n, c, i) * spatial_dim + batch_s;
+        if(output_index < c * grid_size)
+            output[output_index] = Uvalue.f[index] / channel_sum;
     }
 
 #endif // CSR-Vector vs CSR-Stream
