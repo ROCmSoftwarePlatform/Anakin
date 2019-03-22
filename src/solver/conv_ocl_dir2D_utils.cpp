@@ -31,95 +31,77 @@ namespace solver {
 
 void addPoolingKernel(const ConvolutionContext& params, ConvSolution& result) {
 
-    typedef enum{
-        Pooling_unknow = 0,
-        Pooling_max = 1,
-        Pooling_average_include_padding = 2,
-        Pooling_average_exclude_padding = 3,
-        Pooling_max_deterministic
-    } PoolingType;
+    const PoolingContext& pool_param = params.poolingContext;
 
     KernelInfo kernel2;
-    int pooling_type = 0;
-    int average_include = 0;
 
-    switch (params.poolingContext.pooling_type) {
-    case Pooling_max:
-        pooling_type = (PoolingType)MLO_POOLING_OP_MAX;
-        break;
+    if (pool_param.kernel_size1 * pool_param.kernel_size0 >= 32
+            && ((pool_param.kernel_size1 <= pool_param.kernel_stride1
+                 && pool_param.kernel_size0 <= pool_param.kernel_stride0)
+                || pool_param.out_height * pool_param.out_width == 1)) {
+        int output_size  = pool_param.batch_sz * pool_param.n_outputs * pool_param.out_height *
+                           pool_param.out_width;
 
-    case Pooling_average_exclude_padding:
-    case Pooling_average_include_padding:
-        pooling_type = (PoolingType)MLO_POOLING_OP_AVE;
-        break;
+        int group_size   = 256;
+        int group_size_0 = 256;  // adder
 
-    case Pooling_unknow:
-    case Pooling_max_deterministic:
-    default:
-         pooling_type = (PoolingType)MLO_POOLING_OP_MAX;
-         break;
-    }
-
-    if (params.poolingContext.pooling_global == 1 && params.poolingContext.in_height * params.poolingContext.in_width >= 64)
-    {
-        int windows_size       = params.poolingContext.in_height * params.poolingContext.in_width;
-        int group_size         = 1024;
-
-        while (group_size > windows_size && group_size > 64)
-        {
-            group_size = group_size >> 1;
+        while (group_size_0 * 8 > pool_param.kernel_size1 * pool_param.kernel_size0 && group_size_0 > 1) {
+            group_size_0 = group_size_0 >> 1;
         }
 
-        kernel2.l_wk           = {group_size, 1, 1};
-        kernel2.g_wk           = {group_size, params.poolingContext.n_inputs, params.poolingContext.batch_sz};
-        kernel2.kernel_file    = "PoolingGlobal.cl";
-        kernel2.kernel_name    = "PoolingGlobal";
+        int group_size_1 = group_size / group_size_0;
+
+        int global_size_0 = group_size_0;
+        int global_size_1 = (output_size + group_size_1 - 1) / group_size_1 * group_size_1;
+
+        kernel2.l_wk         = {group_size_0, group_size_1, 1};
+        kernel2.g_wk         = {global_size_0, global_size_1, 1};
+        kernel2.kernel_file  = "PoolingGeneral.cl";
+        kernel2.kernel_name  = "PoolingGeneral";
         kernel2.isMIOpenKernel = false;
 
-        kernel2.comp_options   = std::string(" -DGROUP_SIZE=") + std::to_string(group_size)
-                                    + std::string(" -DPOOLING_TYPE=") + std::to_string(params.poolingContext.pooling_type)
-                                    + std::string(" -DMLO_CONV_BIAS=0")
-                                    + std::string(" -DMLO_CONV_PRELU=0");
-    }
-    else
-    {
+        kernel2.comp_options = std::string(" -DGROUP_SIZE=") + std::to_string(group_size)
+                               + std::string(" -DGROUP_SIZE_0=") + std::to_string(group_size_0)
+                               + std::string(" -DGROUP_SIZE_1=") + std::to_string(group_size_1)
+                               + std::string(" -DPOOLING_TYPE=") + std::to_string(pool_param.pooling_type)
+                               + std::string(" -DADDER=") + std::to_string(group_size_0);
+    } else {
         kernel2.l_wk           = {256, 1, 1};
         kernel2.g_wk           = {64 * 64 * 40, 1, 1};
         kernel2.kernel_file    = "PoolingGen.cl";
         kernel2.kernel_name    = "mloPooling";
         kernel2.isMIOpenKernel = false;
 
-        int bot_batch_stride   = params.poolingContext.in_width * params.poolingContext.in_height * params.poolingContext.n_inputs;
-        int bot_channel_stride = params.poolingContext.in_width * params.poolingContext.in_height;
+        int bot_batch_stride   = pool_param.in_width * pool_param.in_height * pool_param.n_inputs;
+        int bot_channel_stride = pool_param.in_width * pool_param.in_height;
 
-        int top_batch_stride   = params.poolingContext.out_width * params.poolingContext.out_height * params.poolingContext.n_outputs;
-        int top_channel_stride = params.poolingContext.out_width * params.poolingContext.out_height;
+        int top_batch_stride   = pool_param.out_width * pool_param.out_height * pool_param.n_outputs;
+        int top_channel_stride = pool_param.out_width * pool_param.out_height;
 
         // set comp_options...
         kernel2.comp_options =
-            std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(pooling_type)
-            + std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(params.poolingContext.kernel_size0)
-            + std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(params.poolingContext.kernel_size1)
-            + std::string(" -DMLO_POOLING_PAD0=") + std::to_string(params.poolingContext.pad0)
-            + std::string(" -DMLO_POOLING_PAD1=") + std::to_string(params.poolingContext.pad1)
-            + std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(params.poolingContext.kernel_stride0)
-            + std::string(" -DMLO_POOLING_STRIDE1=") + std::to_string(params.poolingContext.kernel_stride1)
-            + std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(params.poolingContext.n_outputs)
-            + std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(params.poolingContext.n_inputs)
+            std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(pool_param.pooling_type)
+            + std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(pool_param.kernel_size0)
+            + std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(pool_param.kernel_size1)
+            + std::string(" -DMLO_POOLING_PAD0=") + std::to_string(pool_param.pad0)
+            + std::string(" -DMLO_POOLING_PAD1=") + std::to_string(pool_param.pad1)
+            + std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(pool_param.kernel_stride0)
+            + std::string(" -DMLO_POOLING_STRIDE1=") + std::to_string(pool_param.kernel_stride1)
+            + std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(pool_param.n_outputs)
+            + std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(pool_param.n_inputs)
             + std::string(" -DMLO_POOLING_GROUP_SZ0=8")
             + std::string(" -DMLO_POOLING_GROUP_SZ1=8")
             + std::string(" -DMLO_POOLING_BOT_BATCH_STRIDE=") + std::to_string(bot_batch_stride)
             + std::string(" -DMLO_POOLING_BOT_CHANNEL_STRIDE=") + std::to_string(bot_channel_stride)
-            + std::string(" -DMLO_POOLING_BOT_STRIDE=") + std::to_string(params.poolingContext.in_width)
+            + std::string(" -DMLO_POOLING_BOT_STRIDE=") + std::to_string(pool_param.in_width)
             + std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") + std::to_string(top_batch_stride)
             + std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(top_channel_stride)
-            + std::string(" -DMLO_POOLING_TOP_STRIDE=") + std::to_string(params.poolingContext.out_width)
-            + std::string(" -DMLO_POOLING_BOT_WIDTH=") + std::to_string(params.poolingContext.in_width)
-            + std::string(" -DMLO_POOLING_BOT_HEIGHT=") + std::to_string(params.poolingContext.in_height)
-            + std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(params.poolingContext.out_width)
-            + std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(params.poolingContext.out_height)
-            + std::string(" -DBATCH_NUM=") + std::to_string(params.poolingContext.batch_sz)
-            + std::string(" -DAVERAGE_INCLUDE=") + std::to_string(average_include)
+            + std::string(" -DMLO_POOLING_TOP_STRIDE=") + std::to_string(pool_param.out_width)
+            + std::string(" -DMLO_POOLING_BOT_WIDTH=") + std::to_string(pool_param.in_width)
+            + std::string(" -DMLO_POOLING_BOT_HEIGHT=") + std::to_string(pool_param.in_height)
+            + std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(pool_param.out_width)
+            + std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(pool_param.out_height)
+            + std::string(" -DBATCH_NUM=") + std::to_string(pool_param.batch_sz)
             + std::string(" -DCU_NUM=64")
             + std::string(" -DMLO_CONV_BIAS=0")
             + std::string(" -DMLO_CONV_PRELU=0")
