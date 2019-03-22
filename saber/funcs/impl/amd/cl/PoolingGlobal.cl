@@ -31,21 +31,20 @@
 
 __attribute__((reqd_work_group_size(GROUP_SIZE, 1, 1)))
 __kernel void PoolingGlobal(
-        const __global float* src,
-        __global float* dst,
+    const __global float* src,
+    __global float* dst,
 #if MLO_CONV_BIAS
-        const __global float* bias,
+    const __global float* bias,
 #endif
 #if MLO_CONV_PRELU
-        _FLOAT negSlope,
+    float negSlope,
 #endif
-        int N,
-        int C,
-        int H,
-        int W,
-        int pad_h,
-        int pad_w)
-{
+    int N,
+    int C,
+    int H,
+    int W,
+    int pad_h,
+    int pad_w) {
     __local float lcl_buffer[GROUP_SIZE];
     float self;
     float temp;
@@ -65,8 +64,7 @@ __kernel void PoolingGlobal(
     self = 0;
 #endif
 
-    for(int i=idx; i<window; i+=lds)
-    {
+    for (int i = idx; i < window; i += lds) {
         temp = src[src_offset + i];
 #if MLO_CONV_BIAS
         temp += bias[c];
@@ -86,10 +84,8 @@ __kernel void PoolingGlobal(
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    for(lds=lds>>1; lds>=1; lds=lds>>1)
-    {
-        if (idx < lds)
-        {
+    for (lds = lds >> 1; lds >= 1; lds = lds >> 1) {
+        if (idx < lds) {
 #if POOLING_TYPE == Pooling_max
             self = lcl_buffer[idx];
             temp = lcl_buffer[idx + lds];
@@ -98,11 +94,11 @@ __kernel void PoolingGlobal(
             lcl_buffer[idx] += lcl_buffer[idx + lds];
 #endif
         }
+
         barrier(CLK_LOCAL_MEM_FENCE);
     }
 
-    if (idx == 0)
-    {
+    if (idx == 0) {
 #if POOLING_TYPE == Pooling_max
         dst[dst_offset] = lcl_buffer[0];
 #elif POOLING_TYPE == Pooling_average_include_padding

@@ -401,49 +401,34 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
     KernelInfo kernelInfo;
 
     if (pooling_w_h != 0 || pooling_w_w != 0) {
+        if (pooling_w_h * pooling_w_w >= 32
+                && ((pooling_w_h <= pooling_s_h && pooling_w_w <= pooling_s_w) || out_h * out_w == 1)) {
+            int output_size = bt_size * out_c * out_h * out_w;
 
-        int ptype = MLO_POOLING_OP_MAX;
-        int average_include = 0;
+            int group_size   = 256;
+            int group_size_0 = 256;  // adder
 
-        switch (pooling_type) {
-        case Pooling_max: {
-            ptype = MLO_POOLING_OP_MAX;
-        }
-        break;
-
-        case Pooling_average_include_padding: {
-            ptype = MLO_POOLING_OP_AVE;
-            average_include = 1;
-        }
-        break;
-
-        case Pooling_average_exclude_padding: {
-            ptype = MLO_POOLING_OP_AVE;
-        }
-        break;
-
-        default: {
-            LOG(ERROR) << "Unknown polling type: " << pooling_type;
-        }
-        break;
-        }
-
-        if (pooling_global == 1 && in_h * in_w >= 64) {
-            int windows_size       = in_h * in_w;
-            int group_size         = 1024;
-
-            while (group_size > windows_size && group_size > 64) {
-                group_size = group_size >> 1;
+            while (group_size_0 * 8 > pooling_w_h * pooling_w_w && group_size_0 > 1) {
+                group_size_0 = group_size_0 >> 1;
             }
 
+            int group_size_1 = group_size / group_size_0;
+
+            int global_size_0 = group_size_0;
+            int global_size_1 = (output_size + group_size_1 - 1) / group_size_1 * group_size_1;
+
             kernelInfo.wk_dim      = 3;
-            kernelInfo.l_wk        = {group_size, 1, 1};
-            kernelInfo.g_wk        = {group_size, in_c, bt_size};
-            kernelInfo.kernel_file = "PoolingGlobal.cl";
-            kernelInfo.kernel_name = "PoolingGlobal";
+            kernelInfo.l_wk        = {group_size_0, group_size_1, 1};
+            kernelInfo.g_wk        = {global_size_0, global_size_1, 1};
+            kernelInfo.kernel_file = "PoolingGeneral.cl";
+            kernelInfo.kernel_name = "PoolingGeneral";
+            kernelInfo.kernel_type = SABER;
 
             kernelInfo.comp_options = std::string(" -DGROUP_SIZE=") + std::to_string(group_size)
+                                      + std::string(" -DGROUP_SIZE_0=") + std::to_string(group_size_0)
+                                      + std::string(" -DGROUP_SIZE_1=") + std::to_string(group_size_1)
                                       + std::string(" -DPOOLING_TYPE=") + std::to_string(pooling_type)
+                                      + std::string(" -DADDER=") + std::to_string(group_size_0)
                                       + std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias)
                                       + std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive);
         } else {
@@ -453,6 +438,7 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
             int _out_pix_tile0 = std::max(1, 8 / pooling_s_w);
             int _out_pix_tile1 = std::max(1, 8 / pooling_s_h);
 
+            kernelInfo.wk_dim      = 3;
             kernelInfo.l_wk        = {256, 1, 1};
             kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
             kernelInfo.kernel_file = "PoolingGen.cl";
@@ -460,7 +446,7 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
             kernelInfo.kernel_type = SABER;
 
             kernelInfo.comp_options =
-                std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(ptype) +
+                std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(pooling_type) +
                 std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(pooling_w_w) +
                 std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(pooling_w_h) +
                 std::string(" -DMLO_POOLING_PAD0=") + std::to_string(pooling_p_w) +
@@ -484,7 +470,6 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
                 std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(out_w * out_h) +
                 std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") + std::to_string(out_w * out_h * out_c) +
                 std::string(" -DBATCH_NUM=") + std::to_string(bt_size) +
-                std::string(" -DAVERAGE_INCLUDE=") + std::to_string(average_include) +
                 std::string(" -DCU_NUM=64") +
                 std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias) +
                 std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive) +

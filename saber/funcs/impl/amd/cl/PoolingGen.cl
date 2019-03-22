@@ -26,19 +26,17 @@
 
 #define UNUSED __attribute__((__unused__))
 
-#define MLO_POOLING_OP_AVE 0
-#define MLO_POOLING_OP_MAX 1
-#define MLO_POOLING_OP_STC 2
-
-#define MLO_POOLING_GROUP_SZ2 1
+#define Pooling_max 1
+#define Pooling_average_include_padding 2
+#define Pooling_average_exclude_padding 3
 
 #ifndef MLO_POOLING_OP_ID
-#define MLO_POOLING_OP_ID 0
+#define MLO_POOLING_OP_ID Pooling_max
 #endif
 // max
-#if MLO_POOLING_OP_ID == MLO_POOLING_OP_MAX
+#if MLO_POOLING_OP_ID == Pooling_max
 #define MLO_POOLING_OP(A, B) fmax(A, B);
-#elif MLO_POOLING_OP_ID == MLO_POOLING_OP_AVE
+#else
 #define MLO_POOLING_OP(A, B) (A + B);
 #endif
 
@@ -58,8 +56,7 @@ mloPooling(const __global _FLOAT* bot,
 #if MLO_CONV_PRELU
            _FLOAT negSlope,
 #endif
-           UNUSED __global _FLOAT* mask)
-{
+           UNUSED __global _FLOAT* mask) {
     int gid     = get_global_id(0);
     int ob      = BATCH_NUM * MLO_POOLING_N_OUTPUTS; // output * batch_sz
     int top_off = gid;
@@ -72,39 +69,37 @@ mloPooling(const __global _FLOAT* bot,
                      (THREAD_PER_WAVE * CU_NUM * WAVE_PER_4SIMD));
     int top_loop_stride = THREAD_PER_WAVE * CU_NUM * WAVE_PER_4SIMD;
 
-    for(int index = 0;
-        index < loop_num && top_off < ob * MLO_POOLING_TOP_STRIDE * MLO_POOLING_TOP_HEIGHT;
-        index++, top_off += top_loop_stride)
-    {
+    for (int index = 0;
+            index < loop_num && top_off < ob * MLO_POOLING_TOP_STRIDE * MLO_POOLING_TOP_HEIGHT;
+            index++, top_off += top_loop_stride) {
         int bot_b = (top_off / MLO_POOLING_TOP_BATCH_STRIDE);
         int bot_c = (top_off % MLO_POOLING_TOP_BATCH_STRIDE / MLO_POOLING_TOP_CHANNEL_STRIDE);
-        int bot_y = (top_off % MLO_POOLING_TOP_CHANNEL_STRIDE / MLO_POOLING_TOP_STRIDE) * MLO_POOLING_STRIDE1 - MLO_POOLING_PAD1;
+        int bot_y = (top_off % MLO_POOLING_TOP_CHANNEL_STRIDE / MLO_POOLING_TOP_STRIDE) *
+                    MLO_POOLING_STRIDE1 - MLO_POOLING_PAD1;
         int bot_x = (top_off % MLO_POOLING_TOP_STRIDE) * MLO_POOLING_STRIDE0 - MLO_POOLING_PAD0;
 
         bot_off = bot_b * MLO_POOLING_BOT_BATCH_STRIDE + bot_c * MLO_POOLING_BOT_CHANNEL_STRIDE +
                   bot_y * MLO_POOLING_BOT_STRIDE + bot_x;
-#if MLO_POOLING_OP_ID == MLO_POOLING_OP_MAX
+#if MLO_POOLING_OP_ID == Pooling_max
         res = -FLT_MAX;
-#elif MLO_POOLING_OP_ID == MLO_POOLING_OP_AVE
+#else
         res = 0;
 #endif
 
-#if MLO_POOLING_OP_ID == MLO_POOLING_OP_AVE
+#if MLO_POOLING_OP_ID != Pooling_max
         uint pool_size = 0;
 #endif
+
         // for window x, y
-        for(int j = 0; j < MLO_POOLING_KERNEL_SZ1; ++j)
-        {
-            for(int i = 0; i < MLO_POOLING_KERNEL_SZ0; ++i)
-            {
+        for (int j = 0; j < MLO_POOLING_KERNEL_SZ1; ++j) {
+            for (int i = 0; i < MLO_POOLING_KERNEL_SZ0; ++i) {
                 int run_y = (int)bot_y + j;
                 int run_x = (int)bot_x + i;
                 uint vis  = ((run_y >= 0 && run_y < MLO_POOLING_BOT_HEIGHT) &&
                              (run_x >= 0 && run_x < MLO_POOLING_BOT_WIDTH))
                             ? 1 : 0;
 
-                if (vis)
-                {
+                if (vis) {
                     uint bot_gbl_off = bot_off + j * MLO_POOLING_BOT_STRIDE + i;
                     float bot_data   = *(bot + bot_gbl_off);
 
@@ -116,7 +111,7 @@ mloPooling(const __global _FLOAT* bot,
                     bot_data = (bot_data > 0) ? bot_data : bot_data * negSlope;
 #endif
 
-#if MLO_POOLING_OP_ID == MLO_POOLING_OP_AVE
+#if MLO_POOLING_OP_ID != Pooling_max
                     bot_data = (vis) ? bot_data : 0;
 #else
                     bot_data = (vis) ? bot_data : -FLT_MAX;
@@ -124,8 +119,8 @@ mloPooling(const __global _FLOAT* bot,
                     res = MLO_POOLING_OP(res, bot_data);
                 }
 
-#if MLO_POOLING_OP_ID == MLO_POOLING_OP_AVE
-#if AVERAGE_INCLUDE == 1
+#if MLO_POOLING_OP_ID != Pooling_max
+#if MLO_POOLING_OP_ID == Pooling_average_include_padding
                 vis = ((run_y < (MLO_POOLING_BOT_HEIGHT + MLO_POOLING_PAD1)) &&
                        (run_x < (MLO_POOLING_BOT_WIDTH  + MLO_POOLING_PAD0)))
                       ? 1 : 0;
@@ -135,7 +130,7 @@ mloPooling(const __global _FLOAT* bot,
             }
         }
 
-#if MLO_POOLING_OP_ID == MLO_POOLING_OP_AVE
+#if MLO_POOLING_OP_ID != Pooling_max
         res *= (1.0f / (_FLOAT)pool_size);
 #endif
 

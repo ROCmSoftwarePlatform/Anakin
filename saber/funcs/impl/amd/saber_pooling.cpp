@@ -38,8 +38,6 @@ SaberStatus SaberPooling<AMD, OpDtype>::create(
     PoolingParam<AMD>& param,
     Context<AMD>& ctx) {
     KernelInfo kernelInfo;
-    int pooling_type = 0;
-    int average_include = 0;
 
 #ifdef ENABLE_DEBUG
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "param.pooling_type=" << param.pooling_type
@@ -52,50 +50,33 @@ SaberStatus SaberPooling<AMD, OpDtype>::create(
                                          << " param.global_pooling=" << param.global_pooling;
 #endif
 
-    switch (param.pooling_type) {
-    case Pooling_max: {
-        pooling_type = (PoolingType)MLO_POOLING_OP_MAX;
-    }
-    break;
+    if (param.window_h * param.window_w >= 32
+            && ((param.window_h <= param.stride_h && param.window_w <= param.stride_w)
+                || outputs[0]->count(2, 4) == 1)) {
+        int group_size   = 256;
+        int group_size_0 = 256;  // adder
 
-    case Pooling_average_include_padding: {
-        pooling_type = (PoolingType)MLO_POOLING_OP_AVE;
-        average_include = 1;
-    }
-    break;
-
-    case Pooling_average_exclude_padding: {
-        pooling_type = (PoolingType)MLO_POOLING_OP_AVE;
-    }
-    break;
-
-    default: {
-        LOG(ERROR) << "Unknown polling type: " << param.pooling_type;
-    }
-    break;
-    }
-
-    if (param.global_pooling == 1 && inputs[0]->count(2,4) >= 64)
-    {
-        int windows_size       = inputs[0]->count(2,4);
-        int group_size         = 1024;
-
-        while (group_size > windows_size && group_size > 64)
-        {
-            group_size = group_size >> 1;
+        while (group_size_0 * 8 > param.window_h * param.window_w && group_size_0 > 1) {
+            group_size_0 = group_size_0 >> 1;
         }
 
+        int group_size_1 = group_size / group_size_0;
+
+        int global_size_0 = group_size_0;
+        int global_size_1 = (outputs[0]->size() + group_size_1 - 1) / group_size_1 * group_size_1;
+
         kernelInfo.wk_dim      = 3;
-        kernelInfo.l_wk        = {group_size, 1, 1};
-        kernelInfo.g_wk        = {group_size, outputs[0]->channel(), outputs[0]->num()};
-        kernelInfo.kernel_file = "PoolingGlobal.cl";
-        kernelInfo.kernel_name = "PoolingGlobal";
+        kernelInfo.l_wk        = {group_size_0, group_size_1, 1};
+        kernelInfo.g_wk        = {global_size_0, global_size_1, 1};
+        kernelInfo.kernel_file = "PoolingGeneral.cl";
+        kernelInfo.kernel_name = "PoolingGeneral";
 
         kernelInfo.comp_options = std::string(" -DGROUP_SIZE=") + std::to_string(group_size)
-                                  + std::string(" -DPOOLING_TYPE=") + std::to_string(param.pooling_type);
-    }
-    else
-    {
+                                  + std::string(" -DGROUP_SIZE_0=") + std::to_string(group_size_0)
+                                  + std::string(" -DGROUP_SIZE_1=") + std::to_string(group_size_1)
+                                  + std::string(" -DPOOLING_TYPE=") + std::to_string(param.pooling_type)
+                                  + std::string(" -DADDER=") + std::to_string(group_size_0);
+    } else {
         kernelInfo.wk_dim = 3;
         kernelInfo.l_wk        = {256, 1, 1};
         kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
@@ -110,7 +91,7 @@ SaberStatus SaberPooling<AMD, OpDtype>::create(
 
         // set comp_options...
         kernelInfo.comp_options =
-            std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(pooling_type)
+            std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(param.pooling_type)
             + std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(param.window_w)
             + std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(param.window_h)
             + std::string(" -DMLO_POOLING_PAD0=") + std::to_string(param.pad_w)
@@ -132,7 +113,6 @@ SaberStatus SaberPooling<AMD, OpDtype>::create(
             + std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(outputs[0]->width())
             + std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(outputs[0]->height())
             + std::string(" -DBATCH_NUM=") + std::to_string(inputs[0]->num())
-            + std::string(" -DAVERAGE_INCLUDE=") + std::to_string(average_include)
             + std::string(" -DCU_NUM=64")
             + std::string(" -DMIOPEN_USE_FP32=1")
             + std::string(" -DMIOPEN_USE_FP16=0");
@@ -173,8 +153,7 @@ SaberStatus SaberPooling<AMD, OpDtype>::dispatch(
     // To get the commpute command queue
     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
 
-    if (kernel->GetName() == "PoolingGlobal")
-    {
+    if (kernel->GetName() == "PoolingGlobal") {
         err = kernel->SetKernelArgs((PtrDtype)inputs[0]->data(),
                                     (PtrDtype)outputs[0]->mutable_data(),
                                     (int)inputs[0]->num(),
@@ -183,14 +162,26 @@ SaberStatus SaberPooling<AMD, OpDtype>::dispatch(
                                     (int)inputs[0]->width(),
                                     (int)param.pad_h,
                                     (int)param.pad_w);
-    }
-    else if (kernel->GetName() == "mloPooling")
-    {
-        err = kernel->SetKernelArgs((PtrDtype)inputs[0]->data(), (PtrDtype)outputs[0]->mutable_data(), (PtrDtype)0);
-    }
-    else
-    {
-        LOG(ERROR) << "kernel name is not exist";
+    } else if (kernel->GetName() == "PoolingGeneral") {
+        err = kernel->SetKernelArgs((PtrDtype)inputs[0]->data(),
+                                    (PtrDtype)outputs[0]->mutable_data(),
+                                    (int)inputs[0]->num(),
+                                    (int)inputs[0]->channel(),
+                                    (int)inputs[0]->height(),
+                                    (int)inputs[0]->width(),
+                                    (int)outputs[0]->height(),
+                                    (int)outputs[0]->width(),
+                                    (int)param.window_h,
+                                    (int)param.window_w,
+                                    (int)param.stride_h,
+                                    (int)param.stride_w,
+                                    (int)param.pad_h,
+                                    (int)param.pad_w);
+    } else if (kernel->GetName() == "mloPoolingG" || kernel->GetName() == "mloPooling") {
+        err = kernel->SetKernelArgs((PtrDtype)inputs[0]->data(), (PtrDtype)outputs[0]->mutable_data(),
+                                    (PtrDtype)0);
+    } else {
+        LOG(ERROR) << " ***** ERROR ***** : kernel name is not exist " << kernel->GetName();
     }
 
     amd_kernel_list list;
