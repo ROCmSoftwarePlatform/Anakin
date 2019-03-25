@@ -109,7 +109,8 @@ bool ConvOclDirectFwd1x1Tensile::IsApplicable(const ConvolutionContext& params) 
         && (params.n_inputs % 4 == 0)
         && (params.n_outputs % 2 == 0)
         && (params.kernel_stride0 == params.kernel_stride1)
-        && (params.pad0 == 0 && params.pad1 == 0);
+        && (params.pad0 == 0 && params.pad1 == 0)
+        && !(params.has_pooling);
 
     return result;
 }
