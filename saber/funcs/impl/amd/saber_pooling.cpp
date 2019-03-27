@@ -18,6 +18,156 @@
 namespace anakin {
 namespace saber {
 
+static bool tryPoolingGeneral(
+    const std::vector<Tensor<AMD>*>& inputs,
+    std::vector<Tensor<AMD>*>& outputs,
+    PoolingParam<AMD>& param,
+    KernelInfo& kernelInfo) {
+    if (param.window_h * param.window_w < 32) {
+        return false;
+    }
+
+    if ((param.window_h > param.stride_h || param.window_w > param.stride_w)
+            && outputs[0]->count(2, 4) != 1) {
+        return false;
+    }
+
+    int group_size   = 256;
+    int group_size_0 = 256;  // adder
+
+    while (group_size_0 * 8 > param.window_h * param.window_w && group_size_0 > 1) {
+        group_size_0 = group_size_0 >> 1;
+    }
+
+    int group_size_1 = group_size / group_size_0;
+
+    int global_size_0 = group_size_0;
+    int global_size_1 = (outputs[0]->size() + group_size_1 - 1) / group_size_1 * group_size_1;
+
+    kernelInfo.wk_dim      = 3;
+    kernelInfo.l_wk        = {group_size_0, group_size_1, 1};
+    kernelInfo.g_wk        = {global_size_0, global_size_1, 1};
+    kernelInfo.kernel_file = "PoolingGeneral.cl";
+    kernelInfo.kernel_name = "PoolingGeneral";
+
+    kernelInfo.comp_options = std::string(" -DGROUP_SIZE=") + std::to_string(group_size)
+                              + std::string(" -DGROUP_SIZE_0=") + std::to_string(group_size_0)
+                              + std::string(" -DGROUP_SIZE_1=") + std::to_string(group_size_1)
+                              + std::string(" -DPOOLING_TYPE=") + std::to_string(param.pooling_type)
+                              + std::string(" -DADDER=") + std::to_string(group_size_0);
+
+    return true;
+}
+
+static bool tryPoolingWithShare(
+    const std::vector<Tensor<AMD>*>& inputs,
+    std::vector<Tensor<AMD>*>& outputs,
+    PoolingParam<AMD>& param,
+    KernelInfo& kernelInfo) {
+    if (outputs[0]->size() < 1024 * 32 * 32) {
+        return false;
+    }
+
+    if (param.window_h <= param.stride_h || param.window_w <= param.stride_w) {
+        return false;
+    }
+
+    int group_size_1 = 256;
+    int group_size_0 = 256;
+
+    while (group_size_1 * 2 > outputs[0]->height() && group_size_1 > 1) {
+        group_size_1 = group_size_1 >> 1;
+    }
+
+    while (group_size_0 * 2 > outputs[0]->width() && group_size_0 > 1) {
+        group_size_0 = group_size_0 >> 1;
+    }
+
+    while (group_size_0 * group_size_1 > 256) {
+        if (group_size_0 > group_size_1) {
+            group_size_0 = group_size_0 >> 1;
+        } else {
+            group_size_1 = group_size_1 >> 1;
+        }
+    }
+
+    int y_tile = (outputs[0]->height() + group_size_1 - 1) / group_size_1;
+    int x_tile = (outputs[0]->width() + group_size_0 - 1) / group_size_0;
+
+    int y_cache_size = (group_size_1 - 1) * param.stride_h + param.window_h;
+    int x_cache_size = (group_size_0 - 1) * param.stride_w + param.window_w;
+
+    if (group_size_0 * group_size_1 < 64) {
+        return false;
+    }
+
+    if (y_cache_size * x_cache_size > 2000) {
+        return false;
+    }
+
+    kernelInfo.wk_dim = 3;
+    kernelInfo.l_wk        = {group_size_0, group_size_1, 1};
+    kernelInfo.g_wk        = {x_tile * group_size_0, y_tile * group_size_1,  outputs[0]->num()* outputs[0]->channel()};
+    kernelInfo.kernel_file = "PoolingWithShare.cl";
+    kernelInfo.kernel_name = "PoolingWithShare";
+
+    kernelInfo.comp_options = std::string(" -DGROUP_SIZE_0=") + std::to_string(group_size_0)
+                              + std::string(" -DGROUP_SIZE_1=") + std::to_string(group_size_1)
+                              + std::string(" -DPOOLING_TYPE=") + std::to_string(param.pooling_type)
+                              + std::string(" -DCACHE_SIZE_0=") + std::to_string(x_cache_size)
+                              + std::string(" -DCACHE_SIZE_1=") + std::to_string(y_cache_size);
+
+    return true;
+}
+
+static bool tryPoolingGen(
+    const std::vector<Tensor<AMD>*>& inputs,
+    std::vector<Tensor<AMD>*>& outputs,
+    PoolingParam<AMD>& param,
+    KernelInfo& kernelInfo) {
+    kernelInfo.wk_dim = 3;
+    kernelInfo.l_wk        = {256, 1, 1};
+    kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
+    kernelInfo.kernel_file = "PoolingGen.cl";
+    kernelInfo.kernel_name = "mloPooling";
+
+    int bot_batch_stride   = inputs[0]->width() * inputs[0]->height() * inputs[0]->channel();
+    int bot_channel_stride = inputs[0]->width() * inputs[0]->height();
+
+    int top_batch_stride   = outputs[0]->width() * outputs[0]->height() * outputs[0]->channel();
+    int top_channel_stride = outputs[0]->width() * outputs[0]->height();
+
+    // set comp_options...
+    kernelInfo.comp_options =
+        std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(param.pooling_type)
+        + std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(param.window_w)
+        + std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(param.window_h)
+        + std::string(" -DMLO_POOLING_PAD0=") + std::to_string(param.pad_w)
+        + std::string(" -DMLO_POOLING_PAD1=") + std::to_string(param.pad_h)
+        + std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(param.stride_w)
+        + std::string(" -DMLO_POOLING_STRIDE1=") + std::to_string(param.stride_h)
+        + std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(outputs[0]->channel())
+        + std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(inputs[0]->channel())
+        + std::string(" -DMLO_POOLING_GROUP_SZ0=8")
+        + std::string(" -DMLO_POOLING_GROUP_SZ1=8")
+        + std::string(" -DMLO_POOLING_BOT_BATCH_STRIDE=") + std::to_string(bot_batch_stride)
+        + std::string(" -DMLO_POOLING_BOT_CHANNEL_STRIDE=") + std::to_string(bot_channel_stride)
+        + std::string(" -DMLO_POOLING_BOT_STRIDE=") + std::to_string(inputs[0]->width())
+        + std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") + std::to_string(top_batch_stride)
+        + std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(top_channel_stride)
+        + std::string(" -DMLO_POOLING_TOP_STRIDE=") + std::to_string(outputs[0]->width())
+        + std::string(" -DMLO_POOLING_BOT_WIDTH=") + std::to_string(inputs[0]->width())
+        + std::string(" -DMLO_POOLING_BOT_HEIGHT=") + std::to_string(inputs[0]->height())
+        + std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(outputs[0]->width())
+        + std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(outputs[0]->height())
+        + std::string(" -DBATCH_NUM=") + std::to_string(inputs[0]->num())
+        + std::string(" -DCU_NUM=64")
+        + std::string(" -DMIOPEN_USE_FP32=1")
+        + std::string(" -DMIOPEN_USE_FP16=0");
+
+    return true;
+}
+
 typedef TargetWrapper<AMD> AMD_API;
 
 template <DataType OpDtype>
@@ -50,72 +200,14 @@ SaberStatus SaberPooling<AMD, OpDtype>::create(
                                          << " param.global_pooling=" << param.global_pooling;
 #endif
 
-    if (param.window_h * param.window_w >= 32
-            && ((param.window_h <= param.stride_h && param.window_w <= param.stride_w)
-                || outputs[0]->count(2, 4) == 1)) {
-        int group_size   = 256;
-        int group_size_0 = 256;  // adder
-
-        while (group_size_0 * 8 > param.window_h * param.window_w && group_size_0 > 1) {
-            group_size_0 = group_size_0 >> 1;
-        }
-
-        int group_size_1 = group_size / group_size_0;
-
-        int global_size_0 = group_size_0;
-        int global_size_1 = (outputs[0]->size() + group_size_1 - 1) / group_size_1 * group_size_1;
-
-        kernelInfo.wk_dim      = 3;
-        kernelInfo.l_wk        = {group_size_0, group_size_1, 1};
-        kernelInfo.g_wk        = {global_size_0, global_size_1, 1};
-        kernelInfo.kernel_file = "PoolingGeneral.cl";
-        kernelInfo.kernel_name = "PoolingGeneral";
-
-        kernelInfo.comp_options = std::string(" -DGROUP_SIZE=") + std::to_string(group_size)
-                                  + std::string(" -DGROUP_SIZE_0=") + std::to_string(group_size_0)
-                                  + std::string(" -DGROUP_SIZE_1=") + std::to_string(group_size_1)
-                                  + std::string(" -DPOOLING_TYPE=") + std::to_string(param.pooling_type)
-                                  + std::string(" -DADDER=") + std::to_string(group_size_0);
+    if (tryPoolingGeneral(inputs, outputs, param, kernelInfo)) {
+        ;
+    } else if (tryPoolingWithShare(inputs, outputs, param, kernelInfo)) {
+        ;
+    } else if (tryPoolingGen(inputs, outputs, param, kernelInfo)) {
+        ;
     } else {
-        kernelInfo.wk_dim = 3;
-        kernelInfo.l_wk        = {256, 1, 1};
-        kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
-        kernelInfo.kernel_file = "PoolingGen.cl";
-        kernelInfo.kernel_name = "mloPooling";
-
-        int bot_batch_stride   = inputs[0]->width() * inputs[0]->height() * inputs[0]->channel();
-        int bot_channel_stride = inputs[0]->width() * inputs[0]->height();
-
-        int top_batch_stride   = outputs[0]->width() * outputs[0]->height() * outputs[0]->channel();
-        int top_channel_stride = outputs[0]->width() * outputs[0]->height();
-
-        // set comp_options...
-        kernelInfo.comp_options =
-            std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(param.pooling_type)
-            + std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(param.window_w)
-            + std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(param.window_h)
-            + std::string(" -DMLO_POOLING_PAD0=") + std::to_string(param.pad_w)
-            + std::string(" -DMLO_POOLING_PAD1=") + std::to_string(param.pad_h)
-            + std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(param.stride_w)
-            + std::string(" -DMLO_POOLING_STRIDE1=") + std::to_string(param.stride_h)
-            + std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(outputs[0]->channel())
-            + std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(inputs[0]->channel())
-            + std::string(" -DMLO_POOLING_GROUP_SZ0=8")
-            + std::string(" -DMLO_POOLING_GROUP_SZ1=8")
-            + std::string(" -DMLO_POOLING_BOT_BATCH_STRIDE=") + std::to_string(bot_batch_stride)
-            + std::string(" -DMLO_POOLING_BOT_CHANNEL_STRIDE=") + std::to_string(bot_channel_stride)
-            + std::string(" -DMLO_POOLING_BOT_STRIDE=") + std::to_string(inputs[0]->width())
-            + std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") + std::to_string(top_batch_stride)
-            + std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(top_channel_stride)
-            + std::string(" -DMLO_POOLING_TOP_STRIDE=") + std::to_string(outputs[0]->width())
-            + std::string(" -DMLO_POOLING_BOT_WIDTH=") + std::to_string(inputs[0]->width())
-            + std::string(" -DMLO_POOLING_BOT_HEIGHT=") + std::to_string(inputs[0]->height())
-            + std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(outputs[0]->width())
-            + std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(outputs[0]->height())
-            + std::string(" -DBATCH_NUM=") + std::to_string(inputs[0]->num())
-            + std::string(" -DCU_NUM=64")
-            + std::string(" -DMIOPEN_USE_FP32=1")
-            + std::string(" -DMIOPEN_USE_FP16=0");
+        LOG(ERROR) << "no pooling function is selected.";
     }
 
     AMDKernelPtr kptr = CreateKernel(inputs[0]->device_id(), &kernelInfo);
@@ -153,16 +245,7 @@ SaberStatus SaberPooling<AMD, OpDtype>::dispatch(
     // To get the commpute command queue
     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
 
-    if (kernel->GetName() == "PoolingGlobal") {
-        err = kernel->SetKernelArgs((PtrDtype)inputs[0]->data(),
-                                    (PtrDtype)outputs[0]->mutable_data(),
-                                    (int)inputs[0]->num(),
-                                    (int)inputs[0]->channel(),
-                                    (int)inputs[0]->height(),
-                                    (int)inputs[0]->width(),
-                                    (int)param.pad_h,
-                                    (int)param.pad_w);
-    } else if (kernel->GetName() == "PoolingGeneral") {
+    if (kernel->GetName() == "PoolingGeneral" || kernel->GetName() == "PoolingWithShare") {
         err = kernel->SetKernelArgs((PtrDtype)inputs[0]->data(),
                                     (PtrDtype)outputs[0]->mutable_data(),
                                     (int)inputs[0]->num(),

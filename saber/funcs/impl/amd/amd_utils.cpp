@@ -392,6 +392,167 @@ void transpose_CNHW2NCHW(AMDKernelPtr& kptr,
     }
 }
 
+static bool tryPoolingGeneral(KernelInfo& kernelInfo,
+                              int bt_size, int in_h, int in_w, int in_c, int out_h, int out_w,
+                              int out_c, int pooling_w_h, int pooling_w_w, int pooling_s_h,
+                              int pooling_s_w, int pooling_p_h, int pooling_p_w,
+                              int pooling_type, int pooling_global, bool isBias, bool isActive) {
+    if (pooling_w_h * pooling_w_w < 32) {
+        return false;
+    }
+
+    if ((pooling_w_h > pooling_s_h || pooling_w_w > pooling_s_w)
+            && out_h * out_w != 1) {
+        return false;
+    }
+
+    int output_size = bt_size * out_c * out_h * out_w;
+
+    int group_size   = 256;
+    int group_size_0 = 256;  // adder
+
+    while (group_size_0 * 8 > pooling_w_h * pooling_w_w && group_size_0 > 1) {
+        group_size_0 = group_size_0 >> 1;
+    }
+
+    int group_size_1 = group_size / group_size_0;
+
+    int global_size_0 = group_size_0;
+    int global_size_1 = (output_size + group_size_1 - 1) / group_size_1 * group_size_1;
+
+    kernelInfo.wk_dim      = 3;
+    kernelInfo.l_wk        = {group_size_0, group_size_1, 1};
+    kernelInfo.g_wk        = {global_size_0, global_size_1, 1};
+    kernelInfo.kernel_file = "PoolingGeneral.cl";
+    kernelInfo.kernel_name = "PoolingGeneral";
+    kernelInfo.kernel_type = SABER;
+
+    kernelInfo.comp_options = std::string(" -DGROUP_SIZE=") + std::to_string(group_size)
+                              + std::string(" -DGROUP_SIZE_0=") + std::to_string(group_size_0)
+                              + std::string(" -DGROUP_SIZE_1=") + std::to_string(group_size_1)
+                              + std::string(" -DPOOLING_TYPE=") + std::to_string(pooling_type)
+                              + std::string(" -DADDER=") + std::to_string(group_size_0)
+                              + std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias)
+                              + std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive);
+
+    return true;
+}
+
+static bool tryPoolingWithShare(KernelInfo& kernelInfo,
+                                int bt_size, int in_h, int in_w, int in_c, int out_h, int out_w,
+                                int out_c, int pooling_w_h, int pooling_w_w, int pooling_s_h,
+                                int pooling_s_w, int pooling_p_h, int pooling_p_w,
+                                int pooling_type, int pooling_global, bool isBias, bool isActive) {
+    if (bt_size * out_c * out_h * out_w < 1024 * 32 * 32) {
+        return false;
+    }
+
+    if (pooling_w_h <= pooling_s_h || pooling_w_w <= pooling_s_w) {
+        return false;
+    }
+
+    int group_size_1 = 256;
+    int group_size_0 = 256;
+
+    while (group_size_1 * 2 > out_h && group_size_1 > 1) {
+        group_size_1 = group_size_1 >> 1;
+    }
+
+    while (group_size_0 * 2 > out_w && group_size_0 > 1) {
+        group_size_0 = group_size_0 >> 1;
+    }
+
+    while (group_size_0 * group_size_1 > 256) {
+        if (group_size_0 > group_size_1) {
+            group_size_0 = group_size_0 >> 1;
+        } else {
+            group_size_1 = group_size_1 >> 1;
+        }
+    }
+
+    int y_tile = (out_h + group_size_1 - 1) / group_size_1;
+    int x_tile = (out_w + group_size_0 - 1) / group_size_0;
+
+    int y_cache_size = (group_size_1 - 1) * pooling_s_h + pooling_w_h;
+    int x_cache_size = (group_size_0 - 1) * pooling_s_w + pooling_w_w;
+
+    if (group_size_0 * group_size_1 < 64) {
+        return false;
+    }
+
+    if (y_cache_size * x_cache_size > 2000) {
+        return false;
+    }
+
+    kernelInfo.wk_dim      = 3;
+    kernelInfo.l_wk        = {group_size_0, group_size_1, 1};
+    kernelInfo.g_wk        = {x_tile * group_size_0, y_tile * group_size_1, bt_size * out_c};
+    kernelInfo.kernel_file = "PoolingWithShare.cl";
+    kernelInfo.kernel_name = "PoolingWithShare";
+    kernelInfo.kernel_type = SABER;
+
+    kernelInfo.comp_options = std::string(" -DGROUP_SIZE_0=") + std::to_string(group_size_0)
+                              + std::string(" -DGROUP_SIZE_1=") + std::to_string(group_size_1)
+                              + std::string(" -DPOOLING_TYPE=") + std::to_string(pooling_type)
+                              + std::string(" -DCACHE_SIZE_0=") + std::to_string(x_cache_size)
+                              + std::string(" -DCACHE_SIZE_1=") + std::to_string(y_cache_size)
+                              + std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias)
+                              + std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive);
+
+    return true;
+}
+
+static bool tryPoolingGen(KernelInfo& kernelInfo,
+                          int bt_size, int in_h, int in_w, int in_c, int out_h, int out_w,
+                          int out_c, int pooling_w_h, int pooling_w_w, int pooling_s_h,
+                          int pooling_s_w, int pooling_p_h, int pooling_p_w,
+                          int pooling_type, int pooling_global, bool isBias, bool isActive) {
+    int _grp_tile0 = 8;
+    int _grp_tile1 = 8;
+
+    int _out_pix_tile0 = std::max(1, 8 / pooling_s_w);
+    int _out_pix_tile1 = std::max(1, 8 / pooling_s_h);
+
+    kernelInfo.wk_dim      = 3;
+    kernelInfo.l_wk        = {256, 1, 1};
+    kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
+    kernelInfo.kernel_file = "PoolingGen.cl";
+    kernelInfo.kernel_name = "mloPooling";
+    kernelInfo.kernel_type = SABER;
+
+    kernelInfo.comp_options =
+        std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(pooling_type) +
+        std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(pooling_w_w) +
+        std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(pooling_w_h) +
+        std::string(" -DMLO_POOLING_PAD0=") + std::to_string(pooling_p_w) +
+        std::string(" -DMLO_POOLING_PAD1=") + std::to_string(pooling_p_h) +
+        std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(pooling_s_w) +
+        std::string(" -DMLO_POOLING_STRIDE1=") + std::to_string(pooling_s_h) +
+        std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(out_c) +
+        std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(in_c) +
+        std::string(" -DMLO_POOLING_N_HORIZ_OUT_PIX=") + std::to_string(_out_pix_tile0) +
+        std::string(" -DMLO_POOLING_N_VERT_OUT_PIX=") + std::to_string(_out_pix_tile1) +
+        std::string(" -DMLO_POOLING_GROUP_SZ0=") + std::to_string(_grp_tile0) +
+        std::string(" -DMLO_POOLING_GROUP_SZ1=") + std::to_string(_grp_tile1) +
+        std::string(" -DMLO_POOLING_BOT_WIDTH=") + std::to_string(in_w) +
+        std::string(" -DMLO_POOLING_BOT_HEIGHT=") + std::to_string(in_h) +
+        std::string(" -DMLO_POOLING_BOT_STRIDE=") + std::to_string(in_w) +
+        std::string(" -DMLO_POOLING_BOT_CHANNEL_STRIDE=") + std::to_string(in_w * in_h) +
+        std::string(" -DMLO_POOLING_BOT_BATCH_STRIDE=") + std::to_string(in_w * in_h * in_c) +
+        std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(out_w) +
+        std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(out_h) +
+        std::string(" -DMLO_POOLING_TOP_STRIDE=") + std::to_string(out_w) +
+        std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(out_w * out_h) +
+        std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") + std::to_string(out_w * out_h * out_c) +
+        std::string(" -DBATCH_NUM=") + std::to_string(bt_size) +
+        std::string(" -DCU_NUM=64") +
+        std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias) +
+        std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive) +
+        std::string(" -DMIOPEN_USE_FP32=1");
+
+    return true;
+}
+
 void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
                   int n_wei, int in_h, int in_w, int in_c, int out_h, int out_w,
                   int out_c, int pooling_w_h, int pooling_w_w, int pooling_s_h,
@@ -401,79 +562,20 @@ void BiasReluPool(std::vector<AMDKernelPtr>& vkptr, int device_id, int bt_size,
     KernelInfo kernelInfo;
 
     if (pooling_w_h != 0 || pooling_w_w != 0) {
-        if (pooling_w_h * pooling_w_w >= 32
-                && ((pooling_w_h <= pooling_s_h && pooling_w_w <= pooling_s_w) || out_h * out_w == 1)) {
-            int output_size = bt_size * out_c * out_h * out_w;
-
-            int group_size   = 256;
-            int group_size_0 = 256;  // adder
-
-            while (group_size_0 * 8 > pooling_w_h * pooling_w_w && group_size_0 > 1) {
-                group_size_0 = group_size_0 >> 1;
-            }
-
-            int group_size_1 = group_size / group_size_0;
-
-            int global_size_0 = group_size_0;
-            int global_size_1 = (output_size + group_size_1 - 1) / group_size_1 * group_size_1;
-
-            kernelInfo.wk_dim      = 3;
-            kernelInfo.l_wk        = {group_size_0, group_size_1, 1};
-            kernelInfo.g_wk        = {global_size_0, global_size_1, 1};
-            kernelInfo.kernel_file = "PoolingGeneral.cl";
-            kernelInfo.kernel_name = "PoolingGeneral";
-            kernelInfo.kernel_type = SABER;
-
-            kernelInfo.comp_options = std::string(" -DGROUP_SIZE=") + std::to_string(group_size)
-                                      + std::string(" -DGROUP_SIZE_0=") + std::to_string(group_size_0)
-                                      + std::string(" -DGROUP_SIZE_1=") + std::to_string(group_size_1)
-                                      + std::string(" -DPOOLING_TYPE=") + std::to_string(pooling_type)
-                                      + std::string(" -DADDER=") + std::to_string(group_size_0)
-                                      + std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias)
-                                      + std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive);
+        if (tryPoolingGeneral(kernelInfo, bt_size, in_h, in_w, in_c, out_h, out_w, out_c,
+                              pooling_w_h, pooling_w_w, pooling_s_h, pooling_s_w, pooling_p_h, pooling_p_w,
+                              pooling_type, pooling_global, isBias, isActive)) {
+            ; // tryPoolingGeneral will get kernel info
+        } else if (tryPoolingWithShare(kernelInfo, bt_size, in_h, in_w, in_c, out_h, out_w, out_c,
+                                       pooling_w_h, pooling_w_w, pooling_s_h, pooling_s_w, pooling_p_h, pooling_p_w,
+                                       pooling_type, pooling_global, isBias, isActive)) {
+            ; // tryPoolingWithShare will get kernel info
+        } else if (tryPoolingGen(kernelInfo, bt_size, in_h, in_w, in_c, out_h, out_w, out_c,
+                                 pooling_w_h, pooling_w_w, pooling_s_h, pooling_s_w, pooling_p_h, pooling_p_w,
+                                 pooling_type, pooling_global, isBias, isActive)) {
+            ; // tryPoolingGen will get kernel info
         } else {
-            int _grp_tile0 = 8;
-            int _grp_tile1 = 8;
-
-            int _out_pix_tile0 = std::max(1, 8 / pooling_s_w);
-            int _out_pix_tile1 = std::max(1, 8 / pooling_s_h);
-
-            kernelInfo.wk_dim      = 3;
-            kernelInfo.l_wk        = {256, 1, 1};
-            kernelInfo.g_wk        = {64 * 64 * 40, 1, 1};
-            kernelInfo.kernel_file = "PoolingGen.cl";
-            kernelInfo.kernel_name = "mloPooling";
-            kernelInfo.kernel_type = SABER;
-
-            kernelInfo.comp_options =
-                std::string(" -DMLO_POOLING_OP_ID=") + std::to_string(pooling_type) +
-                std::string(" -DMLO_POOLING_KERNEL_SZ0=") + std::to_string(pooling_w_w) +
-                std::string(" -DMLO_POOLING_KERNEL_SZ1=") + std::to_string(pooling_w_h) +
-                std::string(" -DMLO_POOLING_PAD0=") + std::to_string(pooling_p_w) +
-                std::string(" -DMLO_POOLING_PAD1=") + std::to_string(pooling_p_h) +
-                std::string(" -DMLO_POOLING_STRIDE0=") + std::to_string(pooling_s_w) +
-                std::string(" -DMLO_POOLING_STRIDE1=") + std::to_string(pooling_s_h) +
-                std::string(" -DMLO_POOLING_N_OUTPUTS=") + std::to_string(out_c) +
-                std::string(" -DMLO_POOLING_N_CHANNELS=") + std::to_string(in_c) +
-                std::string(" -DMLO_POOLING_N_HORIZ_OUT_PIX=") + std::to_string(_out_pix_tile0) +
-                std::string(" -DMLO_POOLING_N_VERT_OUT_PIX=") + std::to_string(_out_pix_tile1) +
-                std::string(" -DMLO_POOLING_GROUP_SZ0=") + std::to_string(_grp_tile0) +
-                std::string(" -DMLO_POOLING_GROUP_SZ1=") + std::to_string(_grp_tile1) +
-                std::string(" -DMLO_POOLING_BOT_WIDTH=") + std::to_string(in_w) +
-                std::string(" -DMLO_POOLING_BOT_HEIGHT=") + std::to_string(in_h) +
-                std::string(" -DMLO_POOLING_BOT_STRIDE=") + std::to_string(in_w) +
-                std::string(" -DMLO_POOLING_BOT_CHANNEL_STRIDE=") + std::to_string(in_w * in_h) +
-                std::string(" -DMLO_POOLING_BOT_BATCH_STRIDE=") + std::to_string(in_w * in_h * in_c) +
-                std::string(" -DMLO_POOLING_TOP_WIDTH=") + std::to_string(out_w) +
-                std::string(" -DMLO_POOLING_TOP_HEIGHT=") + std::to_string(out_h) +
-                std::string(" -DMLO_POOLING_TOP_STRIDE=") + std::to_string(out_w) +
-                std::string(" -DMLO_POOLING_TOP_CHANNEL_STRIDE=") + std::to_string(out_w * out_h) +
-                std::string(" -DMLO_POOLING_TOP_BATCH_STRIDE=") + std::to_string(out_w * out_h * out_c) +
-                std::string(" -DBATCH_NUM=") + std::to_string(bt_size) +
-                std::string(" -DCU_NUM=64") +
-                std::string(" -DMLO_CONV_BIAS=") + std::to_string(isBias) +
-                std::string(" -DMLO_CONV_PRELU=") + std::to_string(isActive) +
-                std::string(" -DMIOPEN_USE_FP32=1");
+            LOG(ERROR) << " no Pooling kernel is selected.";
         }
 
         // To create the program

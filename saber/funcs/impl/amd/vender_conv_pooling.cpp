@@ -643,7 +643,9 @@ SaberStatus VenderConv2DPooling<AMD, OpDtype>::dispatch(
             }
 
             list.push_back(_kernels_ptr[i]);
-        } else if (_kernels_ptr[i].get()->GetName() == "PoolingGeneral") {
+        } else if (_kernels_ptr[i].get()->GetName() == "PoolingGeneral"
+                || _kernels_ptr[i].get()->GetName() == "PoolingWithShare") {
+
             auto kernel = _kernels_ptr[i].get();
 
             if (needBias) {

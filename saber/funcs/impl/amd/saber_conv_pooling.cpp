@@ -358,7 +358,8 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
             }
 
             list.push_back(_kernels_ptr[i]);
-        } else if (_kernels_ptr[i].get()->GetName() == "PoolingGeneral") {
+        } else if (_kernels_ptr[i].get()->GetName() == "PoolingGeneral"
+                   || _kernels_ptr[i].get()->GetName() == "PoolingWithShare") {
             if (needBias) {
                 if (isBias) {
                     if (isActive) {
