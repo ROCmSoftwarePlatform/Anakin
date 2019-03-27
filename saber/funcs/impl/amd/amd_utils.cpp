@@ -612,12 +612,12 @@ std::vector<KernelInfo> FindSolution(
 #ifdef ENABLE_AMD_EXPAND_ALL_SEARCH
         auto candidate_solutions = miopen::solver::SearchForAllSolutions <
                                    miopen::solver::ConvBinWinograd3x3U,
+                                   miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
                                    miopen::solver::ConvOclDirectFwd1x1Tensile,
                                    miopen::solver::ConvOclDirectFwd1x1AMD,
                                    miopen::solver::ConvOclDirectFwd1x1Gemm,
                                    //miopen::solver::ConvAsm3x3U,
                                    //miopen::solver::ConvAsm1x1U,
-                                   miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
                                    miopen::solver::ConvOclDirectFwdGen,
                                    miopen::solver::ConvOclDirectFwd3x3,
                                    miopen::solver::ConvOclDirectFwd1x1,
@@ -643,15 +643,10 @@ std::vector<KernelInfo> FindSolution(
         if (param.weight()->width() == 1
                 && param.weight()->height() == 1) {
             auto candidate_solutions = miopen::solver::SearchForAllSolutions <
-                                       miopen::solver::ConvBinWinograd3x3U,
                                        miopen::solver::ConvOclDirectFwd1x1Tensile,
                                        miopen::solver::ConvOclDirectFwd1x1AMD,
                                        miopen::solver::ConvOclDirectFwd1x1Gemm,
-                                       //miopen::solver::ConvAsm3x3U,
-                                       //miopen::solver::ConvAsm1x1U,
-                                       miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
                                        miopen::solver::ConvOclDirectFwdGen,
-                                       miopen::solver::ConvOclDirectFwd3x3,
                                        miopen::solver::ConvOclDirectFwd1x1,
                                        miopen::solver::ConvOclDirectFwd > (convContext, db);
             //solution = candidate_solutions[0];
@@ -672,15 +667,12 @@ std::vector<KernelInfo> FindSolution(
         } else {
             solution = miopen::solver::SearchForSolution <
                        miopen::solver::ConvBinWinograd3x3U,
+                       miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
                        miopen::solver::ConvBinWinogradRxS,
-                       miopen::solver::ConvOclDirectFwd1x1AMD,
-                       miopen::solver::ConvOclDirectFwd1x1Gemm,
                        // miopen::solver::ConvAsm3x3U,
                        // miopen::solver::ConvAsm1x1U,
-                       miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
                        miopen::solver::ConvOclDirectFwdGen,
                        miopen::solver::ConvOclDirectFwd3x3,
-                       miopen::solver::ConvOclDirectFwd1x1,
                        miopen::solver::ConvOclDirectFwd > (convContext, db);
         }
 
@@ -806,12 +798,12 @@ std::vector<KernelInfo> FindSolutionWithPooling(
 #ifdef ENABLE_AMD_EXPAND_ALL_SEARCH
         auto candidate_solutions = miopen::solver::SearchForAllSolutions <
                                    miopen::solver::ConvBinWinograd3x3U,
+                                   miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
                                    miopen::solver::ConvOclDirectFwd1x1Tensile,
                                    miopen::solver::ConvOclDirectFwd1x1AMD,
                                    miopen::solver::ConvOclDirectFwd1x1Gemm,
                                    //miopen::solver::ConvAsm3x3U,
                                    //miopen::solver::ConvAsm1x1U,
-                                   miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
                                    miopen::solver::ConvOclDirectFwdGen,
                                    miopen::solver::ConvOclDirectFwd3x3,
                                    miopen::solver::ConvOclDirectFwd1x1,
@@ -837,15 +829,10 @@ std::vector<KernelInfo> FindSolutionWithPooling(
         if (param.conv_param.weight()->width() == 1
                 && param.conv_param.weight()->height() == 1) {
             auto candidate_solutions = miopen::solver::SearchForAllSolutions <
-                                       miopen::solver::ConvBinWinograd3x3U,
                                        miopen::solver::ConvOclDirectFwd1x1Tensile,
                                        miopen::solver::ConvOclDirectFwd1x1AMD,
                                        miopen::solver::ConvOclDirectFwd1x1Gemm,
-                                       //miopen::solver::ConvAsm3x3U,
-                                       //miopen::solver::ConvAsm1x1U,
-                                       miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
                                        miopen::solver::ConvOclDirectFwdGen,
-                                       miopen::solver::ConvOclDirectFwd3x3,
                                        miopen::solver::ConvOclDirectFwd1x1,
                                        miopen::solver::ConvOclDirectFwd > (convContext, db);
             //solution = candidate_solutions[0];
@@ -866,15 +853,12 @@ std::vector<KernelInfo> FindSolutionWithPooling(
         } else {
             solution = miopen::solver::SearchForSolution <
                        miopen::solver::ConvBinWinograd3x3U,
+                       miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
                        miopen::solver::ConvBinWinogradRxS,
-                       miopen::solver::ConvOclDirectFwd1x1AMD,
-                       miopen::solver::ConvOclDirectFwd1x1Gemm,
                        // miopen::solver::ConvAsm3x3U,
                        // miopen::solver::ConvAsm1x1U,
-                       miopen::solver::ConvAsm7x7c3h224w224k64u2v2p3q3f1,
                        miopen::solver::ConvOclDirectFwdGen,
                        miopen::solver::ConvOclDirectFwd3x3,
-                       miopen::solver::ConvOclDirectFwd1x1,
                        miopen::solver::ConvOclDirectFwd > (convContext, db);
         }
 
