@@ -36,15 +36,10 @@ public:
 
     VenderFc() {
         _multikernel      = false;
-        _outGemmWorkspace = nullptr;
         _kernels_ptr.clear();
     }
 
     ~VenderFc() {
-        if (_outGemmWorkspace) {
-            delete _outGemmWorkspace;
-        }
-
         _kernels_ptr.clear();
     }
 
@@ -64,7 +59,6 @@ public:
         FcParam<AMD>& param) override;
 
 private:
-    Tensor<AMD>* _outGemmWorkspace;
     std::vector<AMDKernelPtr> _kernels_ptr;
     int _branch = 1;
     int _usemacro = 0;

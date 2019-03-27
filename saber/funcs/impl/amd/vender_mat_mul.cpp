@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -11,6 +11,29 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+*/
+/*
+     MIT License
+
+     Copyright (c) 2017 Advanced Micro Devices, Inc. All Rights Reserved.
+
+     Permission is hereby granted, free of charge, to any person obtaining a copy
+     of this software and associated documentation files (the "Software"), to deal
+     in the Software without restriction, including without limitation the rights
+     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+     copies of the Software, and to permit persons to whom the Software is
+     furnished to do so, subject to the following conditions:
+
+     The above copyright notice and this permission notice shall be included in all
+     copies or substantial portions of the Software.
+
+     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+     SOFTWARE.
 */
 #include "include/vender_mat_mul.h"
 
@@ -47,6 +70,7 @@ SaberStatus VenderMatMul<AMD, OpDtype>::create(
     size_t global_work_size;
     int errCode;
 
+    //The below section of code are as MIT license, the permission notice is from above (line 74 to 94)
     int M       = param._m;
     int N       = param._n;
     int K       = param._k;
@@ -68,9 +92,6 @@ SaberStatus VenderMatMul<AMD, OpDtype>::create(
     bool miopengemm_verbose = false;
     // jn : print warning messages when the returned kernel(s) might be sub-optimal
     bool miopengemm_warnings = false;
-
-    _outGemmWorkspace = new Tensor<AMD>();
-    _outGemmWorkspace->re_alloc(outputs[0]->shape());
 
     if (!param._is_transpose_X && !param._is_transpose_Y) {
         tA  = false;
@@ -113,7 +134,7 @@ SaberStatus VenderMatMul<AMD, OpDtype>::create(
                                     cm,
                                     (PtrDtype)(X),
                                     (PtrDtype)(Y),
-                                    (PtrDtype)(_outGemmWorkspace->mutable_data()),
+                                    (PtrDtype)(outputs[0]->mutable_data()),
                                     false,
                                     tgg,
                                     miopengemm_verbose,
@@ -251,12 +272,13 @@ SaberStatus VenderMatMul<AMD, OpDtype>::dispatch(
         }
 
         list.push_back(_kernels_ptr[j]);
-        err = LaunchKernel(cm, list);
+    }
 
-        if (!err) {
-            LOG(ERROR) << "Fail to set execution :" << err;
-            return SaberInvalidValue;
-        }
+    err = LaunchKernel(cm, list);
+
+    if (!err) {
+        LOG(ERROR) << "Fail to set execution :" << err;
+        return SaberInvalidValue;
     }
 
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE EXECUTION";

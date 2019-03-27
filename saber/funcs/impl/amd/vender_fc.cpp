@@ -14,19 +14,19 @@
 */
 /*
    MIT License
-   
-   Copyright (c) 2017 Advanced Micro Devices, Inc. All Rights Reserved. 
-   
+
+   Copyright (c) 2017 Advanced Micro Devices, Inc. All Rights Reserved.
+
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
    in the Software without restriction, including without limitation the rights
    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
    copies of the Software, and to permit persons to whom the Software is
    furnished to do so, subject to the following conditions:
-   
+
    The above copyright notice and this permission notice shall be included in all
    copies or substantial portions of the Software.
-   
+
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -140,6 +140,12 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
     std::vector<Tensor<AMD>*>& outputs,
     FcParam<AMD>& param,
     Context<AMD>& ctx) {
+
+    bool is_weights_trans = param.is_transpose_weights;
+
+    if (param.num_output == param.weights->width()) {
+        is_weights_trans = true;
+    }
 
     this->_ctx   = &ctx;
     this->_param = &param;
@@ -335,7 +341,7 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
         _branch = 0;
     }
 
-    if (!param.is_transpose_weights) {
+    if (!is_weights_trans) {
         if (_branch) {
             if (batch_size_index == BATCH_SIZE_GE_INDEX) {
                 kernelInfo.l_wk        = {64, 1, 1};
@@ -365,9 +371,7 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
                 }
             }
         } else { // gemm
-            _outGemmWorkspace = new Tensor<AMD>();
-            _outGemmWorkspace->re_alloc(outputs[0]->shape());
-            //The below section of code are as MIT license, the permission notice is from above (line 16 to 36)
+            //The below section of code are as MIT license, the permission notice is from above (line 375 to 407)
             float alpha = 1.0;
             float beta  = 0.0;
             bool transA     = false;
@@ -396,7 +400,7 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
                                             cm,
                                             (PtrDtype)inputs[0]->data(),
                                             (PtrDtype)param.weights->data(),
-                                            (PtrDtype)_outGemmWorkspace->mutable_data(),
+                                            (PtrDtype)outputs[0]->mutable_data(),
                                             false,
                                             tgg,
                                             miopengemm_verbose,
@@ -460,19 +464,17 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
         }
     } else {
         LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "Transpose Weights!";
-        //The below section of code are as MIT license, the permission notice is from above (line 16 to 36)
+        //The below section of code are as MIT license, the permission notice is from above (line 471 to 503)
         // gemm
         _branch          = 0;
-        _outGemmWorkspace = new Tensor<AMD>();
-        _outGemmWorkspace->re_alloc(outputs[0]->shape());
 
         float alpha = 1.0;
         float beta  = 0.0;
         bool transA     = false;
-        bool transB     = false;
+        bool transB     = true;
         bool transC     = false;
         int leadingd_A     = K;
-        int leadingd_B     = N;
+        int leadingd_B     = K;
         int leadingd_C     = N;
 
         MIOpenGEMM::Geometry tgg {};
@@ -494,7 +496,7 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
                                         cm,
                                         (PtrDtype)inputs[0]->data(),
                                         (PtrDtype)param.weights->data(),
-                                        (PtrDtype)_outGemmWorkspace->mutable_data(),
+                                        (PtrDtype)outputs[0]->mutable_data(),
                                         false,
                                         tgg,
                                         miopengemm_verbose,
