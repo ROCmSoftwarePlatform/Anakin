@@ -670,7 +670,8 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
 #ifdef BIAS
     __global const float* bias,
 #endif
-    __global float* c) {
+    __global float* c,
+    __global float* gAtomicLock) {
     uint lid_x = get_local_id(0);
     uint grid_x = get_group_id(0);
     uint col_id = grid_x / ATOMIC;
@@ -681,7 +682,7 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
     __global const float* pB;
     __global float* pC;
 
-    volatile __global uint* pCounter = (volatile __global uint*)(c + OUTPUT * N);
+    volatile __global uint* pCounter = (volatile __global uint*)(gAtomicLock);
 
     uint wave_stride = ITER * WORKLOAD / (WORKLOAD >> 6);
     uint offset = (grid_x >> 2 << 6) % wave_stride;
@@ -1512,7 +1513,9 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
 #ifdef BIAS
     __global const float* bias,
 #endif
-    __global float* c, uint N, uint WIDTH, uint OUTPUT) {
+    __global float* c,
+    __global float* gAtomicLock,
+    uint N, uint WIDTH, uint OUTPUT) {
     uint lid_x = get_local_id(0);
     uint grid_x = get_group_id(0);
     uint col_id = grid_x / ATOMIC;
@@ -1523,7 +1526,7 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
     __global const float* pB;
     __global float* pC;
 
-    volatile __global uint* pCounter = (volatile __global uint*)(c + OUTPUT * N);
+    volatile __global uint* pCounter = (volatile __global uint*)(gAtomicLock);
 
     uint wave_stride = ITER * WORKLOAD / (WORKLOAD >> 6);
     uint offset = (grid_x >> 2 << 6) % wave_stride;
@@ -1552,12 +1555,15 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
 
             for (uint i = 0; i < ITER; i++, offset = (offset + 64) % wave_stride) {
                 //result[n % 2][lid_x + (lid_x >> 5)] = (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ? a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH] : 0.0f);
-                result[n % 2][lid_x + (lid_x >> 5)] = a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH];
+                if ((offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH < N * WIDTH) &&
+                        (col_id * WIDTH + offset + wave_id * wave_stride + (lid_x & 63)) < WIDTH * OUTPUT) {
+                    result[n % 2][lid_x + (lid_x >> 5)] = a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH];
 
-                pB = (__global const float*)(b + col_id * WIDTH + offset + wave_id * wave_stride + (lid_x & 63));
+                    pB = (__global const float*)(b + col_id * WIDTH + offset + wave_id * wave_stride + (lid_x & 63));
 
-                sum += (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ?
-                        result[n % 2][lid_x + (lid_x >> 5)] * pB[0] : 0.0f);
+                    sum += (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ?
+                            result[n % 2][lid_x + (lid_x >> 5)] * pB[0] : 0.0f);
+                }
             }
 
             result[n % 2][lid_x + (lid_x >> 5)] = sum;
@@ -1614,7 +1620,6 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
                 }
 
                 barrier(CLK_LOCAL_MEM_FENCE);
-
 
                 if (lid_x == 0) {
                     do {
