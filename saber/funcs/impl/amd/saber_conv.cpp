@@ -82,6 +82,14 @@ SaberStatus SaberConv2D<AMD, OpDtype>::create(
         for (auto s : solution) {
             if (s.kernel_name == "conv1x1_act"
                     || s.kernel_name == "InnerProduct") {
+                if (s.kernel_name == "conv1x1_act") {
+                    if (_conv1x1_act_lock == nullptr) {
+                        _conv1x1_act_lock = new Tensor<AMD>();
+                    }
+
+                    _conv1x1_act_lock->re_alloc(Shape({outputs[0]->count(1, 4)}, Layout_W), AK_FLOAT);
+                }
+
                 CreateKernelList(inputs[0]->device_id(), s);
             } else {
                 _use_vender = true;
@@ -189,12 +197,14 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                               (PtrDtype)param.weight()->data(),
                               (PtrDtype)inputs[0]->data(),
                               (PtrDtype)param.bias()->data(),
+                              (PtrDtype)_conv1x1_act_lock->mutable_data(),
                               (PtrDtype)outputs[0]->mutable_data(),
                               negative_slope);
                 } else {
                     err = _kernels_ptr[i].get()->SetKernelArgs(
                               (PtrDtype)param.weight()->data(),
                               (PtrDtype)inputs[0]->data(),
+                              (PtrDtype)_conv1x1_act_lock->mutable_data(),
                               (PtrDtype)outputs[0]->mutable_data(),
                               negative_slope);
                 }
@@ -204,6 +214,7 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                               (PtrDtype)param.weight()->data(),
                               (PtrDtype)inputs[0]->data(),
                               (PtrDtype)param.bias()->data(),
+                              (PtrDtype)_conv1x1_act_lock->mutable_data(),
                               (PtrDtype)outputs[0]->mutable_data(),
                               negative_slope,
                               (unsigned int)inputs[0]->channel(),
@@ -214,6 +225,7 @@ SaberStatus SaberConv2D<AMD, OpDtype>::dispatch(
                     err = _kernels_ptr[i].get()->SetKernelArgs(
                               (PtrDtype)param.weight()->data(),
                               (PtrDtype)inputs[0]->data(),
+                              (PtrDtype)_conv1x1_act_lock->mutable_data(),
                               (PtrDtype)outputs[0]->mutable_data(),
                               negative_slope,
                               (unsigned int)inputs[0]->channel(),

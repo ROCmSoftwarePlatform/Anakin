@@ -64,6 +64,14 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::create(
                     || s.kernel_name == "mloPooling"
                     || s.kernel_name == "PoolingGeneral"
                     || s.kernel_name == "PoolingWithShare") {
+                if (s.kernel_name == "conv1x1_act") {
+                    if (_conv1x1_act_lock == nullptr) {
+                        _conv1x1_act_lock = new Tensor<AMD>();
+                    }
+
+                    _conv1x1_act_lock->re_alloc(Shape({outputs[0]->count(1, 4)}, Layout_W), AK_FLOAT);
+                }
+
                 CreateKernelList(inputs[0]->device_id(), s);
             } else {
                 _use_vender = true;
@@ -227,6 +235,7 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
                           (PtrDtype)param.conv_param.weight()->data(),
                           (PtrDtype)inputs[0]->data(),
                           (PtrDtype)param.conv_param.bias()->data(),
+                          (PtrDtype)_conv1x1_act_lock->mutable_data(),
                           (PtrDtype)_outConvRelu->mutable_data(),
                           negative_slope,
                           (unsigned int)inputs[0]->channel(),
@@ -237,6 +246,7 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::dispatch(
                 err = _kernels_ptr[i].get()->SetKernelArgs(
                           (PtrDtype)param.conv_param.weight()->data(),
                           (PtrDtype)inputs[0]->data(),
+                          (PtrDtype)_conv1x1_act_lock->mutable_data(),
                           (PtrDtype)_outConvRelu->mutable_data(),
                           negative_slope,
                           (unsigned int)inputs[0]->channel(),

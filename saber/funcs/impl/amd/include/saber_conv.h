@@ -34,11 +34,18 @@ public:
 
     SaberConv2D() {
         _kernels_ptr.clear();
+        _conv1x1_act_lock = nullptr;
     }
 
     ~SaberConv2D() {
         if (_impl != nullptr) {
             delete _impl;
+            _impl = nullptr;
+        }
+
+        if (_conv1x1_act_lock != nullptr) {
+            delete _conv1x1_act_lock;
+            _conv1x1_act_lock = nullptr;
         }
 
         _kernels_ptr.clear();
@@ -76,6 +83,7 @@ public:
 
 private:
     Impl_t* _impl {nullptr};
+    Tensor<AMD>* _conv1x1_act_lock {nullptr};
     bool _use_vender {false};
     bool _usemacro {false};
     bool _in_place {false};

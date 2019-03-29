@@ -40,6 +40,7 @@ public:
         _kernels_ptr.clear();
         _impl = nullptr;
         _outConvRelu = nullptr;
+        _conv1x1_act_lock = nullptr;
     }
     ~SaberConv2DPooling() {
         if (_impl != nullptr) {
@@ -50,6 +51,11 @@ public:
 
         if (_outConvRelu) {
             delete _outConvRelu;
+        }
+
+        if (_conv1x1_act_lock != nullptr) {
+            delete _conv1x1_act_lock;
+            _conv1x1_act_lock = nullptr;
         }
     }
 
@@ -90,6 +96,7 @@ private:
     CreateKernelList(int device_id, KernelInfo& kernelInfo);
     std::vector<AMDKernelPtr> _kernels_ptr {nullptr};
     Tensor<AMD>* _outConvRelu;
+    Tensor<AMD>* _conv1x1_act_lock {nullptr};
 };
 } // namespace saber
 } // namespace anakin
