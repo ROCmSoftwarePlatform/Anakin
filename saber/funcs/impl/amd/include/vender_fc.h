@@ -36,10 +36,15 @@ public:
 
     VenderFc() {
         _multikernel      = false;
+        _pCounterForConv1x1FC = nullptr;
         _kernels_ptr.clear();
     }
 
     ~VenderFc() {
+        if (_pCounterForConv1x1FC) {
+            delete _pCounterForConv1x1FC;
+        }
+
         _kernels_ptr.clear();
     }
 
@@ -59,6 +64,7 @@ public:
         FcParam<AMD>& param) override;
 
 private:
+    Tensor<AMD>* _pCounterForConv1x1FC {nullptr};
     std::vector<AMDKernelPtr> _kernels_ptr;
     int _branch = 1;
     int _usemacro = 0;

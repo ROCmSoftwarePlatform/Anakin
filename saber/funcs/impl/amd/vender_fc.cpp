@@ -592,6 +592,11 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
             return SaberInvalidValue;
         }
 
+        atomic = (atomic == 0) ? 32 : atomic;
+        Shape pCounterShape({1, (kernelInfo.g_wk[0] / kernelInfo.l_wk[0] / atomic) + M * N, 1, 1},
+                            Layout_NCHW);
+        _pCounterForConv1x1FC = new Tensor<AMD>();
+        _pCounterForConv1x1FC->re_alloc(pCounterShape);
         _kernels_ptr.push_back(kptr);
     } else {
         if (param.bias != nullptr && param.bias->valid_size() > 0) {
@@ -646,7 +651,7 @@ SaberStatus VenderFc<AMD, OpDtype>::dispatch(
         AMD_API::stream_t cm = this->_ctx->get_compute_stream();
 
         // To set the argument
-        PtrDtype memObjects[4] = {0, 0, 0, 0};
+        PtrDtype memObjects[5] = {0, 0, 0, 0, 0};
         cl_event event;
 
         if (_branch) {
@@ -654,9 +659,9 @@ SaberStatus VenderFc<AMD, OpDtype>::dispatch(
             memObjects[1] = (PtrDtype)param.weights->data();
             memObjects[2] = (param.bias != nullptr) ? (PtrDtype)param.bias->data() : nullptr;
             memObjects[3] = (PtrDtype)outputs[0]->mutable_data();
+            memObjects[4] = (PtrDtype)_pCounterForConv1x1FC->mutable_data();
 
             if (_kernels_ptr[0] == NULL || _kernels_ptr[0].get() == NULL) {
-                LOG(ERROR) << "Kernel is not exist";
                 return SaberInvalidValue;
             }
 
@@ -668,15 +673,28 @@ SaberStatus VenderFc<AMD, OpDtype>::dispatch(
                               (PtrDtype)memObjects[2],
                               (PtrDtype)memObjects[3]);
                 } else {
-                    err = _kernels_ptr[0].get()->SetKernelArgs(
-                              (PtrDtype)memObjects[0],
-                              (PtrDtype)memObjects[1],
-                              (PtrDtype)memObjects[2],
-                              (PtrDtype)memObjects[3],
-                              inputs[0]->num(),
-                              param.weights->width(),
-                              outputs[0]->channel()
-                          );
+                    if (_branch == 10) {
+                        err = _kernels_ptr[0].get()->SetKernelArgs(
+                                  (PtrDtype)memObjects[0],
+                                  (PtrDtype)memObjects[1],
+                                  (PtrDtype)memObjects[2],
+                                  (PtrDtype)memObjects[3],
+                                  (PtrDtype)memObjects[4],
+                                  inputs[0]->num(),
+                                  param.weights->width(),
+                                  outputs[0]->channel()
+                              );
+                    } else {
+                        err = _kernels_ptr[0].get()->SetKernelArgs(
+                                  (PtrDtype)memObjects[0],
+                                  (PtrDtype)memObjects[1],
+                                  (PtrDtype)memObjects[2],
+                                  (PtrDtype)memObjects[3],
+                                  inputs[0]->num(),
+                                  param.weights->width(),
+                                  outputs[0]->channel()
+                              );
+                    }
                 }
             } else {
                 if (_usemacro) {
@@ -685,14 +703,26 @@ SaberStatus VenderFc<AMD, OpDtype>::dispatch(
                               (PtrDtype)memObjects[1],
                               (PtrDtype)memObjects[3]);
                 } else {
-                    err = _kernels_ptr[0].get()->SetKernelArgs(
-                              (PtrDtype)memObjects[0],
-                              (PtrDtype)memObjects[1],
-                              (PtrDtype)memObjects[3],
-                              inputs[0]->num(),
-                              param.weights->width(),
-                              outputs[0]->channel()
-                          );
+                    if (_branch == 10) {
+                        err = _kernels_ptr[0].get()->SetKernelArgs(
+                                  (PtrDtype)memObjects[0],
+                                  (PtrDtype)memObjects[1],
+                                  (PtrDtype)memObjects[3],
+                                  (PtrDtype)memObjects[4],
+                                  inputs[0]->num(),
+                                  param.weights->width(),
+                                  outputs[0]->channel()
+                              );
+                    } else {
+                        err = _kernels_ptr[0].get()->SetKernelArgs(
+                                  (PtrDtype)memObjects[0],
+                                  (PtrDtype)memObjects[1],
+                                  (PtrDtype)memObjects[3],
+                                  inputs[0]->num(),
+                                  param.weights->width(),
+                                  outputs[0]->channel()
+                              );
+                    }
                 }
             }
 
