@@ -147,13 +147,16 @@ SaberStatus VenderDeformableConv2D<AMD, OpDtype>::create(
             // jn : print warning messages when the returned kernel(s) might be sub-optimal
             bool miopengemm_warnings = false;
 
+            Tensor<AMD> _outGemmWorkspace;
+            _outGemmWorkspace.reshape(outputs[0]->shape());
+
             // jn : find with no workspace
             MIOpenGEMM::Solution soln = MIOpenGEMM::find(
                                             0.003f,
                                             cm,
                                             (cl_mem)(_deform_col_buffer.data()),
                                             (cl_mem)param.weight()->data(),
-                                            (cl_mem)(outputs[0]->mutable_data()),
+                                            (cl_mem)(_outGemmWorkspace.mutable_data()),
                                             false,
                                             tgg,
                                             miopengemm_verbose,

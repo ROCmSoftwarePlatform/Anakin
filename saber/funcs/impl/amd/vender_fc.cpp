@@ -394,13 +394,15 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
             // jn : print warning messages when the returned kernel(s) might be sub-optimal
             bool miopengemm_warnings = false;
 
+            Tensor<AMD> _outGemmWorkspace;
+            _outGemmWorkspace.reshape(outputs[0]->shape());
             // jn : find with no workspace
             MIOpenGEMM::Solution soln = MIOpenGEMM::find(
                                             0.003f,
                                             cm,
                                             (PtrDtype)inputs[0]->data(),
                                             (PtrDtype)param.weights->data(),
-                                            (PtrDtype)outputs[0]->mutable_data(),
+                                            (PtrDtype)_outGemmWorkspace.mutable_data(),
                                             false,
                                             tgg,
                                             miopengemm_verbose,
@@ -490,13 +492,15 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
         // jn : print warning messages when the returned kernel(s) might be sub-optimal
         bool miopengemm_warnings = false;
 
+        Tensor<AMD> _outGemmWorkspace;
+        _outGemmWorkspace.reshape(outputs[0]->shape());
         // jn : find with no workspace
         MIOpenGEMM::Solution soln = MIOpenGEMM::find(
                                         0.003f,
                                         cm,
                                         (PtrDtype)inputs[0]->data(),
                                         (PtrDtype)param.weights->data(),
-                                        (PtrDtype)outputs[0]->mutable_data(),
+                                        (PtrDtype)_outGemmWorkspace.mutable_data(),
                                         false,
                                         tgg,
                                         miopengemm_verbose,

@@ -127,6 +127,8 @@ SaberStatus VenderMatMul<AMD, OpDtype>::create(
         tgg = MIOpenGEMM::Geometry(false, tA, tB, tC, lda, ldb, ldc, M, N, K, 0, 'f');
     }
 
+    Tensor<AMD> _outGemmWorkspace;
+    _outGemmWorkspace.reshape(outputs[0]->shape());
     // gemm kernel
     // jn : find with no workspace
     MIOpenGEMM::Solution soln = MIOpenGEMM::find(
@@ -134,7 +136,7 @@ SaberStatus VenderMatMul<AMD, OpDtype>::create(
                                     cm,
                                     (PtrDtype)(X),
                                     (PtrDtype)(Y),
-                                    (PtrDtype)(outputs[0]->mutable_data()),
+                                    (PtrDtype)(_outGemmWorkspace.mutable_data()),
                                     false,
                                     tgg,
                                     miopengemm_verbose,
