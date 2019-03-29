@@ -61,7 +61,9 @@ SaberStatus SaberConv2DPooling<AMD, AK_FLOAT>::create(
         for (auto s : solution) {
             if (s.kernel_name == "conv1x1_act_pool"
                     || s.kernel_name == "conv1x1_act"
-                    || s.kernel_name == "mloPooling") {
+                    || s.kernel_name == "mloPooling"
+                    || s.kernel_name == "PoolingGeneral"
+                    || s.kernel_name == "PoolingWithShare") {
                 CreateKernelList(inputs[0]->device_id(), s);
             } else {
                 _use_vender = true;
