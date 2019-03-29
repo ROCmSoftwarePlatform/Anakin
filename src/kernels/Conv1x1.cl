@@ -159,6 +159,7 @@ __kernel void conv1x1_act(
 #if BIAS == 1
     __constant float* bias,
 #endif
+    __global float* lock,
     __global float* out,
     float slope) {
     uint lid_x = get_local_id(0);
@@ -182,10 +183,10 @@ __kernel void conv1x1_act(
                            (WEI_ROW_START + OUT_WI_ROW_START) * STRIDE_IN);
 
 #if ATOMIC == 1
-    __global uint* pBarrier = (__global uint*)(out + OUT_BATCH_STRIDE * N);
-    __global uint* pCounter = (__global uint*)(out + OUT_BATCH_STRIDE * N + COUNTER_STRIDE);
+    __global uint* pBarrier = (__global uint*)(lock);
+    __global uint* pCounter = (__global uint*)(lock + COUNTER_STRIDE);
 #elif ATOMIC == 2
-    volatile __global uint* pCounter = (volatile __global uint*)(out + OUT_BATCH_STRIDE * N);
+    volatile __global uint* pCounter = (volatile __global uint*)(lock);
 #endif
 
 #if BIAS == 1
@@ -1120,6 +1121,7 @@ __kernel void conv1x1_act(
 #if BIAS == 1
     __constant float* bias,
 #endif
+    __global float* lock,
     __global float* out,
     float slope) {
     uint lid_x = get_local_id(0);
@@ -1143,7 +1145,7 @@ __kernel void conv1x1_act(
                            (WEI_ROW_START + OUT_WI_ROW_START) * STRIDE_IN);//
 
 #if ATOMIC == 2
-    volatile __global uint* pCounter = (volatile __global uint*)(out + OUT_BATCH_STRIDE * N);//
+    volatile __global uint* pCounter = (volatile __global uint*)(lock);//
 #endif
 
 #if BIAS == 1
@@ -1603,6 +1605,7 @@ __kernel void conv1x1_act(
 #if BIAS == 1
     __constant float* bias,
 #endif
+    __global float* lock,
     __global float* out,
     float slope, uint C, uint H, uint W, uint K) {
     uint lid_x = get_local_id(0);
@@ -1626,10 +1629,10 @@ __kernel void conv1x1_act(
                            (WEI_ROW_START + OUT_WI_ROW_START) * STRIDE_IN);//
 
 #if ATOMIC == 1
-    __global uint* pBarrier = (__global uint*)(out + OUT_BATCH_STRIDE * N);//
-    __global uint* pCounter = (__global uint*)(out + OUT_BATCH_STRIDE * N + COUNTER_STRIDE);//
+    __global uint* pBarrier = (__global uint*)(lock);//
+    __global uint* pCounter = (__global uint*)(lock + COUNTER_STRIDE);//
 #elif ATOMIC == 2
-    volatile __global uint* pCounter = (volatile __global uint*)(out + OUT_BATCH_STRIDE * N);//
+    volatile __global uint* pCounter = (volatile __global uint*)(lock);//
 #endif
 
 #if BIAS == 1
@@ -2567,6 +2570,7 @@ __kernel void conv1x1_act(
 #if BIAS == 1
     __constant float* bias,
 #endif
+    __global float* lock,
     __global float* out,
     float slope, uint C, uint H, uint W, uint K) {
     uint lid_x = get_local_id(0);
@@ -2590,7 +2594,7 @@ __kernel void conv1x1_act(
                            (WEI_ROW_START + OUT_WI_ROW_START) * STRIDE_IN);//
 
 #if ATOMIC == 2
-    volatile __global uint* pCounter = (volatile __global uint*)(out + OUT_BATCH_STRIDE * N);//
+    volatile __global uint* pCounter = (volatile __global uint*)(lock);//
 #endif
 
 #if BIAS == 1
