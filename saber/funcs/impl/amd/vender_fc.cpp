@@ -597,7 +597,7 @@ SaberStatus VenderFc<AMD, OpDtype>::create(
         }
 
         atomic = (atomic == 0) ? 32 : atomic;
-        Shape pCounterShape({1, (kernelInfo.g_wk[0] / kernelInfo.l_wk[0] / atomic) + M * N, 1, 1},
+        Shape pCounterShape({1, M * 64 / atomic, 1, 1},
                             Layout_NCHW);
         _pCounterForConv1x1FC = new Tensor<AMD>();
         _pCounterForConv1x1FC->re_alloc(pCounterShape);
