@@ -663,7 +663,7 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
 #define OUTPUT 21841
 #endif
 
-
+#define COUNTER_STRIDE  (64 / ATOMIC)
 
 __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProduct(
     __global const float* a, __global const float* b,
@@ -697,7 +697,7 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
     if (grid_x % ATOMIC == 0) {
         for (uint n = 0; n < N; n++)
             if (lid_x == 0) {
-                *(pCounter + col_id + n * OUTPUT) = 0;
+                *(pCounter + col_id + n * COUNTER_STRIDE) = 0;
             }
     }
 
@@ -753,6 +753,8 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
                 result[n % 2][lid_x] += result[n % 2][lid_x + 1];
             }
 
+            barrier(CLK_LOCAL_MEM_FENCE);
+
             if (grid_x % ATOMIC == 0) {
 #ifdef BIAS
                 pC[n * OUTPUT] = bias[col_id] + result[n % 2][0];
@@ -763,12 +765,13 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
                 barrier(CLK_GLOBAL_MEM_FENCE);
 
                 if (lid_x == 0) {
-                    atomic_inc(pCounter + col_id + n * OUTPUT);
+                    atomic_inc(pCounter + col_id + n * COUNTER_STRIDE);
                 }
             } else {
                 if (lid_x == 0) {
                     do {
-                    } while (atomic_cmpxchg((volatile __global uint*)(pCounter + col_id + n * OUTPUT), 1, 1) == 0);
+                    } while (atomic_cmpxchg((volatile __global uint*)(pCounter + col_id + n * COUNTER_STRIDE), 1,
+                                            1) == 0);
                 }
 
                 barrier(CLK_LOCAL_MEM_FENCE);
@@ -1507,6 +1510,7 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
 #define WORKLOAD    (LOCAL_SIZE * ATOMIC)
 #define ITER ((WIDTH + WORKLOAD - 1) / WORKLOAD)
 
+#define COUNTER_STRIDE  (64 / ATOMIC)
 
 __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProduct(
     __global const float* a, __global const float* b,
@@ -1541,7 +1545,7 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
     if (grid_x % ATOMIC == 0) {
         for (uint n = 0; n < N; n++) {
             if (lid_x == 0) {
-                *(pCounter + col_id + n * OUTPUT) = 0;
+                *(pCounter + col_id + n * COUNTER_STRIDE) = 0;
             }
         }
     }
@@ -1601,6 +1605,8 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
                 result[n % 2][lid_x] += result[n % 2][lid_x + 1];
             }
 
+            barrier(CLK_LOCAL_MEM_FENCE);
+
             if (grid_x % ATOMIC == 0) {
 #ifdef BIAS
                 pC[n * OUTPUT] = bias[col_id] + result[n % 2][0];
@@ -1611,12 +1617,13 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
                 barrier(CLK_GLOBAL_MEM_FENCE);
 
                 if (lid_x == 0) {
-                    atomic_inc(pCounter + col_id + n * OUTPUT);
+                    atomic_inc(pCounter + col_id + n * COUNTER_STRIDE);
                 }
             } else {
                 if (lid_x == 0) {
                     do {
-                    } while (atomic_cmpxchg((volatile __global uint*)(pCounter + col_id + n * OUTPUT), 1, 1) == 0);
+                    } while (atomic_cmpxchg((volatile __global uint*)(pCounter + col_id + n * COUNTER_STRIDE), 1,
+                                            1) == 0);
                 }
 
                 barrier(CLK_LOCAL_MEM_FENCE);
