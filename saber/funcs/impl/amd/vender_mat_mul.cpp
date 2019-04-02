@@ -65,6 +65,7 @@ SaberStatus VenderMatMul<AMD, OpDtype>::create(
     KernelInfo kernelInfo;
     AMDKernelPtr kptr;
     _kernels_ptr.clear();
+
     std::string kernel_clstring;
     size_t local_work_size;
     size_t global_work_size;
@@ -74,11 +75,13 @@ SaberStatus VenderMatMul<AMD, OpDtype>::create(
     int M       = param._m;
     int N       = param._n;
     int K       = param._k;
+
     float alpha = 1.0;
     float beta  = 0.0;
     bool tA     = false;
     bool tB     = false;
     bool tC     = false;
+
     int lda     = 0;
     int ldb     = 0;
     int ldc     = 0;
@@ -154,8 +157,8 @@ SaberStatus VenderMatMul<AMD, OpDtype>::create(
         kernelInfo.kernel_name = soln.v_tgks[i].fname;
         local_work_size        = soln.v_tgks[i].local_work_size;
         global_work_size       = soln.v_tgks[i].global_work_size;
-
         kernelInfo.kernel_file = kernel_clstring;
+
         kernelInfo.l_wk        = {local_work_size, 1, 1};
         kernelInfo.g_wk        = {global_work_size, 1, 1};
         kernelInfo.kernel_type = SOURCE;
@@ -206,7 +209,6 @@ SaberStatus VenderMatMul<AMD, OpDtype>::dispatch(
     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
 
     bool err = false;
-    amd_kernel_list list;
     // To set the argument
     PtrDtype memObjects[3]   = {0, 0, 0};
     cl_float floatObjects[2] = {1.0f, 0.0f};
@@ -224,6 +226,8 @@ SaberStatus VenderMatMul<AMD, OpDtype>::dispatch(
                                          << " N=" << N << " K=" << K << " batch=" << param._b;
 
     for (int b = 0; b < param._b; b++) {
+        amd_kernel_list list;
+
         memObjects[0]    = (PtrDtype)(inputs[0]->data());
         memObjects[1]    = (PtrDtype)(inputs[1]->data());
         memObjects[2]    = (PtrDtype)(outputs[0]->mutable_data());
@@ -238,8 +242,7 @@ SaberStatus VenderMatMul<AMD, OpDtype>::dispatch(
         }
 
         if (_multikernel) {
-            err = _kernels_ptr[j].get()->SetKernelArgs(
-                      memObjects[2], offsetObjects[2], floatObjects[1]);
+            err = _kernels_ptr[j].get()->SetKernelArgs(memObjects[2], offsetObjects[2], floatObjects[1]);
 
             if (!err) {
                 LOG(ERROR) << "Fail to set kernel args :" << err;
@@ -249,21 +252,15 @@ SaberStatus VenderMatMul<AMD, OpDtype>::dispatch(
             list.push_back(_kernels_ptr[j++]);
 
             err = _kernels_ptr[j].get()->SetKernelArgs(
-                      memObjects[0],
-                      offsetObjects[0],
-                      memObjects[1],
-                      offsetObjects[1],
-                      memObjects[2],
-                      offsetObjects[2],
+                      memObjects[0], offsetObjects[0],
+                      memObjects[1], offsetObjects[1],
+                      memObjects[2], offsetObjects[2],
                       floatObjects[0]);
         } else {
             err = _kernels_ptr[j].get()->SetKernelArgs(
-                      memObjects[0],
-                      offsetObjects[0],
-                      memObjects[1],
-                      offsetObjects[1],
-                      memObjects[2],
-                      offsetObjects[2],
+                      memObjects[0], offsetObjects[0],
+                      memObjects[1], offsetObjects[1],
+                      memObjects[2], offsetObjects[2],
                       floatObjects[0],
                       floatObjects[1]);
         }
@@ -274,13 +271,13 @@ SaberStatus VenderMatMul<AMD, OpDtype>::dispatch(
         }
 
         list.push_back(_kernels_ptr[j]);
-    }
 
-    err = LaunchKernel(cm, list);
+        err = LaunchKernel(cm, list);
 
-    if (!err) {
-        LOG(ERROR) << "Fail to set execution :" << err;
-        return SaberInvalidValue;
+        if (!err) {
+            LOG(ERROR) << "Fail to set execution :" << err;
+            return SaberInvalidValue;
+        }
     }
 
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "COMPLETE EXECUTION";
