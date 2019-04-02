@@ -96,9 +96,6 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::create(
     _kernels.clear();
     KernelInfo kernelInfo;
 
-    // To set local work size
-    kernelInfo.wk_dim = 3;
-    kernelInfo.l_wk   = {256, 1, 1};
     int count;
     int grid_size;
 
@@ -116,8 +113,23 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::create(
         grid_size = inputs[0]->channel() * inputs[0]->height() * inputs[0]->width();
     }
 
-    //The below section of code are as MIT license, the permission notice is from above (line 132 to 161)
-    int num_batch = count < 256 ? nextPow2(256 / count) : 1;
+    //The below section of code are as MIT license, the permission notice is from above (line 131 to 170)
+    // To set local work size
+    int local_work_size;
+    kernelInfo.kernel_file = "MIOpenSoftmax.cl";
+
+    if (count < 16128) {
+        local_work_size = 256;
+        kernelInfo.kernel_name = "SoftmaxForward_Fast";
+    } else {
+        local_work_size = 512;
+        kernelInfo.kernel_name = "SoftmaxForward";
+    }
+
+    kernelInfo.wk_dim = 3;
+    kernelInfo.l_wk   = {local_work_size, 1, 1};
+
+    int num_batch = count < local_work_size ? nextPow2(local_work_size / count) : 1;
 
     // To set comp_options
     kernelInfo.comp_options = std::string(" -DMIOPEN_USE_FP32=1")
@@ -133,7 +145,7 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::create(
     } else { // CSR-Stream like approach
 
         // num_threads iterating over channels for one spatial_dim
-        int batch_size = 256 / num_batch;
+        int batch_size = local_work_size / num_batch;
         // num_channels each threads iterates over to cover all the channels
         int u_batch_size = count > batch_size ? nextPow2(count / batch_size) : 1;
 
@@ -145,8 +157,6 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::create(
                                    + " -DU_BATCH_SIZE=" + std::to_string(u_batch_size);
     }
 
-    kernelInfo.kernel_file = "MIOpenSoftmax.cl";
-    kernelInfo.kernel_name = "SoftmaxForward";
     kernelInfo.kernel_type = MIOPEN;
     CreateKernelList(inputs[0]->device_id(), kernelInfo);
 
