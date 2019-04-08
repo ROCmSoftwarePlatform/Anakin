@@ -42,7 +42,7 @@ namespace solver {
 std::string changeTensileKernelName(int width, int height, int batch, int stride, int c, int k,
                                     int bias, int relu) {
     std::ostringstream newName;
-    newName << TENSILE_KERNEL_DIR << "/ConvFwd1x1_" << width << "x" << height << "x" << c << "x" << k <<
+    newName << "./kernel" << "/ConvFwd1x1_" << width << "x" << height << "x" << c << "x" << k <<
             "x" << batch << "_" << bias << "_" << relu << "_" << stride << ".s";
 
     create_directories(TENSILE_KERNEL_DIR);
@@ -110,6 +110,7 @@ bool ConvOclDirectFwd1x1Tensile::IsApplicable(const ConvolutionContext& params) 
         && (params.n_outputs % 2 == 0)
         && (params.kernel_stride0 == params.kernel_stride1)
         && (params.pad0 == 0 && params.pad1 == 0)
+        && params.has_active
         && !(params.has_pooling);
 
     return result;
@@ -163,11 +164,6 @@ ConvSolution ConvOclDirectFwd1x1Tensile::GetSolution(
     const ConvolutionContext& params,
     const TensilePerformanceConfig& searched_params) const {
     ConvSolution result;
-
-    if (TensileConv::DirConv1x1Fwd::GetDbFilePath() == "./db/") {
-        std::string db_path = TENSILE_DB_DIR;
-        TensileConv::DirConv1x1Fwd::SetDbFilePath(db_path);
-    }
 
     std::vector<int> localNum_v(3);
     std::vector<int> globalNum_v(3);
