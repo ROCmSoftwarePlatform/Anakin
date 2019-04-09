@@ -39,17 +39,6 @@ SaberStatus SaberPower<AMD, OpDtype>::create(
 
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "create";
 
-    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
-            << "AMD Summary: input size N " << inputs[0]->num()
-            << " C " << inputs[0]->channel()
-            << " H " << inputs[0]->height()
-            << " W " << inputs[0]->width();
-
-    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
-            << "AMD Summary: op param power " << param.power
-            << " scale " << param.scale
-            << " shift " << param.shift;
-
     const int count = outputs[0]->valid_size();
     Shape shape({inputs[0]->dims(), 1, 1, 1});
     _in_steps.re_alloc(shape);
