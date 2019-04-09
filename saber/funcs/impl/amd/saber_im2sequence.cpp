@@ -39,20 +39,6 @@ SaberStatus SaberIm2Sequence<AMD, OpDtype>::create(
 
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "create";
 
-    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
-            << "AMD Summary: input size N " << inputs[0]->num()
-            << " C " << inputs[0]->channel()
-            << " H " << inputs[0]->height()
-            << " W " << inputs[0]->width();
-
-    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
-            << "AMD Summary: op param "
-            << " window_h " << param.window_h << " window_w " << param.window_w
-            << " pad_up " << param.pad_up << " pad_down " << param.pad_down
-            << " pad_left " << param.pad_left << " pad_right " << param.pad_right
-            << " stride_h " << param.stride_h << " stride_w " << param.stride_w
-            << " dilation_h " << param.dilation_h << " dilation_w " << param.dilation_w;
-
     const int count  = outputs[0]->valid_size();
     int input_height = inputs[0]->height(); // P
     _kernel_exten_h  = param.dilation_h * (param.window_h - 1) + 1;
