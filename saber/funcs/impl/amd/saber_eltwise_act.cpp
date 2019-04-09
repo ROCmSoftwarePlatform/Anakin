@@ -56,15 +56,6 @@ SaberStatus SaberEltwiseActive<AMD, OpDtype>::create(
 
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "create";
 
-    LOG(INFO) << "AMD Summary: input size N " << inputs[0]->num() << " C " << inputs[0]->channel()
-              << " H " << inputs[0]->height() << " W " << inputs[0]->width();
-
-    LOG(INFO) << "AMD Summary: op param has_eltwise " << eltwise_param.has_eltwise << " type " <<
-              eltwise_param.operation
-              << " has_act " << param.activation_param.has_active << " type " << param.activation_param.active
-              << " coef " << param.activation_param.coef << " negative_slope " <<
-              param.activation_param.negative_slope;
-
     if (_other_activation) {
         _out_eltwise = new Tensor<AMD>();
         _out_eltwise->re_alloc(outputs[0]->shape());
