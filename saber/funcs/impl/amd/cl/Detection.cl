@@ -32,49 +32,6 @@ __kernel void permute_data_kernel(
     }
 }
 
-__kernel void permute_data_kernel_f4(
-    const global float* data,
-    const int data_size,
-    const int num_classes,
-    const int num_data,
-    const int num_dim,
-    global float* new_data) {
-
-    int index           = get_global_id(0);
-    global float4* vsrc;
-    float4 data_private;
-    int i, c, d, n, new_index;
-
-    if (index < data_size) {
-        data_private = *(global float4*)(&data[index * 4]);
-        i         = (index * 4) % num_dim;
-        c         = (index * 4 / num_dim) % num_classes;
-        d         = (index * 4 / num_dim / num_classes) % num_data;
-        n         = index * 4 / num_dim / num_classes / num_data;
-        new_index = ((n * num_classes + c) * num_data + d) * num_dim + i;
-        new_data[new_index] = data_private.x;
-        i         = (index * 4 + 1) % num_dim;
-        c         = ((index * 4 + 1) / num_dim) % num_classes;
-        d         = ((index * 4 + 1) / num_dim / num_classes) % num_data;
-        n         = (index * 4 + 1) / num_dim / num_classes / num_data;
-        new_index = ((n * num_classes + c) * num_data + d) * num_dim + i;
-        new_data[new_index] = data_private.y;
-        i         = (index * 4 + 2) % num_dim;
-        c         = ((index * 4 + 2) / num_dim) % num_classes;
-        d         = ((index * 4 + 2) / num_dim / num_classes) % num_data;
-        n         = (index * 4 + 2) / num_dim / num_classes / num_data;
-        new_index = ((n * num_classes + c) * num_data + d) * num_dim + i;
-        new_data[new_index] = data_private.z;
-        i         = (index * 4 + 3) % num_dim;
-        c         = ((index * 4 + 3) / num_dim) % num_classes;
-        d         = ((index * 4 + 3) / num_dim / num_classes) % num_data;
-        n         = (index * 4 + 3) / num_dim / num_classes / num_data;
-        new_index = ((n * num_classes + c) * num_data + d) * num_dim + i;
-        new_data[new_index] = data_private.w;
-
-    }
-}
-
 __kernel void decode_bbox_corner_variance_kernel(/*const int count, \*/
     const global float* loc_data,
     const global float* prior_data,
