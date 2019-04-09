@@ -50,20 +50,6 @@ SaberStatus VenderDeformableConv2D<AMD, OpDtype>::create(
 
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << "create";
 
-    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
-            << "AMD Summary: input size N " << inputs[0]->num()
-            << " C " << inputs[0]->channel()
-            << " H " << inputs[0]->height()
-            << " W " << inputs[0]->width();
-
-    LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG)
-            << "AMD Summary: op param K " << param.weight()->num()
-            << " Y " << param.weight()->height() << " X " << param.weight()->width()
-            << " SH " << param.stride_h << " SW " << param.stride_w
-            << " PH " << param.pad_h << " PW " << param.pad_w
-            << " DH " << param.dilation_h << " DW " << param.dilation_w
-            << " Alpha " << param.alpha << " Beta " << param.beta << " GP " << param.group;
-
     const int count = outputs[0]->valid_size();
     KernelInfo kernelInfo;
     AMDKernelPtr kptr;
