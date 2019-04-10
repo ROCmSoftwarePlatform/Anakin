@@ -37,55 +37,58 @@ bool ConvCommon::getKernelInfo(const ConvolutionContext& params, Conv1x1Type& mT
         dev = GFX900;
     }
 
-    for (int i = 0; i < conv1x1type.size(); i++) {
-        if (params.has_pooling && conv1x1type[i].fusion_pooling
-                && params.poolingContext.pooling_type == MLO_POOLING_OP_MAX
-                && params.poolingContext.kernel_size1 == 2
-                && params.poolingContext.kernel_size0 == 2
-                && params.poolingContext.pad1 == 0
-                && params.poolingContext.pad0 == 0
-                && params.poolingContext.kernel_stride1 == 2
-                && params.poolingContext.kernel_stride0 == 2
-                && conv1x1type[i].dev == dev && conv1x1type[i].batch == params.batch_sz
-                && conv1x1type[i].stride == params.kernel_stride0 && conv1x1type[i].channel == params.n_inputs
-                && conv1x1type[i].width == params.in_width && conv1x1type[i].height == params.in_height
-                && conv1x1type[i].output_num == params.n_outputs) {
 
-            mType = conv1x1type[i];
-            ALOGD("Got kernel:" << mType.kernel_name << "!!");
-            return true;
-        } else if (!conv1x1type[i].fusion_pooling && conv1x1type[i].dev == dev
-                   && conv1x1type[i].batch == params.batch_sz
-                   && conv1x1type[i].stride == params.kernel_stride0 && (conv1x1type[i].channel == params.n_inputs
-                           || conv1x1type[i].channel == 0)
-                   && conv1x1type[i].width == params.in_width && conv1x1type[i].height == params.in_height
-                   && conv1x1type[i].output_num == params.n_outputs
-                  ) {
+    if (params.in_height * params.in_width <= 4096 && params.batch_sz <= 2 &&
+            !(params.kernel_stride0 == 2 && (params.in_width % 2 == 1 || params.in_height % 2 == 1)))
+        for (int i = 0; i < conv1x1type.size(); i++) {
+            if (params.has_pooling && conv1x1type[i].fusion_pooling
+                    && params.poolingContext.pooling_type == MLO_POOLING_OP_MAX
+                    && params.poolingContext.kernel_size1 == 2
+                    && params.poolingContext.kernel_size0 == 2
+                    && params.poolingContext.pad1 == 0
+                    && params.poolingContext.pad0 == 0
+                    && params.poolingContext.kernel_stride1 == 2
+                    && params.poolingContext.kernel_stride0 == 2
+                    && conv1x1type[i].dev == dev && conv1x1type[i].batch == params.batch_sz
+                    && conv1x1type[i].stride == params.kernel_stride0 && conv1x1type[i].channel == params.n_inputs
+                    && conv1x1type[i].width == params.in_width && conv1x1type[i].height == params.in_height
+                    && conv1x1type[i].output_num == params.n_outputs) {
 
-            mType = conv1x1type[i];
-            ALOGD("Got kernel:" << mType.kernel_name << "!!");
-            return true;
-        } else if (!conv1x1type[i].fusion_pooling && conv1x1type[i].dev == dev
-                   && conv1x1type[i].batch == params.batch_sz
-                   && conv1x1type[i].width == 0) {
+                mType = conv1x1type[i];
+                ALOGD("Got kernel:" << mType.kernel_name << "!!");
+                return true;
+            } else if (!conv1x1type[i].fusion_pooling && conv1x1type[i].dev == dev
+                       && conv1x1type[i].batch == params.batch_sz
+                       && conv1x1type[i].stride == params.kernel_stride0 && (conv1x1type[i].channel == params.n_inputs
+                               || conv1x1type[i].channel == 0)
+                       && conv1x1type[i].width == params.in_width && conv1x1type[i].height == params.in_height
+                       && conv1x1type[i].output_num == params.n_outputs
+                      ) {
 
-            mType = conv1x1type[i];
-            ALOGD("Got kernel:" << mType.kernel_name << "!!");
-            return true;
+                mType = conv1x1type[i];
+                ALOGD("Got kernel:" << mType.kernel_name << "!!");
+                return true;
+            } else if (!conv1x1type[i].fusion_pooling && conv1x1type[i].dev == dev
+                       && conv1x1type[i].batch == params.batch_sz
+                       && conv1x1type[i].width == 0) {
+
+                mType = conv1x1type[i];
+                ALOGD("Got kernel:" << mType.kernel_name << "!!");
+                return true;
+            }
+
+            if (conv1x1type[i].dev == dev
+                    && ((conv1x1type[i].channel == params.n_inputs && params.n_inputs == 1024)
+                        || (conv1x1type[i].channel == params.n_inputs && params.n_inputs == 1280))
+                    && (conv1x1type[i].output_num == params.n_outputs && params.n_outputs == 1000)
+                    && (conv1x1type[i].stride == params.kernel_stride0 && params.kernel_stride0 == 1)
+                    && (conv1x1type[i].width == params.in_width && params.in_width == 1)
+                    && conv1x1type[i].batch >= params.batch_sz) {
+                mType = conv1x1type[i];
+                ALOGD("Got kernel:" << mType.kernel_name << "!!");
+                return true;
+            }
         }
-
-        if (conv1x1type[i].dev == dev
-                && ((conv1x1type[i].channel == params.n_inputs && params.n_inputs == 1024)
-                    || (conv1x1type[i].channel == params.n_inputs && params.n_inputs == 1280))
-                && (conv1x1type[i].output_num == params.n_outputs && params.n_outputs == 1000)
-                && (conv1x1type[i].stride == params.kernel_stride0 && params.kernel_stride0 == 1)
-                && (conv1x1type[i].width == params.in_width && params.in_width == 1)
-                && conv1x1type[i].batch >= params.batch_sz) {
-            mType = conv1x1type[i];
-            ALOGD("Got kernel:" << mType.kernel_name << "!!");
-            return true;
-        }
-    }
 
     /*if (params.batch_sz < 32 && ((params.kernel_stride0 == 1 && params.n_inputs >= 256 && params.n_outputs >= 256)
                                  || (params.in_width <= 14 && params.in_height <= 14 && params.kernel_stride0 == 1)
