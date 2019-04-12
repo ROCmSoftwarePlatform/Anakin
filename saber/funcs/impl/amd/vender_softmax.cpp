@@ -96,24 +96,11 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::create(
     _kernels.clear();
     KernelInfo kernelInfo;
 
-    int count;
-    int grid_size;
+    int count = inputs[0]->valid_shape()[param.axis];
+    int grid_size = inputs[0]->count_valid(0, param.axis) * inputs[0]->count_valid(param.axis + 1,
+                    inputs[0]->dims());
 
-    if (param.axis == 1) {
-        count = inputs[0]->channel();
-        grid_size = inputs[0]->num() * inputs[0]->height() * inputs[0]->width();
-    } else if (param.axis == 2) {
-        count = inputs[0]->height();
-        grid_size = inputs[0]->num() * inputs[0]->channel() * inputs[0]->width();
-    } else if (param.axis == 3) {
-        count = inputs[0]->width();
-        grid_size = inputs[0]->num() * inputs[0]->channel() * inputs[0]->height();
-    } else {
-        count = inputs[0]->num();
-        grid_size = inputs[0]->channel() * inputs[0]->height() * inputs[0]->width();
-    }
-
-    //The below section of code are as MIT license, the permission notice is from above (line 131 to 170)
+    //The below section of code are as MIT license, the permission notice is from above (line 106 to 145)
     // To set local work size
     int local_work_size;
     kernelInfo.kernel_file = "MIOpenSoftmax.cl";
@@ -173,27 +160,10 @@ SaberStatus VenderSoftmax<AMD, OpDtype>::dispatch(
     bool err                     = false;
     amd_kernel_list::iterator it = _kernels.begin();
 
-    int count;
-    int grid_size;
-    int spatial_dim;
-
-    if (param.axis == 1) {
-        count = inputs[0]->channel();
-        spatial_dim = inputs[0]->height() * inputs[0]->width();
-        grid_size = inputs[0]->num() * inputs[0]->height() * inputs[0]->width();
-    } else if (param.axis == 2) {
-        count = inputs[0]->height();
-        spatial_dim = inputs[0]->width();
-        grid_size = inputs[0]->num() * inputs[0]->channel() * inputs[0]->width();
-    } else if (param.axis == 3) {
-        count = inputs[0]->width();
-        spatial_dim = 1;
-        grid_size = inputs[0]->num() * inputs[0]->channel() * inputs[0]->height();
-    } else {
-        count = inputs[0]->num();
-        spatial_dim = inputs[0]->channel() * inputs[0]->height() * inputs[0]->width();
-        grid_size = inputs[0]->channel() * inputs[0]->height() * inputs[0]->width();
-    }
+    int count = inputs[0]->valid_shape()[param.axis];
+    int grid_size = inputs[0]->count_valid(0, param.axis) * inputs[0]->count_valid(param.axis + 1,
+                    inputs[0]->dims());
+    int spatial_dim = inputs[0]->count_valid(param.axis + 1, inputs[0]->dims());
 
     // To set the argument
     err = it->get()->SetKernelArgs(
