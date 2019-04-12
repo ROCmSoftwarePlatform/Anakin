@@ -2517,6 +2517,7 @@ __kernel void conv1x1_act_pool(
 
 #define IN_BATCH_STRIDE     (C * H * W)
 #define OUT_BATCH_STRIDE    (K * OH * OW)
+#define FILTER_SIZE         (K * C)
 
 #define COUNTER_STRIDE  (WG_PER_IN * WG_PER_WEI)
 #define GROUP_ITER  (grid_x / COUNTER_STRIDE)
@@ -2600,7 +2601,6 @@ __kernel void conv1x1_act(
 #if BIAS == 1
     __constant float* pBias = (__constant float*)(bias + WEI_ROW_START + OUT_WI_ROW_START);//
 #endif
-
     uint split_stride;
 
     if ((GROUP_ITER + 1) * QSTRIDE < C) {
@@ -2637,13 +2637,21 @@ __kernel void conv1x1_act(
 
 #if BRANCH == 1
 
+    uint idx = WEI_ROW_START * STRIDE_WEI + WEI_COL_START * QSTRIDE + WEI_WI_COL_START;
+#if STRIDE == 2
+    uint iidx = (IN_WI_COL_START_REAL) + WEI_COL_START * QSTRIDE * STRIDE_IN_REAL;
+#else
+    uint iidx = (IN_COL_START + IN_WI_COL_START) + WEI_COL_START * QSTRIDE * STRIDE_IN;
+#endif
+
     for (uint k = 0; k < iter; k++, offset = (offset + PER_ITER_STRIDE) % split_stride) {
         per_iter_stride = ((k == iter - 1 && GROUP_ITER == GSU_MINUS_ONE) ? remainder : PER_ITER_STRIDE);
 
         for (uint i = 0; i < LDS_WEI_READ_ITER; i++) {
 #if 1
             shared_wei[WEI_WI_COL_START + (((lid_x / WEI_READ_LINE) + i * LOCAL_STRIDE)) * LDS_WEI_STRIDE] =
-                pWei[(((lid_x / WEI_READ_LINE) + i * LOCAL_STRIDE)) * STRIDE_WEI + offset];
+                (idx + (((lid_x / WEI_READ_LINE) + i * LOCAL_STRIDE)) * STRIDE_WEI + offset < FILTER_SIZE ?
+                 pWei[(((lid_x / WEI_READ_LINE) + i * LOCAL_STRIDE)) * STRIDE_WEI + offset] : 0.0f);
             prefetch(pWei + (((lid_x / WEI_READ_LINE) + i * LOCAL_STRIDE)) * STRIDE_WEI - WEI_WI_COL_START +
                      (offset + PER_ITER_STRIDE) % split_stride, 32);
 #else
@@ -2658,13 +2666,14 @@ __kernel void conv1x1_act(
             for (uint i = 0; i < LDS_IN_READ_ITER; i++) {
 #if STRIDE == 2
                 shared_in[(LDS_IN_ROW_START + i) + IN_WI_COL_START * LDS_IN_STRIDE] =
-                    (IN_COL_START + IN_WI_COL_START < STRIDE_IN ?
+                    (iidx + (LDS_IN_ROW_START + i + offset) * STRIDE_IN_REAL + n * IN_BATCH_STRIDE < N * IN_BATCH_STRIDE
+                     ?
                      pIn[(LDS_IN_ROW_START + i + offset) * STRIDE_IN_REAL + n * IN_BATCH_STRIDE] : 0.0f);
                 prefetch(pIn + (LDS_IN_ROW_START + i + (offset + PER_ITER_STRIDE) % split_stride) * STRIDE_IN_REAL -
                          IN_WI_COL_START_REAL + IN_COL_START_REAL / OW * OW * 4 + n * IN_BATCH_STRIDE, 64);
 #else
                 shared_in[(LDS_IN_ROW_START + i) + IN_WI_COL_START * LDS_IN_STRIDE] =
-                    (IN_COL_START + IN_WI_COL_START < STRIDE_IN ?
+                    (iidx + (LDS_IN_ROW_START + i + offset) * STRIDE_IN + n * IN_BATCH_STRIDE < N * IN_BATCH_STRIDE ?
                      pIn[(LDS_IN_ROW_START + i + offset) * STRIDE_IN + n * IN_BATCH_STRIDE] : 0.0f);
                 prefetch(pIn + (LDS_IN_ROW_START + i + (offset + PER_ITER_STRIDE) % split_stride) * STRIDE_IN -
                          IN_WI_COL_START + n * IN_BATCH_STRIDE, 32);
