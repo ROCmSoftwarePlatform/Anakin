@@ -336,7 +336,7 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
             if (params.bias) {
                 kernelInfo.comp_options = std::string(" -DBIAS ") + std::string(" -DWIDTH=")
                                           + std::to_string(params.n_inputs)
-                                          + std::string(" -DMACRO -DNO_SLOPE")
+                                          + std::string(" -DMACRO")
                                           + std::string(" -DOUTPUT=") + std::to_string(params.n_outputs)
                                           + std::string(" -DKERNEL_METHOD=") + std::to_string(conv11_param.kernel_method)
                                           + std::string(" -DN=") + std::to_string(params.batch_sz);
@@ -344,9 +344,13 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
                 kernelInfo.comp_options =
                     std::string(" -DWIDTH=") + std::to_string(params.n_inputs)
                     + std::string(" -DOUTPUT=") + std::to_string(params.n_outputs)
-                    + std::string(" -DMACRO -DNO_SLOPE")
+                    + std::string(" -DMACRO")
                     + std::string(" -DKERNEL_METHOD=") + std::to_string(conv11_param.kernel_method)
                     + std::string(" -DN=") + std::to_string(params.batch_sz);
+            }
+
+            if (!params.has_active) {
+                kernelInfo.comp_options += std::string(" -DNO_SLOPE");
             }
 
             kernelInfo.l_wk = {64, 1, 1};
