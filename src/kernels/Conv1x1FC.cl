@@ -230,7 +230,11 @@ void reduce(__local float* buffer, int tid) {
 }
 
 __attribute__((reqd_work_group_size(128, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c) {
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c) {
     __local float shared_a[129];
     __local float shared_b[8][65];
 
@@ -274,8 +278,12 @@ __attribute__((reqd_work_group_size(128, 1, 1))) __kernel void InnerProduct(
     }
 
     if (lid_x < 8) {
+#ifdef BIAS
         c[(grid_x << 3) + lid_x] =
             result[lid_x >> 2][(lid_x & 3) << 4] + bias[(grid_x << 3) + lid_x];
+#else
+        c[(grid_x << 3) + lid_x] = result[lid_x >> 2][(lid_x & 3) << 4];
+#endif
     }
 }
 #elif KERNEL_METHOD == 4
@@ -292,7 +300,11 @@ void reduce(__local float* buffer, int tid) {
 }
 
 __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c) {
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c) {
     __local float shared_a[2][66];
     __local float shared_b[8][66];
     __local float result[65];
@@ -331,7 +343,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
         float* pOut = (float*)&out;
 
         for (int i = 0; i < 8; i++) {
+#ifdef BIAS
             pOut[i] = result[((lid_x * 8 + i) << 2)] + bias[(grid_x << 3) + i];
+#else
+            pOut[i] = result[((lid_x * 8 + i) << 2)];
+#endif
         }
 
         __global float8* pC = (__global float8*)(c + (grid_x << 3) + lid_x * OUTPUT);
@@ -352,7 +368,11 @@ void reduce(__local float* buffer, int tid) {
 }
 
 __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c) {
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c) {
     __local float shared_a[4][66];
     __local float shared_b[4][66];
     __local float result[65];
@@ -388,7 +408,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
         float* pOut = (float*)&out;
 
         for (int i = 0; i < 4; i++) {
+#ifdef BIAS
             pOut[i] = result[((lid_x * 4 + i) << 2)] + bias[(grid_x << 2) + i];
+#else
+            pOut[i] = result[((lid_x * 4 + i) << 2)];
+#endif
         }
 
         __global float4* pC = (__global float4*)(c + (grid_x << 2) + lid_x * OUTPUT);
@@ -399,7 +423,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
 #define ITER (WIDTH >> 6)
 
 __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c) {
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c) {
     __local float shared_a[8][66];
     __local float shared_b[8][66];
     __local float result[65];
@@ -435,7 +463,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
         float* pOut = (float*)&out;
 
         for (int i = 0; i < 8; i++) {
+#ifdef BIAS
             pOut[i] = result[((lid_x * 8 + i))] + bias[(grid_x << 3) + i];
+#else
+            pOut[i] = result[((lid_x * 8 + i))];
+#endif
         }
 
         __global float8* pC = (__global float8*)(c + (grid_x << 3) + lid_x * OUTPUT);
@@ -447,7 +479,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
 #define ITER (WIDTH >> 7)
 
 __attribute__((reqd_work_group_size(256, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c) {
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c) {
     __local float shared_a[1536];
     __local float shared_b[2560];
     __local float2* pShared_a = (__local float2*)shared_a;
@@ -470,7 +506,9 @@ __attribute__((reqd_work_group_size(256, 1, 1))) __kernel void InnerProduct(
                                 (grid_x >> 6) * QSTRIDE);
     __global float4* pC    = (__global float4*)(c + ((lid_x >> 4 << 1) * OUTPUT +
                              ((grid_x & 63) << 6) + ((lid_x & 15) << 2)));
+#ifdef BIAS
     __global float4* pBias = (__global float4*)(bias + ((grid_x & 63) << 6) + ((lid_x & 15) << 2));
+#endif
 
     int offset = (((grid_x & 63) << 5)) % QSTRIDE;
 
@@ -518,7 +556,11 @@ __attribute__((reqd_work_group_size(256, 1, 1))) __kernel void InnerProduct(
 
     if ((grid_x >> 6) == 0) {
         for (uint i = 0; i < 2; i++) {
+#ifdef BIAS
             pC[i * OUTPUT >> 2] = sum[i] + pBias[0];
+#else
+            pC[i * OUTPUT >> 2] = sum[i];
+#endif
         }
     } else {
         for (uint i = 0; i < 2; i++) {
@@ -537,7 +579,11 @@ void reduce(__local float* buffer, int tid) {
 }
 
 __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c) {
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c) {
     int gid_x  = get_global_id(0);
     int lid_x  = get_local_id(0);
     int grid_x = get_group_id(0);
@@ -578,7 +624,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
     if (lid_x < 32 && ((grid_x % HWG) << 3) + (lid_x & 7) < OUTPUT) {
         int out_offset =
             ((grid_x / HWG << 2) + (lid_x >> 3)) * OUTPUT + ((grid_x % HWG) << 3) + (lid_x & 7);
+#ifdef BIAS
         c[out_offset] = bias[((grid_x % HWG) << 3) + (lid_x & 7)] + result[(lid_x << 1)];
+#else
+        c[out_offset] = result[(lid_x << 1)];
+#endif
     }
 }
 #elif KERNEL_METHOD == 9
@@ -591,7 +641,11 @@ void reduce(__local float* buffer, int tid) {
 }
 
 __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c) {
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c) {
     int gid_x  = get_global_id(0);
     int lid_x  = get_local_id(0);
     int grid_x = get_group_id(0);
@@ -631,7 +685,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
     if (lid_x < 32 && ((grid_x & 127) << 3) + (lid_x & 7) < OUTPUT) {
         int out_offset =
             ((grid_x >> 7 << 2) + (lid_x >> 3)) * OUTPUT + ((grid_x & 127) << 3) + (lid_x & 7);
+#ifdef BIAS
         c[out_offset] = bias[((grid_x & 127) << 3) + (lid_x & 7)] + result[(lid_x << 1)];
+#else
+        c[out_offset] = result[(lid_x << 1)];
+#endif
     }
 }
 #elif KERNEL_METHOD == 10
@@ -1085,7 +1143,11 @@ void reduce(__local float* buffer, int tid) {
 }
 
 __attribute__((reqd_work_group_size(128, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c,
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c,
     uint N, uint WIDTH, uint OUTPUT) {
     __local float shared_a[129];
     __local float shared_b[8][65];
@@ -1130,8 +1192,12 @@ __attribute__((reqd_work_group_size(128, 1, 1))) __kernel void InnerProduct(
     }
 
     if (lid_x < 8) {
+#ifdef BIAS
         c[(grid_x << 3) + lid_x] =
             result[lid_x >> 2][(lid_x & 3) << 4] + bias[(grid_x << 3) + lid_x];
+#else
+        c[(grid_x << 3) + lid_x] = result[lid_x >> 2][(lid_x & 3) << 4];
+#endif
     }
 }
 #elif KERNEL_METHOD == 4
@@ -1148,7 +1214,11 @@ void reduce(__local float* buffer, int tid) {
 }
 
 __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c,
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c,
     uint N, uint WIDTH, uint OUTPUT) {
     __local float shared_a[2][66];
     __local float shared_b[8][66];
@@ -1188,7 +1258,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
         float* pOut = (float*)&out;
 
         for (int i = 0; i < 8; i++) {
+#ifdef BIAS
             pOut[i] = result[((lid_x * 8 + i) << 2)] + bias[(grid_x << 3) + i];
+#else
+            pOut[i] = result[((lid_x * 8 + i) << 2)];
+#endif
         }
 
         __global float8* pC = (__global float8*)(c + (grid_x << 3) + lid_x * OUTPUT);
@@ -1209,7 +1283,11 @@ void reduce(__local float* buffer, int tid) {
 }
 
 __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c,
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c,
     uint N, uint WIDTH, uint OUTPUT) {
     __local float shared_a[4][66];
     __local float shared_b[4][66];
@@ -1246,7 +1324,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
         float* pOut = (float*)&out;
 
         for (int i = 0; i < 4; i++) {
+#ifdef BIAS
             pOut[i] = result[((lid_x * 4 + i) << 2)] + bias[(grid_x << 2) + i];
+#else
+            pOut[i] = result[((lid_x * 4 + i) << 2)];
+#endif
         }
 
         __global float4* pC = (__global float4*)(c + (grid_x << 2) + lid_x * OUTPUT);
@@ -1257,7 +1339,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
 #define ITER (WIDTH >> 6)
 
 __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c,
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c,
     uint N, uint WIDTH, uint OUTPUT) {
     __local float shared_a[8][66];
     __local float shared_b[8][66];
@@ -1294,7 +1380,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
         float* pOut = (float*)&out;
 
         for (int i = 0; i < 8; i++) {
+#ifdef BIAS
             pOut[i] = result[((lid_x * 8 + i))] + bias[(grid_x << 3) + i];
+#else
+            pOut[i] = result[((lid_x * 8 + i))];
+#endif
         }
 
         __global float8* pC = (__global float8*)(c + (grid_x << 3) + lid_x * OUTPUT);
@@ -1306,7 +1396,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
 #define ITER (WIDTH >> 7)
 
 __attribute__((reqd_work_group_size(256, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c,
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c,
     uint N, uint WIDTH, uint OUTPUT) {
     __local float shared_a[1536];
     __local float shared_b[2560];
@@ -1330,7 +1424,9 @@ __attribute__((reqd_work_group_size(256, 1, 1))) __kernel void InnerProduct(
                                 (grid_x >> 6) * QSTRIDE);
     __global float4* pC    = (__global float4*)(c + ((lid_x >> 4 << 1) * OUTPUT +
                              ((grid_x & 63) << 6) + ((lid_x & 15) << 2)));
+#ifdef BIAS
     __global float4* pBias = (__global float4*)(bias + ((grid_x & 63) << 6) + ((lid_x & 15) << 2));
+#endif
 
     int offset = (((grid_x & 63) << 5)) % QSTRIDE;
 
@@ -1378,7 +1474,11 @@ __attribute__((reqd_work_group_size(256, 1, 1))) __kernel void InnerProduct(
 
     if ((grid_x >> 6) == 0) {
         for (uint i = 0; i < 2; i++) {
+#ifdef BIAS
             pC[i * OUTPUT >> 2] = sum[i] + pBias[0];
+#else
+            pC[i * OUTPUT >> 2] = sum[i];
+#endif
         }
     } else {
         for (uint i = 0; i < 2; i++) {
@@ -1397,7 +1497,11 @@ void reduce(__local float* buffer, int tid) {
 }
 
 __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c,
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c,
     uint N, uint WIDTH, uint OUTPUT) {
     int gid_x  = get_global_id(0);
     int lid_x  = get_local_id(0);
@@ -1439,7 +1543,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
     if (lid_x < 32 && ((grid_x % HWG) << 3) + (lid_x & 7) < OUTPUT) {
         int out_offset =
             ((grid_x / HWG << 2) + (lid_x >> 3)) * OUTPUT + ((grid_x % HWG) << 3) + (lid_x & 7);
+#ifdef BIAS
         c[out_offset] = bias[((grid_x % HWG) << 3) + (lid_x & 7)] + result[(lid_x << 1)];
+#else
+        c[out_offset] = result[(lid_x << 1)];
+#endif
     }
 }
 #elif KERNEL_METHOD == 9
@@ -1452,7 +1560,11 @@ void reduce(__local float* buffer, int tid) {
 }
 
 __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
-    __global const float* a, __global const float* b, __global const float* bias, __global float* c,
+    __global const float* a, __global const float* b,
+#ifdef BIAS
+    __global const float* bias,
+#endif
+    __global float* c,
     uint N, uint WIDTH, uint OUTPUT) {
     int gid_x  = get_global_id(0);
     int lid_x  = get_local_id(0);
@@ -1493,7 +1605,11 @@ __attribute__((reqd_work_group_size(64, 1, 1))) __kernel void InnerProduct(
     if (lid_x < 32 && ((grid_x & 127) << 3) + (lid_x & 7) < OUTPUT) {
         int out_offset =
             ((grid_x >> 7 << 2) + (lid_x >> 3)) * OUTPUT + ((grid_x & 127) << 3) + (lid_x & 7);
+#ifdef BIAS
         c[out_offset] = bias[((grid_x & 127) << 3) + (lid_x & 7)] + result[(lid_x << 1)];
+#else
+        c[out_offset] = result[(lid_x << 1)];
+#endif
     }
 }
 #elif KERNEL_METHOD == 10
