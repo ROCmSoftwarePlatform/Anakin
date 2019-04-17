@@ -38,9 +38,9 @@ struct Arguments {
 #define ARG_SIZE    4
 
 Arguments args[] = {
-    {32, 64},
+    {64, 32},
     {32, 32},
-    {16, 32},
+    {32, 16},
     {16, 16},
 };
 
@@ -482,14 +482,11 @@ ConvSolution ConvOclDirectFwd1x1AMD::GetSolution(
 }
 
 template <class Solver>
-static void ExpandGetSolution(ConvSolution& kernel_search_result, const ConvolutionContext& params, const LegacyPerformanceConfig& result, Solver&& s)
-{
-    if(!kernel_search_result.Succeeded()) // once
-    {
-        if(s.IsApplicable(params))
-        {
-            if(s.IsValidPerformanceConfig(params, result))
-            {
+static void ExpandGetSolution(ConvSolution& kernel_search_result, const ConvolutionContext& params,
+                              const LegacyPerformanceConfig& result, Solver&& s) {
+    if (!kernel_search_result.Succeeded()) { // once
+        if (s.IsApplicable(params)) {
+            if (s.IsValidPerformanceConfig(params, result)) {
                 kernel_search_result = s.GetSolution(params, result);
             }
         }
@@ -497,8 +494,8 @@ static void ExpandGetSolution(ConvSolution& kernel_search_result, const Convolut
 }
 
 template <class Solver, class... Solvers>
-static void ExpandGetSolution(ConvSolution& kernel_search_result, const ConvolutionContext& params, const LegacyPerformanceConfig& result, Solver&& solver, Solvers&&... solvers)
-{
+static void ExpandGetSolution(ConvSolution& kernel_search_result, const ConvolutionContext& params,
+                              const LegacyPerformanceConfig& result, Solver&& solver, Solvers&& ... solvers) {
     ExpandGetSolution(kernel_search_result, result, solver);
     ExpandGetSolution(kernel_search_result, result, solvers...);
 }
@@ -511,30 +508,26 @@ static int MeasureLoop(Handle* profile_h,
                        Data_t bias_ocl_buf,
                        double& processing_time,
                        const ConvolutionContext& params,
-                       const LegacyPerformanceConfig& result)
-{
-    ConvSolution kernel_search_result{miopenStatusNotInitialized};
+                       const LegacyPerformanceConfig& result) {
+    ConvSolution kernel_search_result {miopenStatusNotInitialized};
 
 #if(__cplusplus >= 201402L)
     miopen::each_args(
-        [&](auto s) {
-            if(!kernel_search_result.Succeeded()) // once
-            {
-                if(s.IsApplicable(params))
-                {
-                    if(s.IsValidPerformanceConfig(params, result))
-                    {
-                        kernel_search_result = s.GetSolution(params, result);
-                    }
+    [&](auto s) {
+        if (!kernel_search_result.Succeeded()) { // once
+            if (s.IsApplicable(params)) {
+                if (s.IsValidPerformanceConfig(params, result)) {
+                    kernel_search_result = s.GetSolution(params, result);
                 }
             }
-        },
-        Solvers{}...);
+        }
+    },
+    Solvers {} ...);
 #else
-    ExpandGetSolution(kernel_search_result, params, result, Solvers{}...);
+    ExpandGetSolution(kernel_search_result, params, result, Solvers {} ...);
 #endif
-    if(!kernel_search_result.Succeeded())
-    {
+
+    if (!kernel_search_result.Succeeded()) {
         return 1;
     }
 
@@ -543,42 +536,41 @@ static int MeasureLoop(Handle* profile_h,
     std::string compiler_options = params.general_compile_options + kernel_params.comp_options;
 
     // Creating OCLKernel obj
-    try
-    {
+    try {
 
         float padding_value = 0;
 
-        if(profile_h)
-        {
+        if (profile_h) {
             processing_time = std::numeric_limits<float>::max();
 
-            
+
 
             std::cout << "kernel name:" << kernel_params.kernel_name << std::endl;
+
             if (kernel_params.kernel_name == "conv1x1_act") {
                 auto k = profile_h->AddKernel("",
-                                          "",
-                                          kernel_params.kernel_file,
-                                          kernel_params.kernel_name,
-                                          kernel_params.l_wk,
-                                          kernel_params.g_wk,
-                                          compiler_options);
-                if(params.bias)
-                {
-                    k(wei_ocl_buf, bot_ocl_buf, bias_ocl_buf, top_ocl_buf, params.negative_slope, params.n_inputs, params.in_height, params.in_width, params.n_outputs);
-                }
-                else
-                {
-                    k(wei_ocl_buf, bot_ocl_buf, top_ocl_buf, params.negative_slope, params.n_inputs, params.in_height, params.in_width, params.n_outputs);
+                                              "",
+                                              kernel_params.kernel_file,
+                                              kernel_params.kernel_name,
+                                              kernel_params.l_wk,
+                                              kernel_params.g_wk,
+                                              compiler_options);
+
+                if (params.bias) {
+                    k(wei_ocl_buf, bot_ocl_buf, bias_ocl_buf, top_ocl_buf, params.negative_slope, params.n_inputs,
+                      params.in_height, params.in_width, params.n_outputs);
+                } else {
+                    k(wei_ocl_buf, bot_ocl_buf, top_ocl_buf, params.negative_slope, params.n_inputs, params.in_height,
+                      params.in_width, params.n_outputs);
                 }
             } else if (kernel_params.kernel_name == "InnerProduct") {
                 auto k = profile_h->AddKernel("",
-                                          "",
-                                          kernel_params.kernel_file,
-                                          kernel_params.kernel_name,
-                                          kernel_params.l_wk,
-                                          kernel_params.g_wk,
-                                          compiler_options);
+                                              "",
+                                              kernel_params.kernel_file,
+                                              kernel_params.kernel_name,
+                                              kernel_params.l_wk,
+                                              kernel_params.g_wk,
+                                              compiler_options);
 
                 if (params.bias) {
                     if (params.has_active) {
@@ -595,17 +587,17 @@ static int MeasureLoop(Handle* profile_h,
                 }
             } else {
                 auto k = profile_h->AddKernel("",
-                                          "",
-                                          kernel_params.kernel_file,
-                                          kernel_params.kernel_name,
-                                          kernel_params.l_wk,
-                                          kernel_params.g_wk,
-                                          "");
+                                              "",
+                                              kernel_params.kernel_file,
+                                              kernel_params.kernel_name,
+                                              kernel_params.l_wk,
+                                              kernel_params.g_wk,
+                                              "");
 
                 size_t slot_sz = 4096;
 
                 std::vector<float> slot_sys_buf(slot_sz);
-                auto slot_ocl_buf = profile_h->Write(slot_sys_buf); 
+                auto slot_ocl_buf = profile_h->Write(slot_sys_buf);
 
                 size_t bias_sz = params.n_outputs;
 
@@ -613,17 +605,18 @@ static int MeasureLoop(Handle* profile_h,
                 auto tmp_bias_ocl_buf = profile_h->Write(bias_sys_buf);
 
                 if (params.has_active) {
-                    k(bot_ocl_buf, wei_ocl_buf, tmp_bias_ocl_buf.get(), top_ocl_buf, slot_ocl_buf.get(), params.negative_slope);
+                    k(bot_ocl_buf, wei_ocl_buf, tmp_bias_ocl_buf.get(), top_ocl_buf, slot_ocl_buf.get(),
+                      params.negative_slope);
                 } else {
                     k(bot_ocl_buf, wei_ocl_buf, tmp_bias_ocl_buf.get(), top_ocl_buf, slot_ocl_buf.get(), 1.0f);
                 }
             }
+
             processing_time = profile_h->GetKernelTime();
         }
     }
 
-    catch(miopen::Exception& ex)
-    {
+    catch (miopen::Exception& ex) {
         MIOPEN_LOG_E("MeasureLoop failed for: " << ex.what());
         return -1;
     }
@@ -632,25 +625,23 @@ static int MeasureLoop(Handle* profile_h,
     std::cout << "\t\t\t\t" << processing_time << std::endl;
     return 0;
 }
-        
+
 
 LegacyPerformanceConfig
-ConvOclDirectFwd1x1AMD::SearchForMeasureOnce(const ConvolutionContext& params) const
-{
+ConvOclDirectFwd1x1AMD::SearchForMeasureOnce(const ConvolutionContext& params) const {
     LegacyPerformanceConfig result;
 
     miopen::Handle profile_h;
     double processing_time = std::numeric_limits<double>::max();
     double min_proc_time = std::numeric_limits<double>::max();
 
-    
+
 
     // allocate tem input/output buffers
     size_t bot_sz = params.bot_sz / sizeof(float);
     std::vector<float> bot_sys_buf(bot_sz);
 
-    for(int i = 0; i < bot_sz; i++)
-    {
+    for (int i = 0; i < bot_sz; i++) {
         bot_sys_buf[i] = static_cast<float>(rand() * (1.0 / RAND_MAX));
     }
 
@@ -662,18 +653,18 @@ ConvOclDirectFwd1x1AMD::SearchForMeasureOnce(const ConvolutionContext& params) c
     auto top_ocl_buf = profile_h.Write(top_sys_buf);
 
     std::vector<float> random_top_sys_buf(top_sz);
-    for(int i = 0; i < top_sz; i++)
-    {
+
+    for (int i = 0; i < top_sz; i++) {
         random_top_sys_buf[i] = static_cast<float>(rand() * (1.0 / RAND_MAX));
     }
 
     size_t weights_sz = params.weights_sz / sizeof(float);
     std::vector<float> wei_sys_buf(weights_sz);
 
-    std::cout << "top_sz:" << top_sz << " bot_sz:" << bot_sz << " weights_sz:" << weights_sz << std::endl;
+    std::cout << "top_sz:" << top_sz << " bot_sz:" << bot_sz << " weights_sz:" << weights_sz <<
+              std::endl;
 
-    for(int i = 0; i < weights_sz; i++)
-    {
+    for (int i = 0; i < weights_sz; i++) {
         wei_sys_buf[i] = static_cast<float>((rand() * (1.0 / RAND_MAX) - 0.5) * 0.001);
     }
 
@@ -682,12 +673,11 @@ ConvOclDirectFwd1x1AMD::SearchForMeasureOnce(const ConvolutionContext& params) c
     std::vector<float> bias_sys_buf;
     miopen::Allocator::ManageDataPtr bias_ocl_buf = nullptr;
 
-    if(params.bias != 0)
-    {
+    if (params.bias != 0) {
         size_t bias_sz = params.bias_sz / sizeof(float);
         bias_sys_buf   = std::vector<float>(bias_sz);
-        for(int i = 0; i < bias_sz; i++)
-        {
+
+        for (int i = 0; i < bias_sz; i++) {
             bias_sys_buf[i] = static_cast<float>(rand() * (1.0 / RAND_MAX));
         }
 
@@ -696,22 +686,21 @@ ConvOclDirectFwd1x1AMD::SearchForMeasureOnce(const ConvolutionContext& params) c
 
     // randomize output
     profile_h.WriteTo(reinterpret_cast<const void*>(random_top_sys_buf.data()),
-          top_ocl_buf,
-          random_top_sys_buf.size() * sizeof(float));
+                      top_ocl_buf,
+                      random_top_sys_buf.size() * sizeof(float));
 
     // enable profiling for the handle for benchmarking
     profile_h.EnableProfiling(true);
     const auto ret = MeasureLoop<ConvOclDirectFwd1x1AMD>(&profile_h,
-                              bot_ocl_buf.get(),
-                              top_ocl_buf.get(),
-                              wei_ocl_buf.get(),
-                              bias_ocl_buf.get(),
-                              processing_time,
-                              params,
-                              result);
+                     bot_ocl_buf.get(),
+                     top_ocl_buf.get(),
+                     wei_ocl_buf.get(),
+                     bias_ocl_buf.get(),
+                     processing_time,
+                     params,
+                     result);
 
-     if(min_proc_time > processing_time)
-    {
+    if (min_proc_time > processing_time) {
         min_proc_time = processing_time;
         MIOPEN_LOG_I2("processing_time = " << processing_time << ", result = " << result);
     }
