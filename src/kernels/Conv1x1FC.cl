@@ -1789,8 +1789,8 @@ __attribute__((reqd_work_group_size(LOCAL_SIZE, 1, 1))) __kernel void InnerProdu
             sum = 0.0f;
 
             for (uint i = 0; i < ITER; i++, offset = (offset + 64) % wave_stride) {
-                //result[n % 2][lid_x + (lid_x >> 5)] = (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ? a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH] : 0.0f);
-                result[n % 2][lid_x + (lid_x >> 5)] = a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH];
+                result[n % 2][lid_x + (lid_x >> 5)] = (offset + wave_id * wave_stride + (lid_x & 63) < WIDTH ? a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH] : 0.0f);
+                //result[n % 2][lid_x + (lid_x >> 5)] = a[offset + wave_id * wave_stride + (lid_x & 63) + n * WIDTH];
 
                 pB = (__global const float*)(b + grid_x * WIDTH + offset + wave_id * wave_stride + (lid_x & 63));
                 pC = (__global float*)(c + grid_x);

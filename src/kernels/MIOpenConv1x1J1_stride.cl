@@ -193,7 +193,7 @@ MIOpenConv1x1(const __global _FLOAT* __restrict in_ptr,
 
     uint tmp      = grp_id0_faked * FIXED_WORKGROUP_SIZE + local_id0;
     uint batch_id = tmp / MLO_OUT_CHANNEL_STRIDE;
-    uint pos      = tmp - batch_id * MLO_OUT_BATCH_STRIDE;
+    uint pos      = tmp - batch_id * MLO_OUT_CHANNEL_STRIDE;
 
     if (batch_id >= BATCHSIZE) {
         return;
