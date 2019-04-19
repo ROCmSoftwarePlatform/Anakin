@@ -145,6 +145,9 @@ Status ConvBatchnormHelper<Ttype, Ptype>::Init(OpContext<Ttype>& ctx,
     auto bias_term = GET_PARAMETER(bool, bias_term);
 
     //different device please change here!!!
+#ifdef AMD_GPU
+    saber::ImplEnum impl_e = SABER_IMPL;
+#else
     saber::ImplEnum impl_e = VENDER_IMPL;
 
     if (std::is_same<Ttype, X86>::value) {
@@ -185,7 +188,7 @@ Status ConvBatchnormHelper<Ttype, Ptype>::Init(OpContext<Ttype>& ctx,
     if (std::is_same<Ttype, NV>::value && Ptype == Precision::INT8) {
         impl_e = SABER_IMPL;
     }
-
+#endif
     SABER_CHECK(_funcs_conv_batchnorm.init(ins, outs, \
                                            _param_conv_batchnorm, SPECIFY, impl_e, ctx));
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
+/* Copyright (c) 2019 Anakin Authors, Inc. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -88,26 +88,8 @@ template<>
 Status DeconvolutionHelper<AMD, Precision::FP32>::Init(OpContext<AMD>& ctx,
         const std::vector<Tensor4dPtr<AMD> >& ins,
         std::vector<Tensor4dPtr<AMD >>& outs) {
-    bool p = true;
-    p = p && (_param_deconv.weight()->width() == 4);
-    p = p && (_param_deconv.weight()->height() == 4);
-    p = p && (_param_deconv.pad_h == 1);
-    p = p && (_param_deconv.pad_w == 1);
-    p = p && (_param_deconv.stride_h == 2);
-    p = p && (_param_deconv.stride_w == 2);
-    p = p && (ins[0]->channel() <= 64);
-    p = p && (ins[0]->width() % 64 == 0);
-    p = p || ((ins[0]->channel() == _param_deconv.group)
-              && (ins[0]->channel() == outs[0]->channel()));
 
-    //p = p && (_param_deconv.group == 1);
-    //    LOG(ERROR)<<"DECONV INIT";
-    if (p) {
-        //        LOG(ERROR)<<"using saber deconv";
-        SABER_CHECK(_funcs_deconv.init(ins, outs, _param_deconv, SPECIFY, SABER_IMPL, ctx));
-    } else {
-        SABER_CHECK(_funcs_deconv.init(ins, outs, _param_deconv, SPECIFY, VENDER_IMPL/*SABER_IMPL*/, ctx));
-    }
+    SABER_CHECK(_funcs_deconv.init(ins, outs, _param_deconv, SPECIFY, SABER_IMPL, ctx));
 
     return Status::OK();
 }

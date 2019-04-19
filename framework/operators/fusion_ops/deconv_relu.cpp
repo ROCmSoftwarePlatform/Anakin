@@ -114,6 +114,16 @@ Status DeconvReluHelper<Ttype, Ptype>::Init(OpContext<Ttype>& ctx,
     return Status::OK();
 }
 
+#ifdef AMD_GPU
+INSTANCE_DECONVRELU(AMD, Precision::FP32)
+template<>
+Status DeconvReluHelper<AMD, Precision::FP32>::Init(OpContext<AMD>& ctx,
+        const std::vector<Tensor4dPtr<AMD> >& ins,
+        std::vector<Tensor4dPtr<AMD> >& outs) {
+    _funcs_deconv_relu.init(ins, outs, _param_deconv_relu, SPECIFY, SABER_IMPL, ctx);
+}
+#endif
+
 template<typename Ttype, Precision Ptype>
 Status DeconvReluHelper<Ttype, Ptype>::InferShape(const
         std::vector<Tensor4dPtr<Ttype> >& ins,
@@ -138,13 +148,6 @@ template class DeconvReluHelper<NV, Precision::INT8>;
 template class DeconvReluHelper<ARM, Precision::FP32>;
 template class DeconvReluHelper<ARM, Precision::FP16>;
 template class DeconvReluHelper<ARM, Precision::INT8>;
-#endif
-
-#ifdef AMD_GPU
-INSTANCE_DECONVRELU(AMD, Precision::FP32)
-template class DeconvReluHelper<AMD, Precision::FP32>;
-template class DeconvReluHelper<AMD, Precision::FP16>;
-template class DeconvReluHelper<AMD, Precision::INT8>;
 #endif
 
 // register helper
