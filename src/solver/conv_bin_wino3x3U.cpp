@@ -151,7 +151,9 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
                             && params.poolingContext.pad0 == 0
                             && params.poolingContext.pad1 == 0) {
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_pooling.so";
-                    } else if ((n_inputs == 128 && n_outputs == 128
+                    }
+#if 0
+                    else if ((n_inputs == 128 && n_outputs == 128
                                 && params.in_height == 28 && params.in_width == 28 && params.batch_sz == 1)
                               || (n_inputs == 1024 && n_outputs == 1024
                                 && params.in_height == 7 && params.in_width == 7 && params.batch_sz <= 2)
@@ -169,7 +171,9 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
                                 && params.in_width == 128 && params.batch_sz <= 1)) {
                         //todo: remove n_inputs = n_outputs
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu_sw.so";
-                    } else {
+                    }
+#endif
+                    else {
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v3_0b_gfx803_md10_bias_prelu.so";
                     }
                 } else if (params.kernel_stride0 == 2) {
@@ -195,6 +199,7 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
         } else if (params.rmv == rocm_meta_version::AMDHSA_1_0) {
             if (params.has_active && params.bias) {
                 if (params.kernel_stride0 == 1) {
+#if 0
                     if ((n_inputs == 128 && n_outputs == 128
                          && params.in_height == 28 && params.in_width == 28 && params.batch_sz == 1)
                        || (n_inputs == 1024 && n_outputs == 1024
@@ -207,7 +212,9 @@ ConvSolution ConvBinWinograd3x3U::GetSolution(const ConvolutionContext& params) 
                          && params.in_height == 14 && params.in_width == 14 && params.batch_sz <= 2)) {
                         //todo: remove n_inputs = n_outputs
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu_sw.so";
-                    } else {
+                    } else
+#endif
+                    {
                         kernel.kernel_file = "conv_3x3_wheel_alpha_v7_0_3b_gfx900_md10_bias_prelu.so";
                     }
                 } else if (params.kernel_stride0 == 2
