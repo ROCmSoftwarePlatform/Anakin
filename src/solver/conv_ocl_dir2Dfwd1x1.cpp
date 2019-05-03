@@ -213,6 +213,9 @@ ConvSolution ConvOclDirectFwd1x1::GetSolution(const ConvolutionContext& params,
         }
         else
         {
+            //disable MIOpenConv1x1S.cl
+            result.status = miopenStatusInternalError;
+            return result;
 
             // parameters
             //	int i_sz = params.in_width * params.in_height;
