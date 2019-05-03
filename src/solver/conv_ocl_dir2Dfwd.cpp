@@ -41,6 +41,41 @@ static bool using_MIOpenGroupConvDirUni_out_pixel_1x1(const ConvolutionContext& 
 
 bool ConvOclDirectFwd::IsApplicable(const ConvolutionContext& params) const
 {
+    if (params.group_counts == params.n_outputs && params.group_counts == params.n_inputs) {
+        if (params.kernel_size0 == 3 && params.kernel_size1 == 3
+            && params.pad0 == 1 && params.pad1 == 1
+            && params.kernel_dilation0 == 1 && params.kernel_dilation1 == 1) {
+            if (params.kernel_stride0 == 1 && params.kernel_stride1 == 1) {
+                if ((params.group_counts == 16 && params.in_height == 32 && params.in_width == 32)
+                    || (params.group_counts == 32 && params.in_height == 2 && params.in_width == 2)
+                    || (params.group_counts == 32 && params.in_height == 64 && params.in_width == 64)
+                    || (params.group_counts == 72 && params.in_height == 32 && params.in_width == 32)
+                    || (params.group_counts == 96 && params.in_height == 16 && params.in_width == 16)
+                    || (params.group_counts == 144 && params.in_height == 8 && params.in_width == 8)
+                    || (params.group_counts == 192 && params.in_height == 4 && params.in_width == 4)
+                    || (params.group_counts == 288 && params.in_height == 4 && params.in_width == 4)
+                    || (params.group_counts == 384 && params.in_height == 4 && params.in_width == 4)
+                    || (params.group_counts == 9 && params.in_height == 32 && params.in_width == 32)
+                    || (params.group_counts == 48 && params.in_height == 16 && params.in_width == 16)
+                    || (params.group_counts == 72 && params.in_height == 8 && params.in_width == 8)
+                    || (params.group_counts == 96 && params.in_height == 4 && params.in_width == 4)
+                    || (params.group_counts == 144 && params.in_height == 4 && params.in_width == 4)) {
+                    return false;
+                }
+            } else if (params.kernel_stride0 == 2 && params.kernel_stride1 == 2) {
+                if ((params.group_counts == 72 && params.in_height == 32 && params.in_width == 32)
+                    || (params.group_counts == 96 && params.in_height == 16 && params.in_width == 16)
+                    || (params.group_counts == 144 && params.in_height == 8 && params.in_width == 8)
+                    || (params.group_counts == 144 && params.in_height == 4 && params.in_width == 4)
+                    || (params.group_counts == 36 && params.in_height == 32 && params.in_width == 32)
+                    || (params.group_counts == 48 && params.in_height == 16 && params.in_width == 16)
+                    || (params.group_counts == 72 && params.in_height == 8 && params.in_width == 8)
+                    || (params.group_counts == 48 && params.in_height == 64 && params.in_width == 64)){
+                    return false;
+                }
+            }
+        }
+    }
     // clang-format off
     // Cases when dy has negative padding are not supported (issue 918)
     if(params.direction.IsBackwardData()
