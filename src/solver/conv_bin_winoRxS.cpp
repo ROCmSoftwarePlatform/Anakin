@@ -68,6 +68,14 @@ bool ConvBinWinogradRxS::IsApplicable(const ConvolutionContext& params) const {
         return false;
     }
 
+    if (params.kernel_size1 == 3 && params.kernel_size0 == 3
+        && params.n_inputs == 5 && params.n_outputs == 9
+        && params.in_height == 64 && params.in_width == 64
+        && params.kernel_stride0 == 2 && params.kernel_stride1 == 2
+        && params.pad0 == 1 && params.pad1 ==1
+        && params.kernel_dilation0 == 1 && params.kernel_dilation1 ==1) {
+        return false;
+    }
     // clang-format on
 
     // Check if kernel is suitable for the problem description
